@@ -1,0 +1,190 @@
+import { NextResponse } from 'next/server';
+import { z } from 'zod';
+import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
+import { isValidPhNumber, normalizeToLocal, maskPhone } from '@/lib/utils/phone';
+import { encryptPhone } from '@/lib/utils/encryption';
+import { sanitizeNotes } from '@/lib/utils/sanitize';
+
+const createJobSchema = z.object({
+  machine_id: z.string().uuid('Invalid machine ID'),
+  phone: z.string().refine(
+    (val) => isValidPhNumber(val),
+    { message: 'Please enter a valid Philippine mobile number (e.g., 09171234567)' }
+  ),
+  notes: z.string().max(500, 'Notes must be 500 characters or less').optional(),
+});
+
+export async function GET() {
+  try {
+    const { laundromat, supabase, error } = await getAuthenticatedUser();
+
+    if (error === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (error === 'Laundromat not found' || !laundromat) {
+      return NextResponse.json({ error: 'Laundromat not found' }, { status: 404 });
+    }
+
+    // Get today's date in PH timezone (Asia/Manila is UTC+8)
+    const now = new Date();
+    const phFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Manila',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const todayPH = phFormatter.format(now); // YYYY-MM-DD format
+
+    // Get jobs started today (PH timezone) OR still in_progress (overdue)
+    const { data: jobs, error: queryError } = await supabase
+      .from('jobs')
+      .select(`
+        id,
+        laundromat_id,
+        machine_id,
+        customer_phone_masked,
+        notes,
+        status,
+        started_at,
+        completed_at,
+        sms_sent,
+        created_at,
+        machines (
+          id,
+          label,
+          type
+        )
+      `)
+      .eq('laundromat_id', laundromat.id)
+      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress`)
+      .order('started_at', { ascending: false });
+
+    if (queryError) {
+      return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
+    }
+
+    // Never send encrypted phone to client -- only masked
+    const safeJobs = (jobs || []).map((job) => ({
+      id: job.id,
+      laundromat_id: job.laundromat_id,
+      machine_id: job.machine_id,
+      customer_phone_masked: job.customer_phone_masked,
+      notes: job.notes,
+      status: job.status,
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      sms_sent: job.sms_sent,
+      created_at: job.created_at,
+      machine: job.machines,
+    }));
+
+    return NextResponse.json({ jobs: safeJobs });
+  } catch {
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+  }
+}
+
+export async function POST(request: Request) {
+  try {
+    const { laundromat, supabase, error } = await getAuthenticatedUser();
+
+    if (error === 'Unauthorized') {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    if (error === 'Laundromat not found' || !laundromat) {
+      return NextResponse.json({ error: 'Laundromat not found' }, { status: 404 });
+    }
+
+    const body = await request.json();
+    const parsed = createJobSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message || 'Invalid input' },
+        { status: 400 }
+      );
+    }
+
+    const { machine_id, phone, notes } = parsed.data;
+
+    // Validate machine exists, belongs to user, and is active
+    const { data: machine, error: machineError } = await supabase
+      .from('machines')
+      .select('*')
+      .eq('id', machine_id)
+      .eq('laundromat_id', laundromat.id)
+      .eq('status', 'active')
+      .single();
+
+    if (machineError || !machine) {
+      return NextResponse.json(
+        { error: 'Machine not found or not active' },
+        { status: 404 }
+      );
+    }
+
+    // Check if machine already has an active job
+    const { data: activeJobs } = await supabase
+      .from('jobs')
+      .select('id')
+      .eq('machine_id', machine_id)
+      .eq('status', 'in_progress')
+      .limit(1);
+
+    if (activeJobs && activeJobs.length > 0) {
+      return NextResponse.json(
+        { error: 'This machine already has an active job' },
+        { status: 409 }
+      );
+    }
+
+    // Normalize, encrypt, and mask phone number
+    const normalizedPhone = normalizeToLocal(phone);
+    const encryptedPhone = encryptPhone(normalizedPhone);
+    const maskedPhone = maskPhone(normalizedPhone);
+
+    // Sanitize notes
+    const sanitizedNotes = notes ? sanitizeNotes(notes) : null;
+
+    const { data: job, error: insertError } = await supabase
+      .from('jobs')
+      .insert({
+        laundromat_id: laundromat.id,
+        machine_id,
+        customer_phone_encrypted: encryptedPhone,
+        customer_phone_masked: maskedPhone,
+        notes: sanitizedNotes,
+        status: 'in_progress',
+      })
+      .select(`
+        id,
+        laundromat_id,
+        machine_id,
+        customer_phone_masked,
+        notes,
+        status,
+        started_at,
+        completed_at,
+        sms_sent,
+        created_at
+      `)
+      .single();
+
+    if (insertError) {
+      return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
+    }
+
+    return NextResponse.json({
+      job: {
+        ...job,
+        machine: {
+          id: machine.id,
+          label: machine.label,
+          type: machine.type,
+        },
+      },
+    }, { status: 201 });
+  } catch {
+    return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
+  }
+}

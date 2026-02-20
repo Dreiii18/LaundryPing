@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>LaundryPing Admin - Machines Management</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              "primary": "#0d968b",
+              "background-light": "#f6f8f8",
+              "background-dark": "#102220",
+            },
+            fontFamily: {
+              "display": ["Inter", "sans-serif"]
+            },
+            borderRadius: {"DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px"},
+          },
+        },
+      }
+    </script>
+<style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .active-nav {
+            background-color: rgba(13, 150, 139, 0.1);
+            color: #0d968b;
+            border-right: 3px solid #0d968b;
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-slate-900 font-display">
+<div class="flex h-screen overflow-hidden">
+<!-- Sidebar Navigation -->
+<aside class="w-64 bg-white dark:bg-slate-900 border-r border-primary/10 flex flex-col">
+<div class="p-6 flex items-center gap-3">
+<div class="size-10 rounded-lg bg-primary flex items-center justify-center text-white shadow-lg shadow-primary/20">
+<span class="material-symbols-outlined">local_laundry_service</span>
+</div>
+<div>
+<h1 class="text-sm font-bold tracking-tight text-slate-900 dark:text-white uppercase">LaundryPing</h1>
+<p class="text-[10px] text-primary font-medium tracking-widest uppercase">Admin Portal</p>
+</div>
+</div>
+<nav class="flex-1 px-4 mt-4 space-y-1">
+<a class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-primary/5 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">dashboard</span>
+                    Dashboard
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-sm font-bold active-nav rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">local_laundry_service</span>
+                    Machines
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-primary/5 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">group</span>
+                    Customers
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-primary/5 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">settings</span>
+                    Settings
+                </a>
+<a class="flex items-center gap-3 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-primary/5 rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined text-[20px]">forum</span>
+                    Support
+                </a>
+</nav>
+<div class="p-4 border-t border-primary/5">
+<div class="flex items-center gap-3 p-2 bg-primary/5 rounded-xl">
+<div class="size-8 rounded-full bg-slate-200 overflow-hidden bg-cover bg-center" data-alt="User profile avatar" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuBuEfajp9soQJY2uIhctHIfd_pk_deCIONURJZ9oHKID2elJK_bQBFpUfx7oqbDH5Wc6zno5YSS6Qx-v-h1gijvzve7A5IZhBetKrQOWTacjLWgnD0tBalhzncEjYT2G2TsrkKVGY-GNLLUrzxTyBdkTIw4qXazkX6MqyYuj-Zj9LMtB2JYVy6jdV-hJVjjKJhyxtiHqP4uGCyoiB5EUzCCpYSejI6cTibg8JmVNktKw-AVfucq47Bgp7TtAplVB97F58co9a6G578")'></div>
+<div class="flex-1 min-w-0">
+<p class="text-xs font-semibold text-slate-900 truncate">Alex Rivera</p>
+<p class="text-[10px] text-slate-500 truncate">Manager</p>
+</div>
+<span class="material-symbols-outlined text-slate-400 text-sm">unfold_more</span>
+</div>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 flex flex-col overflow-hidden">
+<!-- Header -->
+<header class="h-16 bg-white dark:bg-slate-900 border-b border-primary/5 px-8 flex items-center justify-between shrink-0">
+<div class="flex items-center gap-4">
+<h2 class="text-xl font-bold text-slate-900">Machines</h2>
+<span class="px-2 py-0.5 bg-slate-100 text-slate-500 text-xs font-semibold rounded uppercase">12 Total</span>
+</div>
+<div class="flex items-center gap-3">
+<button class="p-2 text-slate-400 hover:text-primary transition-colors">
+<span class="material-symbols-outlined">notifications</span>
+</button>
+<button class="bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg text-sm font-bold flex items-center gap-2 transition-all shadow-sm">
+<span class="material-symbols-outlined text-sm">add</span>
+                        Add Machine
+                    </button>
+</div>
+</header>
+<!-- Content Area -->
+<div class="flex-1 overflow-y-auto p-8 bg-background-light">
+<div class="max-w-6xl mx-auto space-y-6">
+<!-- Filters & Search -->
+<div class="flex flex-col md:flex-row gap-4 items-center justify-between">
+<div class="relative w-full md:w-96">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">search</span>
+<input class="w-full pl-10 pr-4 py-2 bg-white border border-primary/10 rounded-xl text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none transition-all" placeholder="Search by label or type..." type="text"/>
+</div>
+<div class="flex gap-2 w-full md:w-auto">
+<button class="flex-1 md:flex-none px-4 py-2 bg-white border border-primary/10 rounded-xl text-sm font-medium text-slate-600 hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">filter_list</span>
+                                Filters
+                            </button>
+<button class="flex-1 md:flex-none px-4 py-2 bg-white border border-primary/10 rounded-xl text-sm font-medium text-slate-600 hover:bg-primary/5 transition-colors flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-sm">download</span>
+                                Export
+                            </button>
+</div>
+</div>
+<!-- Tabs -->
+<div class="flex border-b border-slate-200">
+<button class="px-6 py-3 border-b-2 border-primary text-primary text-sm font-bold">All Machines</button>
+<button class="px-6 py-3 border-b-2 border-transparent text-slate-500 text-sm font-medium hover:text-slate-700 transition-colors">Washers</button>
+<button class="px-6 py-3 border-b-2 border-transparent text-slate-500 text-sm font-medium hover:text-slate-700 transition-colors">Dryers</button>
+<button class="px-6 py-3 border-b-2 border-transparent text-slate-500 text-sm font-medium hover:text-slate-700 transition-colors">Maintenance</button>
+</div>
+<!-- Table Container -->
+<div class="bg-white rounded-xl shadow-sm border border-primary/5 overflow-hidden">
+<table class="w-full text-left border-collapse">
+<thead>
+<tr class="bg-slate-50/50">
+<th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Label</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Type</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Status</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Cycles Today</th>
+<th class="px-6 py-4 text-xs font-bold text-slate-400 uppercase tracking-wider">Last Sync</th>
+<th class="px-6 py-4 text-right text-xs font-bold text-slate-400 uppercase tracking-wider">Actions</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-primary/5">
+<!-- Row 1 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">W1</div>
+<span class="text-sm font-semibold text-slate-900 tracking-tight">Washer Unit #1</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-slate-600">
+<span class="material-symbols-outlined text-[18px]">water_drop</span>
+<span class="text-sm font-medium">Washer</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
+<span class="size-1.5 rounded-full bg-green-500 mr-2"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600">14</td>
+<td class="px-6 py-5 text-sm text-slate-500 font-medium">2 mins ago</td>
+<td class="px-6 py-5 text-right">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 2 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">W2</div>
+<span class="text-sm font-semibold text-slate-900 tracking-tight">Washer Unit #2</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-slate-600">
+<span class="material-symbols-outlined text-[18px]">water_drop</span>
+<span class="text-sm font-medium">Washer</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-green-100 text-green-700">
+<span class="size-1.5 rounded-full bg-green-500 mr-2"></span>
+                                            Active
+                                        </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600">12</td>
+<td class="px-6 py-5 text-sm text-slate-500 font-medium">Just now</td>
+<td class="px-6 py-5 text-right">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 3 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">D1</div>
+<span class="text-sm font-semibold text-slate-900 tracking-tight">Dryer Unit #1</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-slate-600">
+<span class="material-symbols-outlined text-[18px]">air</span>
+<span class="text-sm font-medium">Dryer</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-primary/10 text-primary">
+<span class="size-1.5 rounded-full bg-primary mr-2 animate-pulse"></span>
+                                            In Use
+                                        </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600">8</td>
+<td class="px-6 py-5 text-sm text-slate-500 font-medium">10 mins ago</td>
+<td class="px-6 py-5 text-right">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+<!-- Row 4 -->
+<tr class="hover:bg-primary/5 transition-colors group">
+<td class="px-6 py-5">
+<div class="flex items-center gap-3">
+<div class="size-8 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">D2</div>
+<span class="text-sm font-semibold text-slate-900 tracking-tight">Dryer Unit #2</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<div class="flex items-center gap-2 text-slate-600">
+<span class="material-symbols-outlined text-[18px]">air</span>
+<span class="text-sm font-medium">Dryer</span>
+</div>
+</td>
+<td class="px-6 py-5">
+<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold bg-orange-100 text-orange-700">
+<span class="material-symbols-outlined text-[12px] mr-1">warning</span>
+                                            Offline
+                                        </span>
+</td>
+<td class="px-6 py-5 text-sm text-slate-600">0</td>
+<td class="px-6 py-5 text-sm text-slate-500 font-medium">1 hour ago</td>
+<td class="px-6 py-5 text-right">
+<button class="p-1.5 text-slate-400 hover:text-primary hover:bg-primary/10 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">edit</span>
+</button>
+<button class="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all">
+<span class="material-symbols-outlined text-[20px]">delete</span>
+</button>
+</td>
+</tr>
+</tbody>
+</table>
+<!-- Pagination -->
+<div class="px-6 py-4 bg-slate-50/50 flex items-center justify-between border-t border-primary/5">
+<span class="text-xs font-medium text-slate-500 uppercase tracking-wider">Showing 1 to 4 of 12 machines</span>
+<div class="flex gap-1">
+<button class="size-8 flex items-center justify-center rounded-lg border border-primary/10 bg-white text-slate-400 hover:text-primary hover:bg-primary/5 transition-all">
+<span class="material-symbols-outlined text-sm">chevron_left</span>
+</button>
+<button class="size-8 flex items-center justify-center rounded-lg border border-primary/20 bg-primary text-white font-bold text-xs">1</button>
+<button class="size-8 flex items-center justify-center rounded-lg border border-primary/10 bg-white text-slate-600 hover:text-primary hover:bg-primary/5 font-medium text-xs">2</button>
+<button class="size-8 flex items-center justify-center rounded-lg border border-primary/10 bg-white text-slate-600 hover:text-primary hover:bg-primary/5 font-medium text-xs">3</button>
+<button class="size-8 flex items-center justify-center rounded-lg border border-primary/10 bg-white text-slate-400 hover:text-primary hover:bg-primary/5 transition-all">
+<span class="material-symbols-outlined text-sm">chevron_right</span>
+</button>
+</div>
+</div>
+</div>
+<!-- Statistics Summary -->
+<div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+<div class="bg-white p-6 rounded-xl border border-primary/5 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-xl bg-green-50 flex items-center justify-center text-green-600">
+<span class="material-symbols-outlined">check_circle</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500">Available</p>
+<p class="text-2xl font-bold text-slate-900">8 Machines</p>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl border border-primary/5 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-xl bg-primary/5 flex items-center justify-center text-primary">
+<span class="material-symbols-outlined">sync</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500">Currently Running</p>
+<p class="text-2xl font-bold text-slate-900">3 Machines</p>
+</div>
+</div>
+</div>
+<div class="bg-white p-6 rounded-xl border border-primary/5 shadow-sm">
+<div class="flex items-center gap-4">
+<div class="size-12 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+<span class="material-symbols-outlined">construction</span>
+</div>
+<div>
+<p class="text-sm font-medium text-slate-500">Maintenance Needed</p>
+<p class="text-2xl font-bold text-slate-900">1 Machine</p>
+</div>
+</div>
+</div>
+</div>
+</div>
+</div>
+</main>
+</div>
+</body></html>
