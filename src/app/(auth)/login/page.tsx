@@ -112,7 +112,7 @@ export default function LoginPage() {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
-                className="absolute inset-y-0 right-0 flex items-center pr-3 text-[#618986] hover:text-[#111817] transition-colors min-w-[44px] justify-center"
+                className="absolute inset-y-0 right-0 flex items-center pr-3 text-[#618986] hover:text-[#111817] transition-colors min-w-11 justify-center"
               >
                 {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
               </button>
@@ -122,7 +122,7 @@ export default function LoginPage() {
           <Button
             type="submit"
             disabled={loading}
-            className="w-full h-11 min-h-[44px] rounded-lg bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm"
+            className="w-full h-11 min-h-11 rounded-lg bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm"
           >
             {loading ? (
               <>

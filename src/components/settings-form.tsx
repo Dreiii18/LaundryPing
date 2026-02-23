@@ -74,7 +74,7 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
             placeholder="e.g., Clean & Go"
             maxLength={50}
             required
-            className="h-12 min-h-[44px]"
+            className="h-12 min-h-11"
           />
           <p className="text-xs text-slate-400 mt-1">{name.length}/50 characters</p>
         </div>
@@ -89,7 +89,7 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
             placeholder="Enter full physical address"
             maxLength={200}
             rows={3}
-            className="min-h-[44px]"
+            className="min-h-11"
           />
         </div>
       </div>
@@ -97,7 +97,7 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
         <Button
           type="submit"
           disabled={saving || !hasChanges}
-          className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold shadow-md min-h-[44px]"
+          className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold shadow-md min-h-11"
         >
           {saving ? (
             <>

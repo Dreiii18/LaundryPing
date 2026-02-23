@@ -188,7 +188,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         </div>
         <Button
           onClick={openAddModal}
-          className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm min-h-[44px]"
+          className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm min-h-11"
         >
           <Plus className="size-4" />
           Add Machine
@@ -251,7 +251,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                         size="icon"
                         onClick={() => openEditModal(machine)}
                         aria-label={`Edit ${machine.label}`}
-                        className="text-slate-400 hover:text-[#0d968b] hover:bg-[#0d968b]/10 min-h-[44px] min-w-[44px]"
+                        className="text-slate-400 hover:text-[#0d968b] hover:bg-[#0d968b]/10 min-h-11 min-w-11"
                       >
                         <Pencil className="size-4" />
                       </Button>
@@ -260,7 +260,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                         size="icon"
                         onClick={() => openDeleteDialog(machine)}
                         aria-label={`Delete ${machine.label}`}
-                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 min-h-[44px] min-w-[44px]"
+                        className="text-slate-400 hover:text-red-500 hover:bg-red-50 min-h-11 min-w-11"
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -336,14 +336,14 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                 variant="outline"
                 onClick={() => setModalOpen(false)}
                 disabled={saving}
-                className="min-h-[44px]"
+                className="min-h-11"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={saving}
-                className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-[44px]"
+                className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
               >
                 {saving ? (
                   <>

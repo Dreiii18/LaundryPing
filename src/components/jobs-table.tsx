@@ -244,7 +244,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
                     onClick={() => handleMarkDone(job)}
                     disabled={completingId !== null}
                     aria-label={`Mark ${job.machine?.label || 'job'} as done`}
-                    className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 min-h-[44px] min-w-[44px]"
+                    className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 min-h-11 min-w-11"
                   >
                     {completingId === job.id ? (
                       <>
@@ -269,7 +269,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
 
       {/* Payment Method Dialog for Pay Later jobs */}
       <Dialog open={payLaterJobId !== null} onOpenChange={(open) => { if (!open) setPayLaterJobId(null); }}>
-        <DialogContent className="sm:max-w-[400px]">
+        <DialogContent className="sm:max-w-100">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-[#111817]">
               Collect Payment
@@ -298,7 +298,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
               type="button"
               variant="ghost"
               onClick={() => setPayLaterJobId(null)}
-              className="min-h-[44px]"
+              className="min-h-11"
             >
               Cancel
             </Button>
@@ -306,7 +306,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
               type="button"
               disabled={!payLaterMethod}
               onClick={handlePayLaterConfirm}
-              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-[44px]"
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
             >
               Confirm & Complete
             </Button>

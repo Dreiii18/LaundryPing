@@ -73,7 +73,7 @@ export default async function SettingsPage() {
             </h3>
           </div>
           <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="p-4 bg-[#f6f8f8] rounded-lg border border-slate-100">
+            <div className="p-4 bg-background-light rounded-lg border border-slate-100">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                 Sent this month
               </p>
@@ -88,13 +88,13 @@ export default async function SettingsPage() {
                 />
               </div>
             </div>
-            <div className="p-4 bg-[#f6f8f8] rounded-lg border border-slate-100">
+            <div className="p-4 bg-background-light rounded-lg border border-slate-100">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                 Remaining credits
               </p>
               <span className="text-2xl font-bold text-slate-900">{remaining}</span>
             </div>
-            <div className="p-4 bg-[#f6f8f8] rounded-lg border border-slate-100">
+            <div className="p-4 bg-background-light rounded-lg border border-slate-100">
               <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mb-1">
                 Billing period
               </p>

@@ -163,7 +163,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[520px] p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-130 p-0 overflow-hidden">
         {/* Decorative accent */}
         <div className="absolute top-0 left-0 w-1.5 h-full bg-[#0d968b]" />
 
@@ -198,7 +198,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 </div>
               ) : (
                 <Select value={machineId} onValueChange={setMachineId}>
-                  <SelectTrigger id="machine-select" className="w-full h-12 min-h-[44px]">
+                  <SelectTrigger id="machine-select" className="w-full h-12 min-h-11">
                     <SelectValue placeholder="Select a machine" />
                   </SelectTrigger>
                   <SelectContent>
@@ -283,7 +283,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               <div className="flex flex-col gap-2">
                 <Label htmlFor="payment-method" className="text-sm font-semibold text-[#111817]">Payment Method</Label>
                 <Select value={paymentMethod} onValueChange={setPaymentMethod}>
-                  <SelectTrigger id="payment-method" className="w-full h-12 min-h-[44px]">
+                  <SelectTrigger id="payment-method" className="w-full h-12 min-h-11">
                     <SelectValue placeholder="Select payment method" />
                   </SelectTrigger>
                   <SelectContent>
@@ -305,7 +305,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}
-                className="min-h-[100px] resize-none"
+                className="min-h-25 resize-none"
               />
             </div>
           </div>
@@ -316,14 +316,14 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               variant="ghost"
               onClick={() => onOpenChange(false)}
               disabled={loading}
-              className="min-h-[44px]"
+              className="min-h-11"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading || machines.length === 0}
-              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold shadow-lg shadow-[#0d968b]/20 min-h-[44px]"
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold shadow-lg shadow-[#0d968b]/20 min-h-11"
             >
               {loading ? (
                 <>

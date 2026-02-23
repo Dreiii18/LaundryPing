@@ -26,7 +26,7 @@ export function EmptyState({ icon = 'jobs', title, description, action }: EmptyS
       {action && (
         <Button
           onClick={action.onClick}
-          className="bg-[#0d968b] hover:bg-[#0d968b]/90 min-h-[44px] min-w-[44px]"
+          className="bg-[#0d968b] hover:bg-[#0d968b]/90 min-h-11 min-w-11"
         >
           {action.label}
         </Button>

@@ -23,12 +23,12 @@ export function Topbar({ shopName, userInitials }: TopbarProps) {
         <div className="flex items-center gap-4">
           <Button
             onClick={() => setModalOpen(true)}
-            className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm shadow-sm min-h-[44px]"
+            className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm shadow-sm min-h-11"
           >
             <Plus className="size-4" aria-hidden="true" />
             Start new job
           </Button>
-          <div className="h-8 w-[1px] bg-slate-200" />
+          <div className="h-8 w-px bg-slate-200" />
           <div className="size-10 bg-[#0d968b]/20 text-[#0d968b] rounded-full flex items-center justify-center font-bold text-sm">
             {userInitials}
           </div>

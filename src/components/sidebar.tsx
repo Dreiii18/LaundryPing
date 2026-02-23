@@ -53,7 +53,7 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-[44px] ${
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-11 ${
                   isActive
                     ? 'bg-[#0d968b]/10 text-[#0d968b] font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -67,7 +67,7 @@ export function Sidebar() {
           })}
 
           {/* Plan & Billing - Disabled */}
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 cursor-not-allowed min-h-[44px]" aria-disabled="true">
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 cursor-not-allowed min-h-11" aria-disabled="true">
             <div className="flex items-center gap-3">
               <CreditCard className="size-5" aria-hidden="true" />
               <span className="text-sm font-medium">Plan & Billing</span>
@@ -81,7 +81,7 @@ export function Sidebar() {
       <div className="px-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors min-h-[44px]"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors min-h-11"
         >
           <LogOut className="size-5" aria-hidden="true" />
           <span className="text-sm font-medium">Logout</span>

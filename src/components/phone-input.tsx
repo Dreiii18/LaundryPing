@@ -43,7 +43,7 @@ export function PhoneInput({ value, onChange, error, disabled }: PhoneInputProps
         disabled={disabled}
         aria-invalid={showError || !!error}
         aria-describedby={showError || error ? 'phone-error' : undefined}
-        className={`h-12 min-h-[44px] ${showError || error ? 'border-red-500 focus-visible:ring-red-500' : isValid && value.length === 11 && touched ? 'border-green-500 focus-visible:ring-green-500' : ''}`}
+        className={`h-12 min-h-11 ${showError || error ? 'border-red-500 focus-visible:ring-red-500' : isValid && value.length === 11 && touched ? 'border-green-500 focus-visible:ring-green-500' : ''}`}
       />
       {(showError || error) && (
         <p id="phone-error" className="text-sm text-red-500 mt-1" role="alert">
