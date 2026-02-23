@@ -1,10 +1,15 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { decryptPhone } from '@/lib/utils/encryption';
 import { normalizeToLocal } from '@/lib/utils/phone';
 import { sendSms } from '@/lib/sms/provider';
 import { buildLaundryDoneMessage } from '@/lib/sms/templates';
 import { ensureBillingCycle, checkAndIncrementQuota, decrementQuota } from '@/lib/sms/quota';
+
+const completeJobSchema = z.object({
+  payment_method: z.enum(['cash', 'ewallet', 'card', 'bank_transfer']).optional(),
+});
 
 export async function POST(
   request: Request,
@@ -39,6 +44,34 @@ export async function POST(
         { error: 'Job already completed', toastType: 'warning' },
         { status: 409 }
       );
+    }
+
+    // Parse optional payment_method from request body
+    let paymentMethod: string | undefined;
+    try {
+      const body = await request.json();
+      const parsed = completeJobSchema.safeParse(body);
+      if (parsed.success) {
+        paymentMethod = parsed.data.payment_method;
+      }
+    } catch {
+      // No body or invalid JSON — that's fine for already-paid jobs
+    }
+
+    // If the job was not paid at creation, require payment_method now
+    if (!job.is_paid && !job.payment_method && !paymentMethod) {
+      return NextResponse.json(
+        { error: 'Payment method is required for unpaid jobs' },
+        { status: 400 }
+      );
+    }
+
+    // Update payment info if provided for pay-later jobs
+    if (!job.is_paid && paymentMethod) {
+      await supabase
+        .from('jobs')
+        .update({ payment_method: paymentMethod, is_paid: true })
+        .eq('id', id);
     }
 
     // Idempotency check: see if SMS was already sent for this job

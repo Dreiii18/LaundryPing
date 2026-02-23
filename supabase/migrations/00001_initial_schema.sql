@@ -43,6 +43,9 @@ CREATE TABLE jobs (
     started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     completed_at TIMESTAMPTZ,
     sms_sent BOOLEAN NOT NULL DEFAULT false,
+    payment_method TEXT CHECK (payment_method IN ('cash', 'ewallet', 'card', 'bank_transfer')),
+    pay_amount NUMERIC(10,2),
+    is_paid BOOLEAN NOT NULL DEFAULT false,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_jobs_laundromat_id ON jobs(laundromat_id);

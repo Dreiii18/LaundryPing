@@ -10,11 +10,34 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, Clock, CircleX, CircleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
+
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'ewallet', label: 'E-wallet' },
+  { value: 'card', label: 'Credit/Debit Card' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+] as const;
 
 interface Job {
   id: string;
@@ -25,6 +48,9 @@ interface Job {
   completed_at: string | null;
   sms_sent: boolean;
   notes: string | null;
+  payment_method: string | null;
+  pay_amount: number | null;
+  is_paid: boolean;
   machine: {
     id: string;
     label: string;
@@ -39,13 +65,17 @@ interface JobsTableProps {
 export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
   const router = useRouter();
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [payLaterJobId, setPayLaterJobId] = useState<string | null>(null);
+  const [payLaterMethod, setPayLaterMethod] = useState('');
 
-  const handleMarkDone = async (jobId: string) => {
+  const completeJob = async (jobId: string, paymentMethod?: string) => {
     setCompletingId(jobId);
 
     try {
       const res = await fetch(`/api/jobs/${jobId}/complete`, {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(paymentMethod ? { payment_method: paymentMethod } : {}),
       });
 
       const data = await res.json();
@@ -71,6 +101,22 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
     } finally {
       setCompletingId(null);
     }
+  };
+
+  const handleMarkDone = (job: Job) => {
+    if (!job.is_paid) {
+      // Open payment method dialog for pay-later jobs
+      setPayLaterJobId(job.id);
+      setPayLaterMethod('');
+    } else {
+      completeJob(job.id);
+    }
+  };
+
+  const handlePayLaterConfirm = () => {
+    if (!payLaterJobId || !payLaterMethod) return;
+    setPayLaterJobId(null);
+    completeJob(payLaterJobId, payLaterMethod);
   };
 
   const formatTime = (dateStr: string) => {
@@ -127,6 +173,9 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
               Phone Number
             </TableHead>
             <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Amount
+            </TableHead>
+            <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Status
             </TableHead>
             <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -148,6 +197,9 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600">
                 {job.customer_phone_masked}
+              </TableCell>
+              <TableCell className="px-6 py-4 text-sm text-slate-600 font-medium">
+                {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}
               </TableCell>
               <TableCell className="px-6 py-4">
                 {job.status === 'in_progress' && isOverdue(job) ? (
@@ -189,7 +241,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleMarkDone(job.id)}
+                    onClick={() => handleMarkDone(job)}
                     disabled={completingId !== null}
                     aria-label={`Mark ${job.machine?.label || 'job'} as done`}
                     className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 min-h-[44px] min-w-[44px]"
@@ -214,6 +266,53 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      {/* Payment Method Dialog for Pay Later jobs */}
+      <Dialog open={payLaterJobId !== null} onOpenChange={(open) => { if (!open) setPayLaterJobId(null); }}>
+        <DialogContent className="sm:max-w-[400px]">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[#111817]">
+              Collect Payment
+            </DialogTitle>
+            <DialogDescription className="text-[#618986]">
+              Select the payment method used by the customer.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="pay-later-method" className="text-sm font-semibold text-[#111817]">Payment Method</Label>
+            <Select value={payLaterMethod} onValueChange={setPayLaterMethod}>
+              <SelectTrigger id="pay-later-method" className="w-full h-12 mt-2">
+                <SelectValue placeholder="Select payment method" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_METHODS.map((m) => (
+                  <SelectItem key={m.value} value={m.value}>
+                    {m.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setPayLaterJobId(null)}
+              className="min-h-[44px]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!payLaterMethod}
+              onClick={handlePayLaterConfirm}
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-[44px]"
+            >
+              Confirm & Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -55,6 +55,9 @@ export default async function DashboardPage() {
       started_at,
       completed_at,
       sms_sent,
+      payment_method,
+      pay_amount,
+      is_paid,
       created_at,
       machines (
         id,
@@ -75,11 +78,19 @@ export default async function DashboardPage() {
     completed_at: job.completed_at,
     sms_sent: job.sms_sent,
     notes: job.notes,
+    payment_method: job.payment_method as string | null,
+    pay_amount: job.pay_amount as number | null,
+    is_paid: job.is_paid as boolean,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
   }));
 
   // Count completed jobs today
   const completedToday = safeJobs.filter((j) => j.status === 'completed').length;
+
+  // Calculate today's total revenue from completed jobs
+  const todayRevenue = safeJobs
+    .filter((j) => j.status === 'completed' && j.pay_amount != null)
+    .reduce((sum, j) => sum + Number(j.pay_amount), 0);
 
   return (
     <div className="space-y-6">
@@ -87,11 +98,19 @@ export default async function DashboardPage() {
       <SmsQuotaWarning used={smsUsed} limit={smsLimit} />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Jobs Completed Today */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
           <p className="text-slate-500 text-sm font-medium mb-1">Jobs completed today</p>
           <p className="text-4xl font-bold text-slate-900" aria-label={`${completedToday} jobs completed today`}>{completedToday}</p>
+        </div>
+
+        {/* Today's Total Revenue */}
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
+          <p className="text-slate-500 text-sm font-medium mb-1">Today&apos;s total revenue</p>
+          <p className="text-4xl font-bold text-slate-900" aria-label={`Today's total revenue: ${todayRevenue} pesos`}>
+            ₱{todayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
         </div>
 
         {/* SMS Usage */}

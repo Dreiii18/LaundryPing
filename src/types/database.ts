@@ -85,6 +85,9 @@ export interface Database {
           started_at: string;
           completed_at: string | null;
           sms_sent: boolean;
+          payment_method: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
+          pay_amount: number | null;
+          is_paid: boolean;
           created_at: string;
         };
         Insert: {
@@ -98,6 +101,9 @@ export interface Database {
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
+          payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
+          pay_amount?: number | null;
+          is_paid?: boolean;
           created_at?: string;
         };
         Update: {
@@ -111,6 +117,9 @@ export interface Database {
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
+          payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
+          pay_amount?: number | null;
+          is_paid?: boolean;
           created_at?: string;
         };
       };

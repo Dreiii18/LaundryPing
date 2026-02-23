@@ -45,6 +45,9 @@ export default async function JobsPage() {
       started_at,
       completed_at,
       sms_sent,
+      payment_method,
+      pay_amount,
+      is_paid,
       created_at,
       machines (
         id,
@@ -65,6 +68,9 @@ export default async function JobsPage() {
     completed_at: job.completed_at,
     sms_sent: job.sms_sent,
     notes: job.notes,
+    payment_method: job.payment_method as string | null,
+    pay_amount: job.pay_amount as number | null,
+    is_paid: job.is_paid as boolean,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
   }));
 

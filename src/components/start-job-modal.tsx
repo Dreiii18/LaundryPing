@@ -20,9 +20,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Loader2, Play, Droplets, Wind } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { isValidPhNumber } from '@/lib/utils/phone';
+
+const PAYMENT_METHODS = [
+  { value: 'cash', label: 'Cash' },
+  { value: 'ewallet', label: 'E-wallet' },
+  { value: 'card', label: 'Credit/Debit Card' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+] as const;
 
 interface Machine {
   id: string;
@@ -41,6 +49,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [machineId, setMachineId] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [isPaid, setIsPaid] = useState(true);
+  const [payAmount, setPayAmount] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -50,6 +61,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setMachineId('');
       setPhone('');
       setNotes('');
+      setIsPaid(true);
+      setPayAmount('');
+      setPaymentMethod('');
       setError('');
       fetchMachines();
     }
@@ -105,6 +119,16 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       return;
     }
 
+    if (!payAmount.trim() || isNaN(Number(payAmount)) || Number(payAmount) < 0) {
+      setError('Please enter a valid amount');
+      return;
+    }
+
+    if (isPaid && !paymentMethod) {
+      setError('Please select a payment method');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -115,6 +139,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
           machine_id: machineId,
           phone: phoneClean,
           notes: notes.trim() || undefined,
+          is_paid: isPaid,
+          pay_amount: Number(payAmount),
+          payment_method: isPaid ? paymentMethod : undefined,
         }),
       });
 
@@ -202,6 +229,73 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 disabled={loading}
               />
             </div>
+
+            {/* Pay Amount */}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="pay-amount" className="text-sm font-semibold text-[#111817]">Amount</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">₱</span>
+                <Input
+                  id="pay-amount"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={payAmount}
+                  onChange={(e) => setPayAmount(e.target.value)}
+                  disabled={loading}
+                  className="pl-7 h-12"
+                />
+              </div>
+            </div>
+
+            {/* Payment Status */}
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-semibold text-[#111817]">Payment Status</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => { setIsPaid(true); setPaymentMethod(''); }}
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors ${
+                    isPaid
+                      ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  Paid
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setIsPaid(false); setPaymentMethod(''); }}
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors ${
+                    !isPaid
+                      ? 'bg-amber-50 border-amber-400 text-amber-700'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  Pay Later
+                </button>
+              </div>
+            </div>
+
+            {/* Payment Method — only when Paid */}
+            {isPaid && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="payment-method" className="text-sm font-semibold text-[#111817]">Payment Method</Label>
+                <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+                  <SelectTrigger id="payment-method" className="w-full h-12 min-h-[44px]">
+                    <SelectValue placeholder="Select payment method" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {PAYMENT_METHODS.map((m) => (
+                      <SelectItem key={m.value} value={m.value}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
             {/* Notes */}
             <div className="flex flex-col gap-2">

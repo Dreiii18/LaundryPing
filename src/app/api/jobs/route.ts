@@ -5,6 +5,8 @@ import { isValidPhNumber, normalizeToLocal, maskPhone } from '@/lib/utils/phone'
 import { encryptPhone } from '@/lib/utils/encryption';
 import { sanitizeNotes } from '@/lib/utils/sanitize';
 
+const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
+
 const createJobSchema = z.object({
   machine_id: z.string().uuid('Invalid machine ID'),
   phone: z.string().refine(
@@ -12,7 +14,13 @@ const createJobSchema = z.object({
     { message: 'Please enter a valid Philippine mobile number (e.g., 09171234567)' }
   ),
   notes: z.string().max(500, 'Notes must be 500 characters or less').optional(),
-});
+  is_paid: z.boolean(),
+  pay_amount: z.number().min(0, 'Amount must be 0 or more'),
+  payment_method: z.enum(PAYMENT_METHODS).optional(),
+}).refine(
+  (data) => !data.is_paid || data.payment_method !== undefined,
+  { message: 'Payment method is required when paid', path: ['payment_method'] }
+);
 
 export async function GET() {
   try {
@@ -48,6 +56,9 @@ export async function GET() {
         started_at,
         completed_at,
         sms_sent,
+        payment_method,
+        pay_amount,
+        is_paid,
         created_at,
         machines (
           id,
@@ -74,6 +85,9 @@ export async function GET() {
       started_at: job.started_at,
       completed_at: job.completed_at,
       sms_sent: job.sms_sent,
+      payment_method: job.payment_method,
+      pay_amount: job.pay_amount,
+      is_paid: job.is_paid,
       created_at: job.created_at,
       machine: job.machines,
     }));
@@ -105,7 +119,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { machine_id, phone, notes } = parsed.data;
+    const { machine_id, phone, notes, is_paid, pay_amount, payment_method } = parsed.data;
 
     // Validate machine exists, belongs to user, and is active
     const { data: machine, error: machineError } = await supabase
@@ -155,6 +169,9 @@ export async function POST(request: Request) {
         customer_phone_masked: maskedPhone,
         notes: sanitizedNotes,
         status: 'in_progress',
+        is_paid,
+        pay_amount,
+        payment_method: payment_method ?? null,
       })
       .select(`
         id,
@@ -166,6 +183,9 @@ export async function POST(request: Request) {
         started_at,
         completed_at,
         sms_sent,
+        payment_method,
+        pay_amount,
+        is_paid,
         created_at
       `)
       .single();
