@@ -30,12 +30,11 @@ export default async function SettingsPage() {
   const smsLimit = laundromat.sms_limit ?? FREE_TIER_SMS_LIMIT;
   const remaining = Math.max(0, smsLimit - smsUsed);
 
-  // Calculate billing period dates
-  const billingStart = laundromat.billing_cycle_start
-    ? new Date(laundromat.billing_cycle_start)
-    : new Date();
-  const billingEnd = new Date(billingStart);
-  billingEnd.setMonth(billingEnd.getMonth() + 1);
+  // Billing period is always 1st to last day of the current month (PH timezone)
+  const now = new Date();
+  const phNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const billingStart = new Date(phNow.getFullYear(), phNow.getMonth(), 1);
+  const billingEnd = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 0); // last day of month
 
   const formatDate = (d: Date) =>
     d.toLocaleDateString('en-US', { month: 'short', day: '2-digit' });

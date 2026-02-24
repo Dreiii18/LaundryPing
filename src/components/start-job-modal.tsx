@@ -23,6 +23,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Loader2, Play, Droplets, Wind, AlertTriangle, XCircle } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
+import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
 
 const PAYMENT_METHODS = [
@@ -78,11 +79,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     setLoadingMachines(true);
     try {
       // Fetch machines
-      const machinesRes = await fetch('/api/machines');
+      const machinesRes = await fetchWithAuth('/api/machines');
       const machinesData = await machinesRes.json();
 
       // Fetch jobs to find machines with active jobs
-      const jobsRes = await fetch('/api/jobs');
+      const jobsRes = await fetchWithAuth('/api/jobs');
       const jobsData = await jobsRes.json();
 
       const activeMachineIds = new Set(
@@ -106,7 +107,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
   const fetchSmsQuota = async () => {
     try {
-      const res = await fetch('/api/sms/usage');
+      const res = await fetchWithAuth('/api/sms/usage');
       if (res.ok) {
         const data = await res.json();
         setSmsUsed(data.used ?? null);
@@ -150,7 +151,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     setLoading(true);
 
     try {
-      const res = await fetch('/api/jobs', {
+      const res = await fetchWithAuth('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -296,7 +297,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 <button
                   type="button"
                   onClick={() => { setIsPaid(true); setPaymentMethod(''); }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors ${
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
                     isPaid
                       ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
@@ -307,7 +308,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 <button
                   type="button"
                   onClick={() => { setIsPaid(false); setPaymentMethod(''); }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors ${
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
                     !isPaid
                       ? 'bg-amber-50 border-amber-400 text-amber-700'
                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
