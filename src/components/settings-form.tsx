@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2, Save, CheckCircle } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/utils/fetch';
 
 interface SettingsFormProps {
   initialName: string;
@@ -33,7 +34,7 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
     setSaving(true);
 
     try {
-      const res = await fetch('/api/settings', {
+      const res = await fetchWithAuth('/api/settings', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

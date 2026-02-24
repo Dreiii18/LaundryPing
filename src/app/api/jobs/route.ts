@@ -152,6 +152,28 @@ export async function POST(request: Request) {
       );
     }
 
+    // Check laundromat-wide active job cap
+    const { count: activeJobCount } = await supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('laundromat_id', laundromat.id)
+      .eq('status', 'in_progress');
+
+    const { count: machineCount } = await supabase
+      .from('machines')
+      .select('id', { count: 'exact', head: true })
+      .eq('laundromat_id', laundromat.id)
+      .eq('status', 'active');
+
+    const maxActiveJobs = Math.max(20, (machineCount ?? 0) * 2);
+
+    if ((activeJobCount ?? 0) >= maxActiveJobs) {
+      return NextResponse.json(
+        { error: `Too many active jobs. Maximum ${maxActiveJobs} concurrent jobs allowed.` },
+        { status: 409 }
+      );
+    }
+
     // Normalize, encrypt, and mask phone number
     const normalizedPhone = normalizeToLocal(phone);
     const encryptedPhone = encryptPhone(normalizedPhone);

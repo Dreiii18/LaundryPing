@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation';
 import { JobsTable } from '@/components/jobs-table';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -88,6 +89,20 @@ export default async function DashboardPage() {
   // Count completed jobs today
   const completedToday = safeJobs.filter((j) => j.status === 'completed').length;
 
+  // Count completed jobs yesterday for trend comparison
+  const yesterdayDate = new Date(phNow);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayPH = phFormatter.format(yesterdayDate);
+  const { count: completedYesterday } = await supabase
+    .from('jobs')
+    .select('id', { count: 'exact', head: true })
+    .eq('laundromat_id', laundromat.id)
+    .eq('status', 'completed')
+    .gte('completed_at', `${yesterdayPH}T00:00:00+08:00`)
+    .lt('completed_at', `${todayPH}T00:00:00+08:00`);
+
+  const yesterdayCount = completedYesterday ?? 0;
+
   // Calculate today's total revenue from completed jobs
   const todayRevenue = safeJobs
     .filter((j) => j.status === 'completed' && j.pay_amount != null)
@@ -103,7 +118,42 @@ export default async function DashboardPage() {
         {/* Jobs Completed Today */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
           <p className="text-slate-500 text-sm font-medium mb-1">Jobs completed today</p>
-          <p className="text-4xl font-bold text-slate-900" aria-label={`${completedToday} jobs completed today`}>{completedToday}</p>
+          <div className="flex items-end gap-3">
+            <p className="text-4xl font-bold text-slate-900" aria-label={`${completedToday} jobs completed today`}>{completedToday}</p>
+            {yesterdayCount > 0 ? (
+              (() => {
+                const pctChange = Math.round(((completedToday - yesterdayCount) / yesterdayCount) * 100);
+                if (pctChange > 0) {
+                  return (
+                    <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
+                      <TrendingUp className="size-3.5" aria-hidden="true" />
+                      +{pctChange}%
+                    </span>
+                  );
+                }
+                if (pctChange < 0) {
+                  return (
+                    <span className="flex items-center gap-0.5 text-xs font-semibold text-red-500 mb-1">
+                      <TrendingDown className="size-3.5" aria-hidden="true" />
+                      {pctChange}%
+                    </span>
+                  );
+                }
+                return (
+                  <span className="flex items-center gap-0.5 text-xs font-semibold text-slate-400 mb-1">
+                    <Minus className="size-3.5" aria-hidden="true" />
+                    0%
+                  </span>
+                );
+              })()
+            ) : completedToday > 0 && yesterdayCount === 0 ? (
+              <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
+                <TrendingUp className="size-3.5" aria-hidden="true" />
+                New
+              </span>
+            ) : null}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">vs {yesterdayCount} yesterday</p>
         </div>
 
         {/* Today's Total Revenue */}

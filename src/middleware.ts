@@ -1,5 +1,10 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
+import { checkRateLimit } from '@/lib/utils/rate-limit';
+
+const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+const INACTIVITY_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 hours
+const LAST_ACTIVITY_COOKIE = 'lp_last_activity';
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
@@ -54,6 +59,60 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/';
     return NextResponse.redirect(url);
+  }
+
+  // --- Session inactivity timeout (8h) ---
+  if (user) {
+    const lastActivityStr = request.cookies.get(LAST_ACTIVITY_COOKIE)?.value;
+    const now = Date.now();
+
+    if (lastActivityStr) {
+      const lastActivity = parseInt(lastActivityStr, 10);
+      if (!isNaN(lastActivity) && now - lastActivity > INACTIVITY_TIMEOUT_MS) {
+        // Session inactive too long — sign out and redirect to login
+        await supabase.auth.signOut();
+        const url = request.nextUrl.clone();
+        url.pathname = '/login';
+        const response = NextResponse.redirect(url);
+        response.cookies.delete(LAST_ACTIVITY_COOKIE);
+        return response;
+      }
+    }
+
+    // Update last activity timestamp
+    supabaseResponse.cookies.set(LAST_ACTIVITY_COOKIE, now.toString(), {
+      httpOnly: true,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: INACTIVITY_TIMEOUT_MS / 1000,
+    });
+  }
+
+  // --- Rate limiting on mutation API endpoints ---
+  if (
+    user &&
+    request.nextUrl.pathname.startsWith('/api/') &&
+    MUTATION_METHODS.has(request.method)
+  ) {
+    const { allowed, remaining, resetAt } = checkRateLimit(user.id);
+
+    if (!allowed) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(Math.ceil((resetAt - Date.now()) / 1000)),
+            'X-RateLimit-Remaining': '0',
+          },
+        }
+      );
+    }
+
+    supabaseResponse.headers.set(
+      'X-RateLimit-Remaining',
+      String(remaining)
+    );
   }
 
   return supabaseResponse;

@@ -59,6 +59,7 @@ import {
   ArrowDown,
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/utils/fetch';
 import { EmptyState } from '@/components/empty-state';
 
 interface Machine {
@@ -245,7 +246,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
 
     try {
       if (editingMachine) {
-        const res = await fetch(`/api/machines/${editingMachine.id}`, {
+        const res = await fetchWithAuth(`/api/machines/${editingMachine.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label: label.trim(), type }),
@@ -258,7 +259,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         }
         toast.success('Machine updated successfully');
       } else {
-        const res = await fetch('/api/machines', {
+        const res = await fetchWithAuth('/api/machines', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ label: label.trim(), type }),
@@ -287,7 +288,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     setDeleting(true);
 
     try {
-      const res = await fetch(`/api/machines/${deletingMachine.id}`, {
+      const res = await fetchWithAuth(`/api/machines/${deletingMachine.id}`, {
         method: 'DELETE',
       });
       const data = await res.json();
@@ -389,7 +390,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                           <button
                             type="button"
                             onClick={() => handleSort(field)}
-                            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider cursor-pointer select-none text-slate-400 hover:text-slate-600 transition-colors"
+                            className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider cursor-pointer select-none text-slate-400 hover:text-slate-600 transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 rounded-sm"
                           >
                             {label}
                             {sortField === field ? (

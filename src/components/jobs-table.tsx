@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Loader2, CheckCircle, Clock, CircleX, CircleAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { fetchWithAuth } from '@/lib/utils/fetch';
 import { EmptyState } from '@/components/empty-state';
 
 const PAYMENT_METHODS = [
@@ -72,7 +73,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
     setCompletingId(jobId);
 
     try {
-      const res = await fetch(`/api/jobs/${jobId}/complete`, {
+      const res = await fetchWithAuth(`/api/jobs/${jobId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(paymentMethod ? { payment_method: paymentMethod } : {}),

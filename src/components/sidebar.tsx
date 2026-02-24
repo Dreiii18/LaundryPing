@@ -20,7 +20,11 @@ const navItems = [
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
-export function Sidebar() {
+interface SidebarContentProps {
+  onNavigate?: () => void;
+}
+
+export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -32,7 +36,7 @@ export function Sidebar() {
   };
 
   return (
-    <aside className="w-64 border-r border-[#0d968b]/10 bg-white flex flex-col justify-between py-6 shrink-0">
+    <div className="flex flex-col justify-between h-full py-6">
       <div>
         {/* Logo */}
         <div className="px-6 mb-8 flex items-center gap-3">
@@ -53,7 +57,8 @@ export function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-11 ${
+                onClick={onNavigate}
+                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-11 outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
                   isActive
                     ? 'bg-[#0d968b]/10 text-[#0d968b] font-semibold'
                     : 'text-slate-600 hover:bg-slate-50 font-medium'
@@ -81,12 +86,20 @@ export function Sidebar() {
       <div className="px-3">
         <button
           onClick={handleLogout}
-          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors min-h-11"
+          className="flex w-full items-center gap-3 px-3 py-2.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors min-h-11 outline-none focus-visible:ring-[3px] focus-visible:ring-red-500/30"
         >
           <LogOut className="size-5" aria-hidden="true" />
           <span className="text-sm font-medium">Logout</span>
         </button>
       </div>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  return (
+    <aside className="hidden md:flex w-64 border-r border-[#0d968b]/10 bg-white flex-col shrink-0">
+      <SidebarContent />
     </aside>
   );
 }
