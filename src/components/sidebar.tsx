@@ -14,7 +14,7 @@ import {
 import Link from 'next/link';
 
 const navItems = [
-  { href: '/', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/jobs', label: 'Jobs', icon: ListTodo },
   { href: '/machines', label: 'Machines', icon: WashingMachine },
   { href: '/settings', label: 'Settings', icon: Settings },

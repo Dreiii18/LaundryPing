@@ -33,7 +33,7 @@ export default function NotFound() {
         {/* Action buttons */}
         <div className="flex items-center gap-3">
           <Link
-            href="/"
+            href="/dashboard"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-[#0d968b] text-white font-bold text-sm hover:bg-[#0d968b]/90 transition-colors shadow-sm"
           >
             <LayoutDashboard className="size-4" />
