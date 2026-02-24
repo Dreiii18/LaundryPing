@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Droplets, Wind } from 'lucide-react';
+import { Loader2, Play, Droplets, Wind, AlertTriangle, XCircle } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { isValidPhNumber } from '@/lib/utils/phone';
 
@@ -55,6 +55,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
+  const [smsUsed, setSmsUsed] = useState<number | null>(null);
+  const [smsLimit, setSmsLimit] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -65,7 +67,10 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setPayAmount('');
       setPaymentMethod('');
       setError('');
+      setSmsUsed(null);
+      setSmsLimit(null);
       fetchMachines();
+      fetchSmsQuota();
     }
   }, [open]);
 
@@ -96,6 +101,19 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setError('Failed to load machines');
     } finally {
       setLoadingMachines(false);
+    }
+  };
+
+  const fetchSmsQuota = async () => {
+    try {
+      const res = await fetch('/api/sms/usage');
+      if (res.ok) {
+        const data = await res.json();
+        setSmsUsed(data.used ?? null);
+        setSmsLimit(data.limit ?? null);
+      }
+    } catch {
+      // Non-blocking — silently ignore failures
     }
   };
 
@@ -183,6 +201,28 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 {error}
               </div>
             )}
+
+            {smsUsed !== null && smsLimit !== null && smsLimit > 0 && (() => {
+              const pct = (smsUsed / smsLimit) * 100;
+              const remaining = Math.max(0, smsLimit - smsUsed);
+              if (pct >= 100) {
+                return (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm">
+                    <XCircle className="size-4 text-red-600 shrink-0" />
+                    <span className="text-red-700">SMS limit reached. Job will be tracked but no SMS will be sent.</span>
+                  </div>
+                );
+              }
+              if (pct >= 80) {
+                return (
+                  <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+                    <AlertTriangle className="size-4 text-amber-600 shrink-0" />
+                    <span className="text-amber-700">SMS quota low: {remaining} message{remaining !== 1 ? 's' : ''} left this month.</span>
+                  </div>
+                );
+              }
+              return null;
+            })()}
 
             {/* Machine Selection */}
             <div className="flex flex-col gap-2">

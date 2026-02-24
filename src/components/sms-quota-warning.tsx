@@ -38,7 +38,7 @@ export function SmsQuotaWarning({ used, limit }: SmsQuotaWarningProps) {
       <div>
         <p className="text-sm font-bold text-amber-800">Running low on SMS this month</p>
         <p className="text-xs text-amber-600">
-          {used} / {limit} messages used. Consider informing some customers manually.
+          You have {Math.max(0, limit - used)} SMS left this month. Consider informing some customers manually.
         </p>
       </div>
     </div>

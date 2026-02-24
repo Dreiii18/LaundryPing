@@ -582,7 +582,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
 
       {/* Add/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-[420px]">
+        <DialogContent className="sm:max-w-105">
           <form onSubmit={handleSave}>
             <DialogHeader>
               <DialogTitle>

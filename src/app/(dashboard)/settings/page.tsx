@@ -1,3 +1,4 @@
+import { FREE_TIER_SMS_LIMIT } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { SettingsForm } from '@/components/settings-form';
@@ -26,7 +27,7 @@ export default async function SettingsPage() {
 
   // Get SMS quota info
   const smsUsed = laundromat.sms_used_this_month ?? 0;
-  const smsLimit = laundromat.sms_limit ?? 50;
+  const smsLimit = laundromat.sms_limit ?? FREE_TIER_SMS_LIMIT;
   const remaining = Math.max(0, smsLimit - smsUsed);
 
   // Calculate billing period dates

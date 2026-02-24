@@ -1,3 +1,4 @@
+import { FREE_TIER_SMS_LIMIT } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { JobsTable } from '@/components/jobs-table';
@@ -25,7 +26,7 @@ export default async function DashboardPage() {
   }
 
   const smsUsed = (laundromat as Record<string, unknown>).sms_used_this_month as number ?? 0;
-  const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? 50;
+  const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? FREE_TIER_SMS_LIMIT;
 
   // Calculate days until billing cycle reset (1st of next month)
   const now = new Date();
