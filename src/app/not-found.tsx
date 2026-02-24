@@ -66,7 +66,7 @@ export default function NotFound() {
 
       {/* Footer */}
       <p className="text-xs text-slate-400 mt-16">
-        &copy; 2025 LaundryPing. All rights reserved.
+        &copy; 2026 LaundryPing. All rights reserved.
       </p>
     </div>
   );
