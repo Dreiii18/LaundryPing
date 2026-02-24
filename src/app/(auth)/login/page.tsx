@@ -35,7 +35,7 @@ export default function LoginPage() {
         return;
       }
 
-      router.push('/');
+      router.push('/dashboard');
       router.refresh();
     } catch {
       setError('An unexpected error occurred');
