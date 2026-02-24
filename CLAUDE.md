@@ -47,7 +47,7 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 ### SMS Subsystem (`lib/sms/`)
 
 - `provider.ts` -- Factory pattern with `SmsProvider` interface. `SMS_PROVIDER=mock` (default) logs to console; `SMS_PROVIDER=semaphore` calls the real API with 5s AbortController timeout.
-- `quota.ts` -- SMS quota management via two Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset) and `check_and_increment_sms_quota` (atomic check with `SELECT ... FOR UPDATE` row locking). Free tier = 50 SMS/month.
+- `quota.ts` -- SMS quota management via two Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset) and `check_and_increment_sms_quota` (atomic check with `SELECT ... FOR UPDATE` row locking). Free tier = 200 SMS/month.
 - `templates.ts` -- Bilingual Tagalog/English SMS message builder.
 - Triple-layer duplicate SMS prevention: UI button disable + `sms_logs` check + UNIQUE constraint on `sms_logs.job_id`.
 
