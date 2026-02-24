@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
+import { FREE_TIER_SMS_LIMIT } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { decryptPhone } from '@/lib/utils/encryption';
 import { normalizeToLocal } from '@/lib/utils/phone';
@@ -126,7 +127,7 @@ export async function POST(
         .single();
 
       return NextResponse.json({
-        message: `Free SMS limit reached (${updatedLaundromat?.sms_used_this_month ?? '?'}/${updatedLaundromat?.sms_limit ?? 50}). Please inform the customer manually.`,
+        message: `Free SMS limit reached (${updatedLaundromat?.sms_used_this_month ?? '?'}/${updatedLaundromat?.sms_limit ?? FREE_TIER_SMS_LIMIT}). Please inform the customer manually.`,
         toastType: 'warning',
         smsSent: false,
         quotaExhausted: true,
