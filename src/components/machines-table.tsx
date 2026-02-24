@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Table,
@@ -114,6 +114,21 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const [type, setType] = useState<'washer' | 'dryer'>('washer');
   const [modalError, setModalError] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Keyboard-aware modal positioning
+  const [keyboardShift, setKeyboardShift] = useState(0);
+
+  useEffect(() => {
+    if (!modalOpen) { setKeyboardShift(0); return; }
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const onResize = () => {
+      const kbHeight = window.innerHeight - vv.height;
+      setKeyboardShift(kbHeight > 100 ? kbHeight / 2 : 0);
+    };
+    vv.addEventListener('resize', onResize);
+    return () => vv.removeEventListener('resize', onResize);
+  }, [modalOpen]);
 
   // Delete dialog state
   const [deleteOpen, setDeleteOpen] = useState(false);
@@ -583,7 +598,13 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
 
       {/* Add/Edit Modal */}
       <Dialog open={modalOpen} onOpenChange={setModalOpen}>
-        <DialogContent className="sm:max-w-105">
+        <DialogContent
+          className="sm:max-w-105"
+          style={{
+            transition: 'top 0.2s ease-out',
+            ...(keyboardShift > 0 && { top: `calc(50% - ${keyboardShift}px)` }),
+          }}
+        >
           <form onSubmit={handleSave}>
             <DialogHeader>
               <DialogTitle>

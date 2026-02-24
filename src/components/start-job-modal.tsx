@@ -182,12 +182,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-130 p-0 overflow-hidden">
+      <DialogContent className="sm:max-w-130 p-0 overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[90dvh]" onOpenAutoFocus={(e) => e.preventDefault()}>
         {/* Decorative accent */}
         <div className="absolute top-0 left-0 w-1.5 h-full bg-[#0d968b]" />
 
-        <form onSubmit={handleSubmit}>
-          <DialogHeader className="px-8 pt-8 pb-4">
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
+          <DialogHeader className="px-5 pt-5 pb-3 sm:px-8 sm:pt-8 sm:pb-4 shrink-0">
             <DialogTitle className="text-2xl font-bold text-[#111817]">
               Start New Job
             </DialogTitle>
@@ -196,7 +196,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="px-8 py-4 space-y-6">
+          <div className="px-5 py-3 space-y-4 sm:px-8 sm:py-4 sm:space-y-6 overflow-y-auto flex-1 min-h-0">
             {error && (
               <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm">
                 {error}
@@ -346,12 +346,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}
-                className="min-h-25 resize-none"
+                className="min-h-16 sm:min-h-25 resize-none"
               />
             </div>
           </div>
 
-          <DialogFooter className="px-8 pb-8 pt-4">
+          <DialogFooter className="px-5 pb-5 pt-3 sm:px-8 sm:pb-8 sm:pt-4 shrink-0">
             <Button
               type="button"
               variant="ghost"
