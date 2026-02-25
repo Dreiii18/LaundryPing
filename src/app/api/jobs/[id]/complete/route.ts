@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
-import { FREE_TIER_SMS_LIMIT } from '@/lib/constants';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { decryptPhone } from '@/lib/utils/encryption';
 import { normalizeToLocal } from '@/lib/utils/phone';
@@ -75,6 +74,28 @@ export async function POST(
         .eq('id', id);
     }
 
+    // Early exit: no plan, no SMS notification, or no phone number
+    const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null &&
+                    (laundromat as Record<string, unknown>).sms_plan_id !== undefined;
+
+    if (!hasPlan || !job.notify_sms || !job.customer_phone_encrypted) {
+      await supabase
+        .from('jobs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          sms_sent: false,
+        })
+        .eq('id', id)
+        .eq('status', 'in_progress');
+
+      return NextResponse.json({
+        message: 'Job completed.',
+        toastType: 'success',
+        smsSent: false,
+      });
+    }
+
     // Idempotency check: see if SMS was already sent for this job
     const { data: existingSmsLog } = await supabase
       .from('sms_logs')
@@ -127,7 +148,7 @@ export async function POST(
         .single();
 
       return NextResponse.json({
-        message: `Free SMS limit reached (${updatedLaundromat?.sms_used_this_month ?? '?'}/${updatedLaundromat?.sms_limit ?? FREE_TIER_SMS_LIMIT}). Please inform the customer manually.`,
+        message: `SMS limit reached (${updatedLaundromat?.sms_used_this_month ?? '?'}/${updatedLaundromat?.sms_limit ?? 0}). Please inform the customer manually.`,
         toastType: 'warning',
         smsSent: false,
         quotaExhausted: true,

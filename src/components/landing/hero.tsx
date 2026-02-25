@@ -18,17 +18,17 @@ export function Hero() {
             href="/signup"
             className="inline-block mt-8 bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-base rounded-lg h-11 px-8 leading-11 transition-colors"
           >
-            Get Started Free
+            Get Started
           </Link>
           {/* Trust indicators */}
           <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-5 gap-y-2 mt-6 text-sm text-[#618986]">
             <span className="flex items-center gap-1.5">
               <span className="text-[#0d968b] font-bold">✓</span>
-              Walang credit card
+              Simula sa ₱299/buwan
             </span>
             <span className="flex items-center gap-1.5">
               <span className="text-[#0d968b] font-bold">✓</span>
-              200 libreng SMS/buwan
+              Hanggang 1,200 SMS/buwan
             </span>
             <span className="flex items-center gap-1.5">
               <span className="text-[#0d968b] font-bold">✓</span>

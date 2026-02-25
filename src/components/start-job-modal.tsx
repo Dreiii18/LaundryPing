@@ -53,11 +53,13 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [isPaid, setIsPaid] = useState(true);
   const [payAmount, setPayAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
+  const [notifySms, setNotifySms] = useState(true);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
   const [smsUsed, setSmsUsed] = useState<number | null>(null);
   const [smsLimit, setSmsLimit] = useState<number | null>(null);
+  const [hasPlan, setHasPlan] = useState<boolean | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -67,9 +69,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setIsPaid(true);
       setPayAmount('');
       setPaymentMethod('');
+      setNotifySms(true);
       setError('');
       setSmsUsed(null);
       setSmsLimit(null);
+      setHasPlan(null);
       fetchMachines();
       fetchSmsQuota();
     }
@@ -112,6 +116,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
         const data = await res.json();
         setSmsUsed(data.used ?? null);
         setSmsLimit(data.limit ?? null);
+        setHasPlan(data.hasPlan ?? false);
       }
     } catch {
       // Non-blocking — silently ignore failures
@@ -127,15 +132,20 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       return;
     }
 
-    if (!phone.trim()) {
-      setError('Phone number is required');
-      return;
-    }
+    // Phone is only required when has plan and notify SMS is on
+    const shouldSendSms = hasPlan && notifySms;
 
-    const phoneClean = phone.replace(/[\s\-()]/g, '');
-    if (!isValidPhNumber(phoneClean)) {
-      setError('Please enter a valid Philippine mobile number (e.g., 09171234567)');
-      return;
+    if (shouldSendSms) {
+      if (!phone.trim()) {
+        setError('Phone number is required');
+        return;
+      }
+
+      const phoneClean = phone.replace(/[\s\-()]/g, '');
+      if (!isValidPhNumber(phoneClean)) {
+        setError('Please enter a valid Philippine mobile number (e.g., 09171234567)');
+        return;
+      }
     }
 
     if (!payAmount.trim() || isNaN(Number(payAmount)) || Number(payAmount) < 0) {
@@ -151,12 +161,14 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     setLoading(true);
 
     try {
+      const phoneClean = phone.replace(/[\s\-()]/g, '');
       const res = await fetchWithAuth('/api/jobs', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           machine_id: machineId,
-          phone: phoneClean,
+          ...(shouldSendSms && phoneClean ? { phone: phoneClean } : {}),
+          notify_sms: shouldSendSms,
           notes: notes.trim() || undefined,
           is_paid: isPaid,
           pay_amount: Number(payAmount),
@@ -179,6 +191,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setLoading(false);
     }
   };
+
+  const showSmsFields = hasPlan === true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -203,7 +217,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               </div>
             )}
 
-            {smsUsed !== null && smsLimit !== null && smsLimit > 0 && (() => {
+            {/* SMS quota warnings - only when plan exists */}
+            {showSmsFields && smsUsed !== null && smsLimit !== null && smsLimit > 0 && (() => {
               const pct = (smsUsed / smsLimit) * 100;
               const remaining = Math.max(0, smsLimit - smsUsed);
               if (pct >= 100) {
@@ -261,15 +276,49 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               )}
             </div>
 
-            {/* Phone Number */}
-            <div className="flex flex-col gap-2">
-              <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
-              <PhoneInput
-                value={phone}
-                onChange={setPhone}
-                disabled={loading}
-              />
-            </div>
+            {/* SMS Notification Toggle + Phone Number - only when plan exists */}
+            {showSmsFields && (
+              <>
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-semibold text-[#111817]">SMS Notification</Label>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setNotifySms(true)}
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                        notifySms
+                          ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      Notify via SMS
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => { setNotifySms(false); setPhone(''); }}
+                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                        !notifySms
+                          ? 'bg-amber-50 border-amber-400 text-amber-700'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      No SMS
+                    </button>
+                  </div>
+                </div>
+
+                {notifySms && (
+                  <div className="flex flex-col gap-2">
+                    <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
+                    <PhoneInput
+                      value={phone}
+                      onChange={setPhone}
+                      disabled={loading}
+                    />
+                  </div>
+                )}
+              </>
+            )}
 
             {/* Pay Amount */}
             <div className="flex flex-col gap-2">

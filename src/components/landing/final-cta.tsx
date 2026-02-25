@@ -11,10 +11,10 @@ export function FinalCta() {
         }}
       >
         <h2 className="relative text-2xl md:text-3xl font-bold text-white mb-4">
-          Subukan ng libre ngayon
+          Simulan ang SMS notifications ngayon
         </h2>
         <p className="relative text-white/50 mb-8 max-w-md mx-auto">
-          Walang credit card. Walang contract. 200 libreng SMS bawat buwan.
+          Walang lock-in. Simula sa ₱299/buwan para sa 300 SMS.
         </p>
         <Link
           href="/signup"

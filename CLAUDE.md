@@ -47,7 +47,7 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 ### SMS Subsystem (`lib/sms/`)
 
 - `provider.ts` -- Factory pattern with `SmsProvider` interface. `SMS_PROVIDER=mock` (default) logs to console; `SMS_PROVIDER=semaphore` calls the real API with 5s AbortController timeout.
-- `quota.ts` -- SMS quota management via two Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset) and `check_and_increment_sms_quota` (atomic check with `SELECT ... FOR UPDATE` row locking). Free tier = 200 SMS/month.
+- `quota.ts` -- SMS quota management via two Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset) and `check_and_increment_sms_quota` (atomic check with `SELECT ... FOR UPDATE` row locking + plan validation). Paid plans only -- no free tier.
 - `templates.ts` -- Bilingual Tagalog/English SMS message builder.
 - Triple-layer duplicate SMS prevention: UI button disable + `sms_logs` check + UNIQUE constraint on `sms_logs.job_id`.
 
@@ -59,11 +59,22 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 
 ### Database
 
-4 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`. Schema in `supabase/migrations/00001_initial_schema.sql`. Types manually defined in `types/database.ts` (not auto-generated).
+5 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`, `sms_plans`. Schema in `supabase/migrations/00001_initial_schema.sql` through `00004_sms_plans.sql`. Types manually defined in `types/database.ts` (not auto-generated).
+
+### SMS Plans (Paid Model)
+
+3 tiers defined in `sms_plans` DB table (not hardcoded):
+- **Starter**: 300 SMS/month, PHP 299
+- **Growth**: 600 SMS/month, PHP 539
+- **Scale**: 1,200 SMS/month, PHP 959
+
+Users without a plan (`sms_plan_id = NULL`) get `sms_limit = 0` and cannot send SMS. Phone number field is hidden in the job modal when no plan is active. Jobs support `notify_sms` boolean and nullable phone columns for no-SMS jobs.
+
+Admin activates plans via SQL: `SELECT activate_sms_plan('<user-uuid>', 'starter');` (defaults to 30-day duration). Payment is via GCash with manual admin verification.
 
 ### Job Completion Flow (`api/jobs/[id]/complete/route.ts`)
 
-This is the most complex route. It: verifies auth + ownership, checks idempotency via `sms_logs`, ensures billing cycle, atomically checks/increments SMS quota, decrypts the phone number, sends SMS, and handles all failure modes (quota exhausted, decryption failure, SMS failure) by decrementing quota back and completing the job without SMS.
+This is the most complex route. It: verifies auth + ownership, checks if plan exists + notify_sms + phone (early exit if any missing -- completes job without SMS), checks idempotency via `sms_logs`, ensures billing cycle, atomically checks/increments SMS quota, decrypts the phone number, sends SMS, and handles all failure modes (quota exhausted, decryption failure, SMS failure) by decrementing quota back and completing the job without SMS.
 
 ## Environment Variables
 
