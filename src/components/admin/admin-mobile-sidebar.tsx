@@ -1,23 +1,22 @@
 'use client';
 
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
-import { SidebarContent } from '@/components/sidebar';
+import { AdminSidebarContent } from '@/components/admin/admin-sidebar';
 import { VisuallyHidden } from '@radix-ui/react-visually-hidden';
 
-interface MobileSidebarProps {
+interface AdminMobileSidebarProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isAdmin?: boolean;
 }
 
-export function MobileSidebar({ open, onOpenChange, isAdmin: isAdminUser }: MobileSidebarProps) {
+export function AdminMobileSidebar({ open, onOpenChange }: AdminMobileSidebarProps) {
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="left" className="w-64 p-0">
         <VisuallyHidden>
-          <SheetTitle>Navigation menu</SheetTitle>
+          <SheetTitle>Admin navigation menu</SheetTitle>
         </VisuallyHidden>
-        <SidebarContent onNavigate={() => onOpenChange(false)} isAdmin={isAdminUser} />
+        <AdminSidebarContent onNavigate={() => onOpenChange(false)} />
       </SheetContent>
     </Sheet>
   );

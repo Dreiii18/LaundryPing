@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/supabase/admin-auth';
-import { Sidebar } from '@/components/sidebar';
-import { Topbar } from '@/components/topbar';
+import { AdminSidebar } from '@/components/admin/admin-sidebar';
+import { AdminTopbar } from '@/components/admin/admin-topbar';
 
-export default async function DashboardLayout({
+export default async function AdminLayout({
   children,
 }: {
   children: React.ReactNode;
@@ -18,26 +18,20 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  // Fetch laundromat data
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('id, name, address')
-    .eq('user_id', user.id)
-    .single();
+  if (!isAdmin(user)) {
+    redirect('/dashboard');
+  }
 
-  const shopName = laundromat?.name || 'My Laundromat';
-  const userEmail = user.email || '';
-  const userInitials = userEmail
+  const userInitials = (user.email || '')
     .split('@')[0]
     .slice(0, 2)
     .toUpperCase();
-  const adminUser = isAdmin(user);
 
   return (
     <div className="flex h-screen overflow-hidden">
-      <Sidebar isAdmin={adminUser} />
+      <AdminSidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar shopName={shopName} userInitials={userInitials} isAdmin={adminUser} />
+        <AdminTopbar userInitials={userInitials} />
         <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background-light">
           {children}
         </main>
