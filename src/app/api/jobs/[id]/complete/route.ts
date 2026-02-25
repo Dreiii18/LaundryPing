@@ -9,6 +9,7 @@ import { ensureBillingCycle, checkAndIncrementQuota, decrementQuota } from '@/li
 
 const completeJobSchema = z.object({
   payment_method: z.enum(['cash', 'ewallet', 'card', 'bank_transfer']).optional(),
+  overdue_reason: z.string().optional(),
 });
 
 export async function POST(
@@ -46,13 +47,15 @@ export async function POST(
       );
     }
 
-    // Parse optional payment_method from request body
+    // Parse optional payment_method and overdue_reason from request body
     let paymentMethod: string | undefined;
+    let overdueReason: string | undefined;
     try {
       const body = await request.json();
       const parsed = completeJobSchema.safeParse(body);
       if (parsed.success) {
         paymentMethod = parsed.data.payment_method;
+        overdueReason = parsed.data.overdue_reason;
       }
     } catch {
       // No body or invalid JSON — that's fine for already-paid jobs
@@ -85,6 +88,7 @@ export async function POST(
           status: 'completed',
           completed_at: new Date().toISOString(),
           sms_sent: false,
+          ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
         .eq('status', 'in_progress');
@@ -136,6 +140,7 @@ export async function POST(
           status: 'completed',
           completed_at: new Date().toISOString(),
           sms_sent: false,
+          ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
         .eq('status', 'in_progress');
@@ -172,6 +177,7 @@ export async function POST(
           status: 'completed',
           completed_at: new Date().toISOString(),
           sms_sent: false,
+          ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
         .eq('status', 'in_progress');
@@ -210,6 +216,7 @@ export async function POST(
           status: 'completed',
           completed_at: new Date().toISOString(),
           sms_sent: true,
+          ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
         .eq('status', 'in_progress');
@@ -241,6 +248,7 @@ export async function POST(
           status: 'completed',
           completed_at: new Date().toISOString(),
           sms_sent: false,
+          ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
         .eq('status', 'in_progress');

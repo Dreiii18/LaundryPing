@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
-import { JobsTable } from '@/components/jobs-table';
+import { JobsPageContent } from '@/components/jobs-page-content';
 
 export default async function JobsPage() {
   const supabase = await createClient();
@@ -22,17 +22,18 @@ export default async function JobsPage() {
     redirect('/login');
   }
 
-  // Get today's date in PH timezone
-  const now = new Date();
-  const phFormatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Manila',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  });
-  const todayPH = phFormatter.format(now);
+  // Mark overdue jobs before fetching
+  await supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id });
 
-  // Fetch jobs for today OR overdue in_progress jobs
+  // Fetch all machines for filter dropdown
+  const { data: machines } = await supabase
+    .from('machines')
+    .select('id, label, type')
+    .eq('laundromat_id', laundromat.id)
+    .eq('status', 'active')
+    .order('label');
+
+  // Fetch ALL jobs (with safety cap), ordered by most recent first
   const { data: jobs } = await supabase
     .from('jobs')
     .select(`
@@ -48,6 +49,8 @@ export default async function JobsPage() {
       payment_method,
       pay_amount,
       is_paid,
+      is_overdue,
+      overdue_reason,
       created_at,
       machines (
         id,
@@ -56,13 +59,13 @@ export default async function JobsPage() {
       )
     `)
     .eq('laundromat_id', laundromat.id)
-    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress`)
-    .order('started_at', { ascending: false });
+    .order('started_at', { ascending: false })
+    .limit(1000);
 
   const safeJobs = (jobs || []).map((job) => ({
     id: job.id,
     machine_id: job.machine_id,
-    customer_phone_masked: job.customer_phone_masked,
+    customer_phone_masked: job.customer_phone_masked as string | null,
     status: job.status as 'in_progress' | 'completed' | 'cancelled',
     started_at: job.started_at,
     completed_at: job.completed_at,
@@ -71,16 +74,16 @@ export default async function JobsPage() {
     payment_method: job.payment_method as string | null,
     pay_amount: job.pay_amount as number | null,
     is_paid: job.is_paid as boolean,
+    is_overdue: job.is_overdue as boolean,
+    overdue_reason: job.overdue_reason as string | null,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
   }));
 
-  return (
-    <div>
-      <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-900">Jobs</h2>
-        <p className="text-slate-500 text-sm mt-1">View and manage today&apos;s laundry jobs.</p>
-      </div>
-      <JobsTable jobs={safeJobs} />
-    </div>
-  );
+  const safeMachines = (machines || []).map((m) => ({
+    id: m.id,
+    label: m.label,
+    type: m.type as 'washer' | 'dryer',
+  }));
+
+  return <JobsPageContent jobs={safeJobs} machines={safeMachines} />;
 }
