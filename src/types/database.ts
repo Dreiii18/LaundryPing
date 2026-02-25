@@ -98,6 +98,8 @@ export interface Database {
           payment_method: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount: number | null;
           is_paid: boolean;
+          is_overdue: boolean;
+          overdue_reason: string | null;
           created_at: string;
         };
         Insert: {
@@ -115,6 +117,8 @@ export interface Database {
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
           is_paid?: boolean;
+          is_overdue?: boolean;
+          overdue_reason?: string | null;
           created_at?: string;
         };
         Update: {
@@ -132,6 +136,8 @@ export interface Database {
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
           is_paid?: boolean;
+          is_overdue?: boolean;
+          overdue_reason?: string | null;
           created_at?: string;
         };
       };
@@ -214,6 +220,10 @@ export interface Database {
       };
       activate_sms_plan: {
         Args: { p_user_id: string; p_plan_tier: string; p_duration_days?: number };
+        Returns: undefined;
+      };
+      mark_overdue_jobs: {
+        Args: { p_laundromat_id: string };
         Returns: undefined;
       };
     };
