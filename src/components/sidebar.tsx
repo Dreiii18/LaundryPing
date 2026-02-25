@@ -9,7 +9,6 @@ import {
   Settings,
   CreditCard,
   LogOut,
-  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -17,6 +16,7 @@ const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/jobs', label: 'Jobs', icon: ListTodo },
   { href: '/machines', label: 'Machines', icon: WashingMachine },
+  { href: '/plan-billing', label: 'Plan & Billing', icon: CreditCard },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -71,14 +71,6 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             );
           })}
 
-          {/* Plan & Billing - Disabled */}
-          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg text-slate-400 cursor-not-allowed min-h-11" aria-disabled="true">
-            <div className="flex items-center gap-3">
-              <CreditCard className="size-5" aria-hidden="true" />
-              <span className="text-sm font-medium">Plan & Billing</span>
-            </div>
-            <Lock className="size-3.5" aria-hidden="true" />
-          </div>
         </nav>
       </div>
 

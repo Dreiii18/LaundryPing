@@ -9,7 +9,7 @@ const FAQ_ITEMS = [
   {
     question: 'Magkano ang LaundryPing?',
     answer:
-      'Libre ang 200 SMS bawat buwan. Walang credit card na kailangan para magsimula.',
+      'May tatlong plan: Starter (₱299/buwan, 300 SMS), Growth (₱539/buwan, 600 SMS), at Scale (₱959/buwan, 1,200 SMS). Piliin ang plan na bagay sa laki ng laundromat mo.',
   },
   {
     question: 'Gaano kabilis ang setup?',
@@ -17,9 +17,9 @@ const FAQ_ITEMS = [
       'Ilang minuto lang. I-register ang mga machine mo at pwede ka nang mag-start ng mga job.',
   },
   {
-    question: 'Paano kung naubos ang 200 SMS ko?',
+    question: 'Paano kung naubos ang SMS ko?',
     answer:
-      'I-co-contact ka namin para sa upgrade options. Hindi mawawala ang data mo.',
+      'Pwede kang mag-upgrade sa mas mataas na plan anytime. Hindi mawawala ang data mo.',
   },
 ];
 

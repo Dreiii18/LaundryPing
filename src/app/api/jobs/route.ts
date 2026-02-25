@@ -12,7 +12,8 @@ const createJobSchema = z.object({
   phone: z.string().refine(
     (val) => isValidPhNumber(val),
     { message: 'Please enter a valid Philippine mobile number (e.g., 09171234567)' }
-  ),
+  ).optional(),
+  notify_sms: z.boolean().optional(),
   notes: z.string().max(500, 'Notes must be 500 characters or less').optional(),
   is_paid: z.boolean(),
   pay_amount: z.number().min(0, 'Amount must be 0 or more'),
@@ -56,6 +57,7 @@ export async function GET() {
         started_at,
         completed_at,
         sms_sent,
+        notify_sms,
         payment_method,
         pay_amount,
         is_paid,
@@ -85,6 +87,7 @@ export async function GET() {
       started_at: job.started_at,
       completed_at: job.completed_at,
       sms_sent: job.sms_sent,
+      notify_sms: job.notify_sms,
       payment_method: job.payment_method,
       pay_amount: job.pay_amount,
       is_paid: job.is_paid,
@@ -120,6 +123,24 @@ export async function POST(request: Request) {
     }
 
     const { machine_id, phone, notes, is_paid, pay_amount, payment_method } = parsed.data;
+
+    // Determine SMS notification based on plan status
+    const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null &&
+                    (laundromat as Record<string, unknown>).sms_plan_id !== undefined;
+    let notifySms = parsed.data.notify_sms ?? true;
+
+    // If no plan, force no SMS
+    if (!hasPlan) {
+      notifySms = false;
+    }
+
+    // If notify_sms is true, phone is required
+    if (notifySms && !phone) {
+      return NextResponse.json(
+        { error: 'Phone number is required when SMS notification is enabled' },
+        { status: 400 }
+      );
+    }
 
     // Validate machine exists, belongs to user, and is active
     const { data: machine, error: machineError } = await supabase
@@ -174,10 +195,15 @@ export async function POST(request: Request) {
       );
     }
 
-    // Normalize, encrypt, and mask phone number
-    const normalizedPhone = normalizeToLocal(phone);
-    const encryptedPhone = encryptPhone(normalizedPhone);
-    const maskedPhone = maskPhone(normalizedPhone);
+    // Process phone number if provided and SMS is enabled
+    let encryptedPhone: string | null = null;
+    let maskedPhone: string | null = null;
+
+    if (notifySms && phone) {
+      const normalizedPhone = normalizeToLocal(phone);
+      encryptedPhone = encryptPhone(normalizedPhone);
+      maskedPhone = maskPhone(normalizedPhone);
+    }
 
     // Sanitize notes
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null;
@@ -191,6 +217,7 @@ export async function POST(request: Request) {
         customer_phone_masked: maskedPhone,
         notes: sanitizedNotes,
         status: 'in_progress',
+        notify_sms: notifySms,
         is_paid,
         pay_amount,
         payment_method: payment_method ?? null,
@@ -205,6 +232,7 @@ export async function POST(request: Request) {
         started_at,
         completed_at,
         sms_sent,
+        notify_sms,
         payment_method,
         pay_amount,
         is_paid,

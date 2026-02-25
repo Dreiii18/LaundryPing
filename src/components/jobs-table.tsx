@@ -43,7 +43,7 @@ const PAYMENT_METHODS = [
 interface Job {
   id: string;
   machine_id: string;
-  customer_phone_masked: string;
+  customer_phone_masked: string | null;
   status: 'in_progress' | 'completed' | 'cancelled';
   started_at: string;
   completed_at: string | null;
@@ -91,7 +91,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
       if (data.toastType === 'success') {
         toast.success(data.message || 'SMS sent to customer.');
       } else if (data.toastType === 'warning') {
-        toast.warning(data.message || 'Free SMS limit reached.');
+        toast.warning(data.message || 'SMS limit reached.');
       } else if (data.toastType === 'error') {
         toast.error(data.message || 'SMS delivery failed. Please inform the customer manually.');
       }
@@ -197,7 +197,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
                 {job.machine?.label || 'Unknown'}
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600">
-                {job.customer_phone_masked}
+                {job.customer_phone_masked || <span className="text-slate-400 italic">--</span>}
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600 font-medium">
                 {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}

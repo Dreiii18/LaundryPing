@@ -1,4 +1,4 @@
-import { MessageSquare, Gift } from 'lucide-react';
+import { MessageSquare, Wallet } from 'lucide-react';
 
 export function Benefits() {
   return (
@@ -21,13 +21,13 @@ export function Benefits() {
         {/* Card 2 — White (neutral) */}
         <div className="bg-white rounded-2xl border border-gray-100 p-8 shadow-sm transition-shadow hover:shadow-md">
           <div className="size-12 rounded-lg bg-[#0d968b]/10 flex items-center justify-center mb-4">
-            <Gift className="size-6 text-[#0d968b]" />
+            <Wallet className="size-6 text-[#0d968b]" />
           </div>
           <h3 className="text-lg font-bold text-[#111817] mb-2">
-            200 libreng SMS bawat buwan
+            Abot-kayang presyo
           </h3>
           <p className="text-[#618986] text-sm leading-relaxed">
-            Magsimula gamit ang free tier. Walang credit card na kailangan.
+            Simula sa ₱299/buwan para sa 300 SMS. Walang lock-in period.
             Set up sa ilang minuto lang — walang training needed.
           </p>
         </div>

@@ -18,6 +18,9 @@ export interface Database {
           sms_limit: number;
           sms_used_this_month: number;
           billing_cycle_start: string;
+          sms_plan_id: string | null;
+          sms_plan_activated_at: string | null;
+          sms_plan_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +32,9 @@ export interface Database {
           sms_limit?: number;
           sms_used_this_month?: number;
           billing_cycle_start?: string;
+          sms_plan_id?: string | null;
+          sms_plan_activated_at?: string | null;
+          sms_plan_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -40,6 +46,9 @@ export interface Database {
           sms_limit?: number;
           sms_used_this_month?: number;
           billing_cycle_start?: string;
+          sms_plan_id?: string | null;
+          sms_plan_activated_at?: string | null;
+          sms_plan_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -78,13 +87,14 @@ export interface Database {
           id: string;
           laundromat_id: string;
           machine_id: string;
-          customer_phone_encrypted: string;
-          customer_phone_masked: string;
+          customer_phone_encrypted: string | null;
+          customer_phone_masked: string | null;
           notes: string | null;
           status: 'in_progress' | 'completed' | 'cancelled';
           started_at: string;
           completed_at: string | null;
           sms_sent: boolean;
+          notify_sms: boolean;
           payment_method: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount: number | null;
           is_paid: boolean;
@@ -94,13 +104,14 @@ export interface Database {
           id?: string;
           laundromat_id: string;
           machine_id: string;
-          customer_phone_encrypted: string;
-          customer_phone_masked: string;
+          customer_phone_encrypted?: string | null;
+          customer_phone_masked?: string | null;
           notes?: string | null;
           status?: 'in_progress' | 'completed' | 'cancelled';
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
+          notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
           is_paid?: boolean;
@@ -110,13 +121,14 @@ export interface Database {
           id?: string;
           laundromat_id?: string;
           machine_id?: string;
-          customer_phone_encrypted?: string;
-          customer_phone_masked?: string;
+          customer_phone_encrypted?: string | null;
+          customer_phone_masked?: string | null;
           notes?: string | null;
           status?: 'in_progress' | 'completed' | 'cancelled';
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
+          notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
           is_paid?: boolean;
@@ -158,6 +170,38 @@ export interface Database {
           created_at?: string;
         };
       };
+      sms_plans: {
+        Row: {
+          id: string;
+          tier: 'starter' | 'growth' | 'scale';
+          label: string;
+          sms_limit: number;
+          price_php: number;
+          description: string | null;
+          sort_order: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          tier: 'starter' | 'growth' | 'scale';
+          label: string;
+          sms_limit: number;
+          price_php: number;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          tier?: 'starter' | 'growth' | 'scale';
+          label?: string;
+          sms_limit?: number;
+          price_php?: number;
+          description?: string | null;
+          sort_order?: number;
+          created_at?: string;
+        };
+      };
     };
     Functions: {
       ensure_billing_cycle: {
@@ -167,6 +211,10 @@ export interface Database {
       check_and_increment_sms_quota: {
         Args: { p_laundromat_id: string };
         Returns: boolean;
+      };
+      activate_sms_plan: {
+        Args: { p_user_id: string; p_plan_tier: string; p_duration_days?: number };
+        Returns: undefined;
       };
     };
   };
