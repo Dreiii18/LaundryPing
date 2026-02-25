@@ -3,30 +3,24 @@
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
-  LayoutDashboard,
-  ListTodo,
-  WashingMachine,
-  Settings,
   CreditCard,
-  Shield,
+  BarChart3,
+  ArrowLeft,
+  WashingMachine,
   LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
 
 const navItems = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/jobs', label: 'Jobs', icon: ListTodo },
-  { href: '/machines', label: 'Machines', icon: WashingMachine },
-  { href: '/plan-billing', label: 'Plan & Billing', icon: CreditCard },
-  { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/admin/plans', label: 'Plans', icon: CreditCard },
+  { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
-interface SidebarContentProps {
+interface AdminSidebarContentProps {
   onNavigate?: () => void;
-  isAdmin?: boolean;
 }
 
-export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarContentProps) {
+export function AdminSidebarContent({ onNavigate }: AdminSidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -41,15 +35,27 @@ export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarCont
     <div className="flex flex-col justify-between h-full py-6">
       <div>
         {/* Logo */}
-        <Link href="/dashboard" className="px-6 mb-8 flex items-center gap-3">
+        <Link href="/admin/plans" className="px-6 mb-6 flex items-center gap-3">
           <div className="size-10 bg-[#0d968b] rounded-lg flex items-center justify-center text-white">
             <WashingMachine className="size-5" />
           </div>
           <div>
             <h1 className="text-lg font-bold leading-none">LaundryPing</h1>
-            <p className="text-xs text-[#0d968b] font-medium">Admin Console</p>
+            <p className="text-xs text-[#0d968b] font-medium">Super Admin</p>
           </div>
         </Link>
+
+        {/* Back to Dashboard */}
+        <div className="px-3 mb-4">
+          <Link
+            href="/dashboard"
+            onClick={onNavigate}
+            className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-slate-500 hover:bg-slate-50 transition-colors min-h-11 outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 font-medium"
+          >
+            <ArrowLeft className="size-5" aria-hidden="true" />
+            <span>Back to Dashboard</span>
+          </Link>
+        </div>
 
         {/* Navigation */}
         <nav className="px-3 space-y-1">
@@ -72,29 +78,7 @@ export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarCont
               </Link>
             );
           })}
-
         </nav>
-
-        {/* Admin Link */}
-        {isAdminUser && (
-          <>
-            <div className="mx-3 my-3 h-px bg-[#0d968b]/15" />
-            <div className="px-3">
-              <Link
-                href="/admin/plans"
-                onClick={onNavigate}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors min-h-11 outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
-                  pathname.startsWith('/admin')
-                    ? 'bg-[#0d968b]/10 text-[#0d968b] font-semibold'
-                    : 'text-[#0d968b] hover:bg-[#0d968b]/5 font-medium'
-                }`}
-              >
-                <Shield className="size-5" aria-hidden="true" />
-                <span>Admin Panel</span>
-              </Link>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Logout */}
@@ -111,14 +95,10 @@ export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarCont
   );
 }
 
-interface SidebarProps {
-  isAdmin?: boolean;
-}
-
-export function Sidebar({ isAdmin: isAdminUser }: SidebarProps) {
+export function AdminSidebar() {
   return (
     <aside className="hidden md:flex w-64 border-r border-[#0d968b]/10 bg-white flex-col shrink-0">
-      <SidebarContent isAdmin={isAdminUser} />
+      <AdminSidebarContent />
     </aside>
   );
 }
