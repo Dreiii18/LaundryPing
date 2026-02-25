@@ -9,9 +9,10 @@ import { MobileSidebar } from './mobile-sidebar';
 interface TopbarProps {
   shopName: string;
   userInitials: string;
+  isAdmin?: boolean;
 }
 
-export function Topbar({ shopName, userInitials }: TopbarProps) {
+export function Topbar({ shopName, userInitials, isAdmin: isAdminUser }: TopbarProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -48,7 +49,7 @@ export function Topbar({ shopName, userInitials }: TopbarProps) {
         </div>
       </header>
 
-      <MobileSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} />
+      <MobileSidebar open={sidebarOpen} onOpenChange={setSidebarOpen} isAdmin={isAdminUser} />
       <StartJobModal open={modalOpen} onOpenChange={setModalOpen} />
     </>
   );
