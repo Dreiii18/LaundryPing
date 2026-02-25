@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client';
 import {
   CreditCard,
   BarChart3,
+  FileText,
   ArrowLeft,
   WashingMachine,
   LogOut,
@@ -13,6 +14,7 @@ import Link from 'next/link';
 
 const navItems = [
   { href: '/admin/plans', label: 'Plans', icon: CreditCard },
+  { href: '/admin/blog', label: 'Blog', icon: FileText },
   { href: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
 ];
 
