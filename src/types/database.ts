@@ -208,6 +208,41 @@ export interface Database {
           created_at?: string;
         };
       };
+      blog_posts: {
+        Row: {
+          id: string;
+          slug: string;
+          title: string;
+          description: string;
+          content: string;
+          author: string;
+          published: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          slug: string;
+          title: string;
+          description?: string;
+          content?: string;
+          author?: string;
+          published?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          slug?: string;
+          title?: string;
+          description?: string;
+          content?: string;
+          author?: string;
+          published?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+      };
     };
     Functions: {
       ensure_billing_cycle: {
