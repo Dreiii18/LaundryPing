@@ -31,7 +31,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/login');
+    router.push('/');
     router.refresh();
   };
 
@@ -39,7 +39,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
     <div className="flex flex-col justify-between h-full py-6">
       <div>
         {/* Logo */}
-        <div className="px-6 mb-8 flex items-center gap-3">
+        <Link href="/dashboard" className="px-6 mb-8 flex items-center gap-3">
           <div className="size-10 bg-[#0d968b] rounded-lg flex items-center justify-center text-white">
             <WashingMachine className="size-5" />
           </div>
@@ -47,7 +47,7 @@ export function SidebarContent({ onNavigate }: SidebarContentProps) {
             <h1 className="text-lg font-bold leading-none">LaundryPing</h1>
             <p className="text-xs text-[#0d968b] font-medium">Admin Console</p>
           </div>
-        </div>
+        </Link>
 
         {/* Navigation */}
         <nav className="px-3 space-y-1">

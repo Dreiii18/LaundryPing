@@ -77,10 +77,10 @@ export async function middleware(request: NextRequest) {
     if (lastActivityStr) {
       const lastActivity = parseInt(lastActivityStr, 10);
       if (!isNaN(lastActivity) && now - lastActivity > INACTIVITY_TIMEOUT_MS) {
-        // Session inactive too long — sign out and redirect to login
+        // Session inactive too long — sign out and redirect to landing page
         await supabase.auth.signOut();
         const url = request.nextUrl.clone();
-        url.pathname = '/login';
+        url.pathname = '/';
         const response = NextResponse.redirect(url);
         response.cookies.delete(LAST_ACTIVITY_COOKIE);
         return response;

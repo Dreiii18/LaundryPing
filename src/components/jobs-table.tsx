@@ -25,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
@@ -52,6 +53,8 @@ interface Job {
   payment_method: string | null;
   pay_amount: number | null;
   is_paid: boolean;
+  is_overdue: boolean;
+  overdue_reason: string | null;
   machine: {
     id: string;
     label: string;
@@ -61,22 +64,31 @@ interface Job {
 
 interface JobsTableProps {
   jobs: Job[];
+  context?: 'dashboard' | 'jobs-page';
 }
 
-export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
+export type { Job };
+
+export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTableProps) {
   const router = useRouter();
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [payLaterJobId, setPayLaterJobId] = useState<string | null>(null);
   const [payLaterMethod, setPayLaterMethod] = useState('');
+  const [overdueJobId, setOverdueJobId] = useState<string | null>(null);
+  const [overdueReason, setOverdueReason] = useState('');
 
-  const completeJob = async (jobId: string, paymentMethod?: string) => {
+  const completeJob = async (jobId: string, options?: { payment_method?: string; overdue_reason?: string }) => {
     setCompletingId(jobId);
 
     try {
+      const body: Record<string, string> = {};
+      if (options?.payment_method) body.payment_method = options.payment_method;
+      if (options?.overdue_reason) body.overdue_reason = options.overdue_reason;
+
       const res = await fetchWithAuth(`/api/jobs/${jobId}/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(paymentMethod ? { payment_method: paymentMethod } : {}),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -104,20 +116,44 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
     }
   };
 
-  const handleMarkDone = (job: Job) => {
+  // Proceeds after overdue dialog (or skips it for non-overdue jobs)
+  const proceedToPaymentOrComplete = (job: Job, overdueReasonText?: string) => {
     if (!job.is_paid) {
       // Open payment method dialog for pay-later jobs
       setPayLaterJobId(job.id);
       setPayLaterMethod('');
+      // Store overdue reason temporarily to pass through payment dialog
+      if (overdueReasonText) setOverdueReason(overdueReasonText);
     } else {
-      completeJob(job.id);
+      completeJob(job.id, overdueReasonText ? { overdue_reason: overdueReasonText } : undefined);
     }
+  };
+
+  const handleMarkDone = (job: Job) => {
+    if (job.is_overdue) {
+      // Open overdue reason dialog first
+      setOverdueJobId(job.id);
+      setOverdueReason('');
+    } else {
+      proceedToPaymentOrComplete(job);
+    }
+  };
+
+  const handleOverdueConfirm = () => {
+    if (!overdueJobId || !overdueReason.trim()) return;
+    const job = initialJobs.find((j) => j.id === overdueJobId);
+    if (!job) return;
+    const reason = overdueReason.trim();
+    setOverdueJobId(null);
+    proceedToPaymentOrComplete(job, reason);
   };
 
   const handlePayLaterConfirm = () => {
     if (!payLaterJobId || !payLaterMethod) return;
+    const reason = overdueReason.trim() || undefined;
     setPayLaterJobId(null);
-    completeJob(payLaterJobId, payLaterMethod);
+    completeJob(payLaterJobId, { payment_method: payLaterMethod, ...(reason && { overdue_reason: reason }) });
+    setOverdueReason('');
   };
 
   const formatTime = (dateStr: string) => {
@@ -130,26 +166,29 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
     });
   };
 
-  const isOverdue = (job: Job) => {
-    if (job.status !== 'in_progress') return false;
-    const startedDate = new Date(job.started_at);
-    const now = new Date();
-    // Consider overdue if started before today (PH timezone)
-    const phNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    const phStarted = new Date(startedDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    return phStarted.toDateString() !== phNow.toDateString();
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      timeZone: 'Asia/Manila',
+    });
   };
 
   if (initialJobs.length === 0) {
     return (
       <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden">
-        <div className="px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
-          <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
-        </div>
+        {context === 'dashboard' && (
+          <div className="px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
+            <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
+          </div>
+        )}
         <EmptyState
           icon="jobs"
-          title="No jobs yet today"
-          description="Click &quot;Start new job&quot; in the top bar to get started with your first laundry job."
+          title={context === 'jobs-page' ? 'No jobs found' : 'No jobs yet today'}
+          description={context === 'jobs-page'
+            ? 'Try adjusting your filters or date range to find jobs.'
+            : 'Click "Start new job" in the top bar to get started with your first laundry job.'}
         />
       </div>
     );
@@ -157,16 +196,23 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
-        <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
-        <div className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
-          <span className="text-xs font-medium text-slate-500">Live</span>
+      {context === 'dashboard' && (
+        <div className="px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
+          <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
+            <span className="text-xs font-medium text-slate-500">Live</span>
+          </div>
         </div>
-      </div>
+      )}
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50/50">
+            {context === 'jobs-page' && (
+              <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Date
+              </TableHead>
+            )}
             <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Machine
             </TableHead>
@@ -193,6 +239,11 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
         <TableBody>
           {initialJobs.map((job) => (
             <TableRow key={job.id} className="hover:bg-slate-50/50 transition-colors">
+              {context === 'jobs-page' && (
+                <TableCell className="px-6 py-4 text-sm text-slate-500 font-medium">
+                  {formatDate(job.started_at)}
+                </TableCell>
+              )}
               <TableCell className="px-6 py-4 text-sm font-bold text-slate-700">
                 {job.machine?.label || 'Unknown'}
               </TableCell>
@@ -203,7 +254,7 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
                 {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}
               </TableCell>
               <TableCell className="px-6 py-4">
-                {job.status === 'in_progress' && isOverdue(job) ? (
+                {job.status === 'in_progress' && job.is_overdue ? (
                   <Badge className="bg-red-100 text-red-700 border-transparent gap-1">
                     <CircleAlert className="size-3" aria-hidden="true" />
                     Overdue
@@ -268,8 +319,61 @@ export function JobsTable({ jobs: initialJobs }: JobsTableProps) {
         </TableBody>
       </Table>
 
+      {/* Overdue Reason Dialog */}
+      <Dialog open={overdueJobId !== null} onOpenChange={(open) => { if (!open) { setOverdueJobId(null); setOverdueReason(''); } }}>
+        <DialogContent className="sm:max-w-100">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[#111817]">
+              Job Overdue
+            </DialogTitle>
+            <DialogDescription className="text-[#618986]">
+              This job was started on{' '}
+              {(() => {
+                const job = initialJobs.find((j) => j.id === overdueJobId);
+                if (!job) return '';
+                return new Date(job.started_at).toLocaleDateString('en-US', {
+                  month: 'short',
+                  day: 'numeric',
+                  year: 'numeric',
+                  timeZone: 'Asia/Manila',
+                });
+              })()}
+              . Please provide a reason for the delay.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            <Label htmlFor="overdue-reason" className="text-sm font-semibold text-[#111817]">Reason</Label>
+            <Textarea
+              id="overdue-reason"
+              value={overdueReason}
+              onChange={(e) => setOverdueReason(e.target.value)}
+              placeholder="e.g. Customer did not pick up on time, machine issue..."
+              className="mt-2 min-h-[80px]"
+            />
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => { setOverdueJobId(null); setOverdueReason(''); }}
+              className="min-h-11"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!overdueReason.trim()}
+              onClick={handleOverdueConfirm}
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
+            >
+              Continue
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Payment Method Dialog for Pay Later jobs */}
-      <Dialog open={payLaterJobId !== null} onOpenChange={(open) => { if (!open) setPayLaterJobId(null); }}>
+      <Dialog open={payLaterJobId !== null} onOpenChange={(open) => { if (!open) { setPayLaterJobId(null); setOverdueReason(''); } }}>
         <DialogContent className="sm:max-w-100">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold text-[#111817]">

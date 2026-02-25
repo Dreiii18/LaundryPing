@@ -55,6 +55,9 @@ export default async function DashboardPage() {
   });
   const todayPH = phFormatter.format(now);
 
+  // Mark overdue jobs before fetching
+  await supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id });
+
   // Fetch jobs for today OR overdue in_progress jobs
   const { data: jobs } = await supabase
     .from('jobs')
@@ -71,6 +74,8 @@ export default async function DashboardPage() {
       payment_method,
       pay_amount,
       is_paid,
+      is_overdue,
+      overdue_reason,
       created_at,
       machines (
         id,
@@ -94,29 +99,40 @@ export default async function DashboardPage() {
     payment_method: job.payment_method as string | null,
     pay_amount: job.pay_amount as number | null,
     is_paid: job.is_paid as boolean,
+    is_overdue: job.is_overdue as boolean,
+    overdue_reason: job.overdue_reason as string | null,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
   }));
 
-  // Count completed jobs today
-  const completedToday = safeJobs.filter((j) => j.status === 'completed').length;
+  // Today's completed jobs (by completed_at) -- count + revenue
+  const { data: todayCompletedJobs } = await supabase
+    .from('jobs')
+    .select('pay_amount')
+    .eq('laundromat_id', laundromat.id)
+    .eq('status', 'completed')
+    .gte('completed_at', `${todayPH}T00:00:00+08:00`);
 
-  // Count completed jobs yesterday for trend comparison
-  const yesterdayDate = new Date(phNow);
+  const completedToday = todayCompletedJobs?.length ?? 0;
+  const todayRevenue = (todayCompletedJobs || [])
+    .filter((j) => j.pay_amount != null)
+    .reduce((sum, j) => sum + Number(j.pay_amount), 0);
+
+  // Yesterday's completed jobs (by completed_at) -- count + revenue
+  const yesterdayDate = new Date(now);
   yesterdayDate.setDate(yesterdayDate.getDate() - 1);
   const yesterdayPH = phFormatter.format(yesterdayDate);
-  const { count: completedYesterday } = await supabase
+
+  const { data: yesterdayCompletedJobs } = await supabase
     .from('jobs')
-    .select('id', { count: 'exact', head: true })
+    .select('pay_amount')
     .eq('laundromat_id', laundromat.id)
     .eq('status', 'completed')
     .gte('completed_at', `${yesterdayPH}T00:00:00+08:00`)
     .lt('completed_at', `${todayPH}T00:00:00+08:00`);
 
-  const yesterdayCount = completedYesterday ?? 0;
-
-  // Calculate today's total revenue from completed jobs
-  const todayRevenue = safeJobs
-    .filter((j) => j.status === 'completed' && j.pay_amount != null)
+  const yesterdayCount = yesterdayCompletedJobs?.length ?? 0;
+  const yesterdayRevenue = (yesterdayCompletedJobs || [])
+    .filter((j) => j.pay_amount != null)
     .reduce((sum, j) => sum + Number(j.pay_amount), 0);
 
   return (
@@ -170,9 +186,44 @@ export default async function DashboardPage() {
         {/* Today's Total Revenue */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
           <p className="text-slate-500 text-sm font-medium mb-1">Today&apos;s total revenue</p>
-          <p className="text-4xl font-bold text-slate-900" aria-label={`Today's total revenue: ${todayRevenue} pesos`}>
-            ₱{todayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-          </p>
+          <div className="flex items-end gap-3">
+            <p className="text-4xl font-bold text-slate-900" aria-label={`Today's total revenue: ${todayRevenue} pesos`}>
+              ₱{todayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </p>
+            {yesterdayRevenue > 0 ? (
+              (() => {
+                const pctChange = Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100);
+                if (pctChange > 0) {
+                  return (
+                    <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
+                      <TrendingUp className="size-3.5" aria-hidden="true" />
+                      +{pctChange}%
+                    </span>
+                  );
+                }
+                if (pctChange < 0) {
+                  return (
+                    <span className="flex items-center gap-0.5 text-xs font-semibold text-red-500 mb-1">
+                      <TrendingDown className="size-3.5" aria-hidden="true" />
+                      {pctChange}%
+                    </span>
+                  );
+                }
+                return (
+                  <span className="flex items-center gap-0.5 text-xs font-semibold text-slate-400 mb-1">
+                    <Minus className="size-3.5" aria-hidden="true" />
+                    0%
+                  </span>
+                );
+              })()
+            ) : todayRevenue > 0 && yesterdayRevenue === 0 ? (
+              <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
+                <TrendingUp className="size-3.5" aria-hidden="true" />
+                New
+              </span>
+            ) : null}
+          </div>
+          <p className="text-xs text-slate-400 mt-1">vs ₱{yesterdayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} yesterday</p>
         </div>
 
         {/* SMS Usage - only when plan exists */}
