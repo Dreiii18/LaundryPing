@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { SmsPlanTier } from '@/lib/constants';
 
 export interface QuotaStatus {
   used: number;
@@ -7,6 +8,9 @@ export interface QuotaStatus {
   canSend: boolean;
   billingCycleStart: string;
   daysUntilReset: number;
+  hasPlan: boolean;
+  planTier: SmsPlanTier | null;
+  planExpiresAt: string | null;
 }
 
 /**
@@ -34,12 +38,25 @@ export async function getQuotaStatus(
 
   const { data: laundromat, error } = await supabase
     .from('laundromats')
-    .select('sms_used_this_month, sms_limit, billing_cycle_start')
+    .select('sms_used_this_month, sms_limit, billing_cycle_start, sms_plan_id, sms_plan_expires_at')
     .eq('id', laundromatId)
     .single();
 
   if (error || !laundromat) {
     throw new Error('Failed to fetch quota status');
+  }
+
+  const hasPlan = laundromat.sms_plan_id !== null;
+  let planTier: SmsPlanTier | null = null;
+
+  if (hasPlan) {
+    const { data: plan } = await supabase
+      .from('sms_plans')
+      .select('tier')
+      .eq('id', laundromat.sms_plan_id)
+      .single();
+
+    planTier = (plan?.tier as SmsPlanTier) ?? null;
   }
 
   const used = laundromat.sms_used_this_month;
@@ -57,9 +74,12 @@ export async function getQuotaStatus(
     used,
     limit,
     remaining,
-    canSend: used < limit,
+    canSend: hasPlan && used < limit,
     billingCycleStart: laundromat.billing_cycle_start,
     daysUntilReset,
+    hasPlan,
+    planTier,
+    planExpiresAt: laundromat.sms_plan_expires_at,
   };
 }
 

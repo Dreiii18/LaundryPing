@@ -20,7 +20,7 @@ export function SmsQuotaWarning({ used, limit }: SmsQuotaWarningProps) {
       >
         <XCircle className="size-5 text-red-600 shrink-0" aria-hidden="true" />
         <div>
-          <p className="text-sm font-bold text-red-800">Free SMS limit reached</p>
+          <p className="text-sm font-bold text-red-800">SMS limit reached</p>
           <p className="text-xs text-red-600">
             Jobs will still be tracked but SMS won&apos;t be sent. Inform customers manually.
           </p>

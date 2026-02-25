@@ -21,6 +21,9 @@ export async function GET() {
       remaining: quota.remaining,
       billingCycleStart: quota.billingCycleStart,
       daysUntilReset: quota.daysUntilReset,
+      hasPlan: quota.hasPlan,
+      planTier: quota.planTier,
+      planExpiresAt: quota.planExpiresAt,
     });
   } catch {
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });

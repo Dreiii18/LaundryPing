@@ -1,4 +1,3 @@
-import { FREE_TIER_SMS_LIMIT } from '@/lib/constants';
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { JobsTable } from '@/components/jobs-table';
@@ -18,7 +17,7 @@ export default async function DashboardPage() {
 
   const { data: laundromat } = await supabase
     .from('laundromats')
-    .select('id, sms_used_this_month, sms_limit')
+    .select('*')
     .eq('user_id', user.id)
     .single();
 
@@ -27,7 +26,19 @@ export default async function DashboardPage() {
   }
 
   const smsUsed = (laundromat as Record<string, unknown>).sms_used_this_month as number ?? 0;
-  const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? FREE_TIER_SMS_LIMIT;
+  const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? 0;
+  const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null;
+
+  // Get plan name if plan exists
+  let planName: string | undefined;
+  if (hasPlan) {
+    const { data: plan } = await supabase
+      .from('sms_plans')
+      .select('label')
+      .eq('id', (laundromat as Record<string, unknown>).sms_plan_id as string)
+      .single();
+    planName = plan?.label ?? undefined;
+  }
 
   // Calculate days until billing cycle reset (1st of next month)
   const now = new Date();
@@ -74,7 +85,7 @@ export default async function DashboardPage() {
   const safeJobs = (jobs || []).map((job) => ({
     id: job.id,
     machine_id: job.machine_id,
-    customer_phone_masked: job.customer_phone_masked,
+    customer_phone_masked: job.customer_phone_masked as string | null,
     status: job.status as 'in_progress' | 'completed' | 'cancelled',
     started_at: job.started_at,
     completed_at: job.completed_at,
@@ -110,11 +121,11 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* SMS Quota Warning */}
-      <SmsQuotaWarning used={smsUsed} limit={smsLimit} />
+      {/* SMS Quota Warning - only when plan exists */}
+      {hasPlan && <SmsQuotaWarning used={smsUsed} limit={smsLimit} />}
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${hasPlan ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
         {/* Jobs Completed Today */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
           <p className="text-slate-500 text-sm font-medium mb-1">Jobs completed today</p>
@@ -164,8 +175,10 @@ export default async function DashboardPage() {
           </p>
         </div>
 
-        {/* SMS Usage */}
-        <SmsUsageCard used={smsUsed} limit={smsLimit} daysUntilReset={daysUntilReset} />
+        {/* SMS Usage - only when plan exists */}
+        {hasPlan && (
+          <SmsUsageCard used={smsUsed} limit={smsLimit} daysUntilReset={daysUntilReset} planName={planName} />
+        )}
       </div>
 
       {/* Today's Jobs Table */}
