@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       email,
       password,
       options: {
-        data: { shop_name: sanitizedShopName },
+        data: { laundromat_name: sanitizedShopName },
       },
     });
 

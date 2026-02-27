@@ -26,7 +26,7 @@ export default async function MachinesPage() {
     .from('machines')
     .select('*')
     .eq('laundromat_id', laundromat.id)
-    .eq('status', 'active')
+    .in('status', ['active', 'maintenance'])
     .order('created_at', { ascending: true });
 
   // Get today's date in PH timezone for filtering completed jobs

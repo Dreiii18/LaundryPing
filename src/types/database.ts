@@ -59,7 +59,7 @@ export interface Database {
           laundromat_id: string;
           label: string;
           type: 'washer' | 'dryer';
-          status: 'active' | 'inactive';
+          status: 'active' | 'inactive' | 'maintenance';
           created_at: string;
           updated_at: string;
         };
@@ -68,7 +68,7 @@ export interface Database {
           laundromat_id: string;
           label: string;
           type: 'washer' | 'dryer';
-          status?: 'active' | 'inactive';
+          status?: 'active' | 'inactive' | 'maintenance';
           created_at?: string;
           updated_at?: string;
         };
@@ -77,7 +77,7 @@ export interface Database {
           laundromat_id?: string;
           label?: string;
           type?: 'washer' | 'dryer';
-          status?: 'active' | 'inactive';
+          status?: 'active' | 'inactive' | 'maintenance';
           created_at?: string;
           updated_at?: string;
         };
@@ -258,6 +258,10 @@ export interface Database {
         Returns: undefined;
       };
       mark_overdue_jobs: {
+        Args: { p_laundromat_id: string };
+        Returns: undefined;
+      };
+      decrement_sms_quota: {
         Args: { p_laundromat_id: string };
         Returns: undefined;
       };

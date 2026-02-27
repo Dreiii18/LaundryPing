@@ -39,12 +39,12 @@ export default function NotFound() {
             <LayoutDashboard className="size-4" />
             Back to Dashboard
           </Link>
-          <Link
-            href="/settings"
+          <a
+            href="mailto:support@laundryping.com"
             className="inline-flex items-center gap-2 px-6 py-3 rounded-lg border border-slate-200 bg-white text-slate-700 font-medium text-sm hover:bg-slate-50 transition-colors"
           >
             Contact Support
-          </Link>
+          </a>
         </div>
 
         {/* Quick links */}
