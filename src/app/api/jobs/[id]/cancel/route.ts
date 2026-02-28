@@ -37,7 +37,7 @@ export async function POST(
     }
 
     // Cancel the job -- no SMS sent
-    await supabase
+    const { error: updateError } = await supabase
       .from('jobs')
       .update({
         status: 'cancelled',
@@ -46,7 +46,15 @@ export async function POST(
       .eq('id', id)
       .eq('status', 'in_progress');
 
-    return NextResponse.json({ message: 'Job cancelled.' });
+    if (updateError) {
+      console.error('[Cancel Job] Update failed:', updateError);
+      return NextResponse.json(
+        { error: 'Failed to cancel job' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ message: 'Job cancelled.', toastType: 'success' });
   } catch (err) {
     console.error('[Cancel Job] Unexpected error:', err);
     return NextResponse.json(

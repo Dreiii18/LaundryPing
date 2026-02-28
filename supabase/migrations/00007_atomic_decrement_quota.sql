@@ -8,4 +8,5 @@ BEGIN
   WHERE id = p_laundromat_id
     AND sms_used_this_month > 0;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;

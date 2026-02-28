@@ -55,12 +55,13 @@ export async function middleware(request: NextRequest) {
   }
 
   // Redirect authenticated users away from auth pages
+  // Note: /forgot-password and /reset-password are intentionally excluded —
+  // Supabase sets a session before the user lands on /reset-password,
+  // so redirecting them would break the password reset flow.
   if (
     user &&
     (request.nextUrl.pathname.startsWith('/login') ||
-      request.nextUrl.pathname.startsWith('/signup') ||
-      request.nextUrl.pathname.startsWith('/forgot-password') ||
-      request.nextUrl.pathname.startsWith('/reset-password'))
+      request.nextUrl.pathname.startsWith('/signup'))
   ) {
     const url = request.nextUrl.clone();
     url.pathname = '/dashboard';

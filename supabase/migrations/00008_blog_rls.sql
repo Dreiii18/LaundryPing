@@ -1,13 +1,11 @@
 -- Enable RLS on blog_posts table
 ALTER TABLE blog_posts ENABLE ROW LEVEL SECURITY;
 
--- Public can read published posts
+-- Drop existing policies to make migration idempotent
+DROP POLICY IF EXISTS "Public can read published posts" ON blog_posts;
+DROP POLICY IF EXISTS "Service role full access" ON blog_posts;
+
+-- Public can read published posts (service role bypasses RLS automatically)
 CREATE POLICY "Public can read published posts"
   ON blog_posts FOR SELECT
   USING (published = true);
-
--- Service role has full access (admin routes use supabaseAdmin which bypasses RLS)
-CREATE POLICY "Service role full access"
-  ON blog_posts FOR ALL
-  USING (true)
-  WITH CHECK (true);

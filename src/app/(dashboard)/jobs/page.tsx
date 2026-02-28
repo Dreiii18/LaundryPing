@@ -93,7 +93,11 @@ export default async function JobsPage({
     query = query.lte('started_at', `${dateTo}T23:59:59+08:00`);
   }
   if (search) {
-    query = query.or(`customer_phone_masked.ilike.%${search}%,notes.ilike.%${search}%`);
+    // Escape PostgREST-special characters to prevent filter injection
+    const sanitized = search.replace(/[,()\\%_]/g, '\\$&');
+    query = query.or(
+      `customer_phone_masked.ilike.%${sanitized}%,notes.ilike.%${sanitized}%`
+    );
   }
 
   // Pagination

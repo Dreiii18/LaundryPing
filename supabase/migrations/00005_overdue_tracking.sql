@@ -14,4 +14,5 @@ BEGIN
     AND is_overdue = false
     AND started_at < (now() AT TIME ZONE 'Asia/Manila')::date::timestamptz;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = public;

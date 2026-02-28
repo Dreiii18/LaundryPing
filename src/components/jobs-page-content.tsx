@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -55,24 +55,28 @@ export function JobsPageContent({
 
   // Keep searchInput in sync when URL-driven filter changes (e.g. clear filters)
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: sync local input with URL-driven prop
     setSearchInput(currentFilters.search);
   }, [currentFilters.search]);
 
-  const buildUrl = (overrides: Record<string, string>) => {
-    const params = new URLSearchParams();
-    const merged = {
-      ...currentFilters,
-      page: String(currentPage),
-      ...overrides,
-    };
-    for (const [key, value] of Object.entries(merged)) {
-      if (value && value !== 'all' && value !== '1' && value !== '') {
-        params.set(key, value);
+  const buildUrl = useCallback(
+    (overrides: Record<string, string>) => {
+      const params = new URLSearchParams();
+      const merged = {
+        ...currentFilters,
+        page: String(currentPage),
+        ...overrides,
+      };
+      for (const [key, value] of Object.entries(merged)) {
+        if (value && value !== 'all' && value !== '1' && value !== '') {
+          params.set(key, value);
+        }
       }
-    }
-    const qs = params.toString();
-    return qs ? `${pathname}?${qs}` : pathname;
-  };
+      const qs = params.toString();
+      return qs ? `${pathname}?${qs}` : pathname;
+    },
+    [currentFilters, currentPage, pathname]
+  );
 
   // Debounce search navigation
   useEffect(() => {
@@ -82,8 +86,7 @@ export function JobsPageContent({
       }
     }, 300);
     return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchInput]);
+  }, [searchInput, currentFilters.search, buildUrl, router]);
 
   const hasFilters =
     currentFilters.status !== 'all' ||
