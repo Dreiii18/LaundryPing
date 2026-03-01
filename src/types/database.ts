@@ -21,6 +21,7 @@ export interface Database {
           sms_plan_id: string | null;
           sms_plan_activated_at: string | null;
           sms_plan_expires_at: string | null;
+          plan_cancelled_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -35,6 +36,7 @@ export interface Database {
           sms_plan_id?: string | null;
           sms_plan_activated_at?: string | null;
           sms_plan_expires_at?: string | null;
+          plan_cancelled_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -49,6 +51,7 @@ export interface Database {
           sms_plan_id?: string | null;
           sms_plan_activated_at?: string | null;
           sms_plan_expires_at?: string | null;
+          plan_cancelled_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -208,6 +211,50 @@ export interface Database {
           created_at?: string;
         };
       };
+      email_logs: {
+        Row: {
+          id: string;
+          laundromat_id: string | null;
+          user_id: string;
+          email_type: 'welcome' | 'plan_activated' | 'plan_expiry_reminder' | 'plan_expired' | 'plan_cancelled';
+          recipient_email: string;
+          subject: string;
+          provider: string;
+          status: 'sent' | 'failed';
+          provider_message_id: string | null;
+          provider_response: Json | null;
+          metadata: Json | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          laundromat_id?: string | null;
+          user_id: string;
+          email_type: 'welcome' | 'plan_activated' | 'plan_expiry_reminder' | 'plan_expired' | 'plan_cancelled';
+          recipient_email: string;
+          subject: string;
+          provider: string;
+          status: 'sent' | 'failed';
+          provider_message_id?: string | null;
+          provider_response?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          laundromat_id?: string | null;
+          user_id?: string;
+          email_type?: 'welcome' | 'plan_activated' | 'plan_expiry_reminder' | 'plan_expired' | 'plan_cancelled';
+          recipient_email?: string;
+          subject?: string;
+          provider?: string;
+          status?: 'sent' | 'failed';
+          provider_message_id?: string | null;
+          provider_response?: Json | null;
+          metadata?: Json | null;
+          created_at?: string;
+        };
+      };
       blog_posts: {
         Row: {
           id: string;
@@ -259,6 +306,10 @@ export interface Database {
       };
       mark_overdue_jobs: {
         Args: { p_laundromat_id: string };
+        Returns: undefined;
+      };
+      cancel_sms_plan: {
+        Args: { p_user_id: string };
         Returns: undefined;
       };
     };

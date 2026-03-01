@@ -3,19 +3,10 @@ import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { sendEmail, buildPlanActivatedEmail } from '@/lib/email';
+import { sendEmail, buildPlanCancelledEmail } from '@/lib/email';
 
-const activatePlanSchema = z.object({
+const cancelPlanSchema = z.object({
   user_id: z.string().uuid('Invalid user ID'),
-  plan_tier: z.enum(['starter', 'growth', 'scale'], {
-    message: 'Plan tier must be "starter", "growth", or "scale"',
-  }),
-  duration_days: z
-    .number()
-    .int()
-    .min(1)
-    .max(365)
-    .default(30),
 });
 
 export async function POST(request: Request) {
@@ -31,7 +22,7 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const parsed = activatePlanSchema.safeParse(body);
+    const parsed = cancelPlanSchema.safeParse(body);
 
     if (!parsed.success) {
       return NextResponse.json(
@@ -40,46 +31,57 @@ export async function POST(request: Request) {
       );
     }
 
-    const { user_id, plan_tier, duration_days } = parsed.data;
+    const { user_id } = parsed.data;
 
-    const { error: rpcError } = await supabaseAdmin.rpc('activate_sms_plan', {
+    // Verify user has an active plan
+    const { data: laundromat } = await supabaseAdmin
+      .from('laundromats')
+      .select('id, name, sms_plan_id')
+      .eq('user_id', user_id)
+      .single();
+
+    if (!laundromat) {
+      return NextResponse.json(
+        { error: 'Laundromat not found' },
+        { status: 404 }
+      );
+    }
+
+    if (!laundromat.sms_plan_id) {
+      return NextResponse.json(
+        { error: 'User does not have an active plan' },
+        { status: 400 }
+      );
+    }
+
+    // Fetch plan details before cancellation (for email)
+    const { data: plan } = await supabaseAdmin
+      .from('sms_plans')
+      .select('label')
+      .eq('id', laundromat.sms_plan_id)
+      .single();
+
+    const { error: rpcError } = await supabaseAdmin.rpc('cancel_sms_plan', {
       p_user_id: user_id,
-      p_plan_tier: plan_tier,
-      p_duration_days: duration_days,
     });
 
     if (rpcError) {
       return NextResponse.json(
-        { error: rpcError.message || 'Failed to activate plan' },
+        { error: rpcError.message || 'Failed to cancel plan' },
         { status: 500 }
       );
     }
 
-    // Fire-and-forget plan activation email
+    // Fire-and-forget cancellation email
     (async () => {
       try {
         const { data: userData } = await supabaseAdmin.auth.admin.getUserById(user_id);
         if (!userData?.user?.email) return;
 
-        const { data: laundromat } = await supabaseAdmin
-          .from('laundromats')
-          .select('id, name')
-          .eq('user_id', user_id)
-          .single();
-
-        const { data: plan } = await supabaseAdmin
-          .from('sms_plans')
-          .select('label, sms_limit, price_php')
-          .eq('tier', plan_tier)
-          .single();
-
-        if (!laundromat || !plan) return;
-
-        const { subject, html } = buildPlanActivatedEmail({
+        const { subject, html } = buildPlanCancelledEmail({
           shopName: laundromat.name,
-          planLabel: plan.label,
-          planLimit: plan.sms_limit,
-          planPricePhp: plan.price_php,
+          planLabel: plan?.label || 'SMS',
+          cancelledAt: new Date().toISOString(),
         });
 
         const result = await sendEmail({ to: { email: userData.user.email }, subject, html });
@@ -87,7 +89,7 @@ export async function POST(request: Request) {
         await supabaseAdmin.from('email_logs').insert({
           user_id,
           laundromat_id: laundromat.id,
-          email_type: 'plan_activated' as const,
+          email_type: 'plan_cancelled' as const,
           recipient_email: userData.user.email,
           subject,
           provider: result.provider,
@@ -96,7 +98,7 @@ export async function POST(request: Request) {
           provider_response: result.rawResponse ? (result.rawResponse as Record<string, unknown>) : null,
         });
       } catch (err) {
-        console.error('[Plan Activation Email] Failed:', err);
+        console.error('[Plan Cancellation Email] Failed:', err);
       }
     })();
 

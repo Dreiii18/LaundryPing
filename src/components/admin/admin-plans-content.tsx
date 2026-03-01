@@ -76,10 +76,12 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [cancelDialogOpen, setCancelDialogOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<LaundryRow | null>(null);
   const [selectedTier, setSelectedTier] = useState<string>('starter');
   const [selectedDuration, setSelectedDuration] = useState<string>('30');
   const [loading, setLoading] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const filtered = laundromats.filter((row) => {
     const q = search.toLowerCase();
@@ -120,6 +122,37 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
       toast.error('An unexpected error occurred');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = (row: LaundryRow) => {
+    setSelectedRow(row);
+    setCancelDialogOpen(true);
+  };
+
+  const handleConfirmCancel = async () => {
+    if (!selectedRow) return;
+    setCancelLoading(true);
+    try {
+      const res = await fetchWithAuth('/api/admin/plans/cancel', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: selectedRow.user_id }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to cancel plan');
+        return;
+      }
+
+      toast.success(`Plan cancelled for ${selectedRow.name}`);
+      setCancelDialogOpen(false);
+      router.refresh();
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -186,7 +219,7 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
                         ? new Date(row.sms_plan_expires_at).toLocaleDateString()
                         : '-'}
                     </TableCell>
-                    <TableCell className="text-right">
+                    <TableCell className="text-right space-x-2">
                       <Button
                         variant="outline"
                         size="sm"
@@ -195,6 +228,16 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
                       >
                         Activate
                       </Button>
+                      {row.plan_tier && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleCancel(row)}
+                          className="text-red-600 border-red-300 hover:bg-red-50"
+                        >
+                          Cancel
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 );
@@ -260,6 +303,31 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
               className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white"
             >
               {loading ? 'Activating...' : 'Confirm Activation'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Cancel SMS Plan</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel the plan for <strong>{selectedRow?.name}</strong> ({selectedRow?.email})?
+              This will immediately set their SMS limit to 0.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCancelDialogOpen(false)} disabled={cancelLoading}>
+              Keep Plan
+            </Button>
+            <Button
+              onClick={handleConfirmCancel}
+              disabled={cancelLoading}
+              variant="destructive"
+            >
+              {cancelLoading ? 'Cancelling...' : 'Confirm Cancellation'}
             </Button>
           </DialogFooter>
         </DialogContent>
