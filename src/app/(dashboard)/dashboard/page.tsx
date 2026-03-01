@@ -1,9 +1,10 @@
 import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
+import Link from 'next/link';
 import { JobsTable } from '@/components/jobs-table';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, WashingMachine, Plus } from 'lucide-react';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -24,6 +25,14 @@ export default async function DashboardPage() {
   if (!laundromat) {
     redirect('/login');
   }
+
+  const { count: machineCount } = await supabase
+    .from('machines')
+    .select('id', { count: 'exact', head: true })
+    .eq('laundromat_id', laundromat.id)
+    .in('status', ['active', 'maintenance']);
+
+  const hasNoMachines = (machineCount ?? 0) === 0;
 
   const smsUsed = (laundromat as Record<string, unknown>).sms_used_this_month as number ?? 0;
   const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? 0;
@@ -137,6 +146,28 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Onboarding Banner - only when no machines and no jobs */}
+      {hasNoMachines && safeJobs.length === 0 && (
+        <div className="bg-white border-2 border-[#0d968b]/30 rounded-xl p-6 flex items-start gap-4">
+          <div className="size-12 rounded-xl bg-[#0d968b]/10 flex items-center justify-center shrink-0">
+            <WashingMachine className="size-6 text-[#0d968b]" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-slate-900 mb-1">Welcome to LaundryPing!</h3>
+            <p className="text-sm text-slate-600 mb-3">
+              Get started by adding your first washing machine or dryer.
+            </p>
+            <Link
+              href="/machines"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d968b] text-white font-semibold text-sm hover:bg-[#0d968b]/90 transition-colors"
+            >
+              <Plus className="size-4" />
+              Add Machine
+            </Link>
+          </div>
+        </div>
+      )}
+
       {/* SMS Quota Warning - only when plan exists */}
       {hasPlan && <SmsQuotaWarning used={smsUsed} limit={smsLimit} />}
 

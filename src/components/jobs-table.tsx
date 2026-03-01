@@ -19,6 +19,16 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -72,6 +82,8 @@ export type { Job };
 export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTableProps) {
   const router = useRouter();
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<string | null>(null);
+  const [cancelConfirmJobId, setCancelConfirmJobId] = useState<string | null>(null);
   const [payLaterJobId, setPayLaterJobId] = useState<string | null>(null);
   const [payLaterMethod, setPayLaterMethod] = useState('');
   const [overdueJobId, setOverdueJobId] = useState<string | null>(null);
@@ -136,6 +148,31 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
       setOverdueReason('');
     } else {
       proceedToPaymentOrComplete(job);
+    }
+  };
+
+  const handleCancelJob = async (jobId: string) => {
+    setCancelConfirmJobId(null);
+    setCancellingId(jobId);
+
+    try {
+      const res = await fetchWithAuth(`/api/jobs/${jobId}/cancel`, {
+        method: 'POST',
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to cancel job');
+        return;
+      }
+
+      toast.success('Job cancelled.');
+      router.refresh();
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setCancellingId(null);
     }
   };
 
@@ -290,23 +327,42 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
               </TableCell>
               <TableCell className="px-6 py-4 text-right">
                 {job.status === 'in_progress' ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleMarkDone(job)}
-                    disabled={completingId !== null}
-                    aria-label={`Mark ${job.machine?.label || 'job'} as done`}
-                    className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 min-h-11 min-w-11"
-                  >
-                    {completingId === job.id ? (
-                      <>
-                        <Loader2 className="size-3 animate-spin" />
-                        <span className="ml-1">Sending...</span>
-                      </>
-                    ) : (
-                      'Mark done'
-                    )}
-                  </Button>
+                  <div className="inline-flex items-center gap-2 justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleMarkDone(job)}
+                      disabled={completingId !== null || cancellingId !== null}
+                      aria-label={`Mark ${job.machine?.label || 'job'} as done`}
+                      className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 min-h-11 min-w-11"
+                    >
+                      {completingId === job.id ? (
+                        <>
+                          <Loader2 className="size-3 animate-spin" />
+                          <span className="ml-1">Sending...</span>
+                        </>
+                      ) : (
+                        'Mark done'
+                      )}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCancelConfirmJobId(job.id)}
+                      disabled={completingId !== null || cancellingId !== null}
+                      aria-label={`Cancel ${job.machine?.label || 'job'}`}
+                      className="text-xs font-bold text-red-600 border-red-200 hover:bg-red-50 min-h-11 min-w-11"
+                    >
+                      {cancellingId === job.id ? (
+                        <>
+                          <Loader2 className="size-3 animate-spin" />
+                          <span className="ml-1">Cancelling...</span>
+                        </>
+                      ) : (
+                        'Cancel'
+                      )}
+                    </Button>
+                  </div>
                 ) : (
                   <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                     <CheckCircle className="size-4 text-slate-300" aria-hidden="true" />
@@ -371,6 +427,27 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Cancel Job Confirmation Dialog */}
+      <AlertDialog open={cancelConfirmJobId !== null} onOpenChange={(open) => { if (!open) setCancelConfirmJobId(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Cancel Job</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to cancel this job? No SMS will be sent.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => { if (cancelConfirmJobId) handleCancelJob(cancelConfirmJobId); }}
+            >
+              Confirm
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Payment Method Dialog for Pay Later jobs */}
       <Dialog open={payLaterJobId !== null} onOpenChange={(open) => { if (!open) { setPayLaterJobId(null); setOverdueReason(''); } }}>

@@ -23,7 +23,7 @@ export async function GET() {
       .from('machines')
       .select('*')
       .eq('laundromat_id', laundromat.id)
-      .eq('status', 'active')
+      .in('status', ['active', 'maintenance'])
       .order('created_at', { ascending: true });
 
     if (queryError) {

@@ -53,7 +53,7 @@ import {
   ChevronRight,
   CheckCircle,
   Activity,
-  // Wrench,
+  Wrench,
   ArrowUpDown,
   ArrowUp,
   ArrowDown,
@@ -112,6 +112,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [label, setLabel] = useState('');
   const [type, setType] = useState<'washer' | 'dryer'>('washer');
+  const [status, setStatus] = useState<'active' | 'maintenance'>('active');
   const [modalError, setModalError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -143,7 +144,9 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const runningCount = initialMachines.filter(
     (m) => m.operationalStatus === 'in_use'
   ).length;
-  // const maintenanceCount = 0;
+  const maintenanceCount = initialMachines.filter(
+    (m) => m.status === 'maintenance'
+  ).length;
 
   // Filtered machines
   const filteredMachines = useMemo(() => {
@@ -154,6 +157,8 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
       result = result.filter((m) => m.type === 'washer');
     } else if (activeTab === 'dryers') {
       result = result.filter((m) => m.type === 'dryer');
+    } else if (activeTab === 'maintenance') {
+      result = result.filter((m) => m.status === 'maintenance');
     }
 
     // Search filter
@@ -226,6 +231,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     setEditingMachine(null);
     setLabel('');
     setType('washer');
+    setStatus('active');
     setModalError('');
     setModalOpen(true);
   };
@@ -234,6 +240,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     setEditingMachine(machine);
     setLabel(machine.label);
     setType(machine.type);
+    setStatus(machine.status === 'maintenance' ? 'maintenance' : 'active');
     setModalError('');
     setModalOpen(true);
   };
@@ -264,7 +271,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         const res = await fetchWithAuth(`/api/machines/${editingMachine.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label.trim(), type }),
+          body: JSON.stringify({ label: label.trim(), type, status }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -377,9 +384,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
               <TabsTrigger value="all">All Machines</TabsTrigger>
               <TabsTrigger value="washers">Washers</TabsTrigger>
               <TabsTrigger value="dryers">Dryers</TabsTrigger>
-              {/* <TabsTrigger value="maintenance" disabled>
-                Maintenance
-              </TabsTrigger> */}
+              <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -454,7 +459,12 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                           </div>
                         </TableCell>
                         <TableCell className="px-6 py-5">
-                          {machine.operationalStatus === 'in_use' ? (
+                          {machine.status === 'maintenance' ? (
+                            <Badge className="bg-orange-100 text-orange-700 border-transparent gap-1.5">
+                              <Wrench className="size-3" />
+                              Maintenance
+                            </Badge>
+                          ) : machine.operationalStatus === 'in_use' ? (
                             <Badge className="bg-[#0d968b]/10 text-[#0d968b] border-transparent gap-1.5">
                               <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
                               In Use
@@ -558,7 +568,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
           </div>
 
           {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-emerald-100">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-lg bg-emerald-100 flex items-center justify-center">
@@ -581,7 +591,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                 </div>
               </div>
             </div>
-            {/* <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-100">
+            <div className="bg-white p-5 rounded-xl shadow-sm border border-orange-100">
               <div className="flex items-center gap-3">
                 <div className="size-10 rounded-lg bg-orange-100 flex items-center justify-center">
                   <Wrench className="size-5 text-orange-600" />
@@ -591,7 +601,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                   <p className="text-2xl font-bold text-slate-900">{maintenanceCount}</p>
                 </div>
               </div>
-            </div> */}
+            </div>
           </div>
         </>
       )}
@@ -657,6 +667,29 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                   </SelectContent>
                 </Select>
               </div>
+
+              {editingMachine && (
+                <div className="flex flex-col gap-2">
+                  <Label className="text-sm font-medium">Status</Label>
+                  <Select
+                    value={status}
+                    onValueChange={(v) => setStatus(v as 'active' | 'maintenance')}
+                  >
+                    <SelectTrigger className="w-full h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="active">Active</SelectItem>
+                      <SelectItem value="maintenance">
+                        <div className="flex items-center gap-2">
+                          <Wrench className="size-4" />
+                          Maintenance
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
 
             <DialogFooter>

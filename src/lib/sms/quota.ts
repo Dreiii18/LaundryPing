@@ -111,18 +111,11 @@ export async function decrementQuota(
   supabase: SupabaseClient,
   laundromatId: string
 ): Promise<void> {
-  // Use direct SQL via RPC for atomic decrement.
-  // Fallback: read-then-write for environments without the RPC.
-  const { data: current } = await supabase
-    .from('laundromats')
-    .select('sms_used_this_month')
-    .eq('id', laundromatId)
-    .single();
+  const { error } = await supabase.rpc('decrement_sms_quota', {
+    p_laundromat_id: laundromatId,
+  });
 
-  if (current && current.sms_used_this_month > 0) {
-    await supabase
-      .from('laundromats')
-      .update({ sms_used_this_month: current.sms_used_this_month - 1 })
-      .eq('id', laundromatId);
+  if (error) {
+    console.error('Quota decrement failed:', error);
   }
 }

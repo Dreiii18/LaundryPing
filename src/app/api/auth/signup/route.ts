@@ -5,7 +5,7 @@ import { sanitizeLaundromatName } from '@/lib/utils/sanitize';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
-  password: z.string().min(6, 'Password must be at least 6 characters'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
   shopName: z.string().min(1, 'Shop name is required').max(50, 'Shop name must be 50 characters or less'),
 });
 
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
       email,
       password,
       options: {
-        data: { shop_name: sanitizedShopName },
+        data: { laundromat_name: sanitizedShopName },
       },
     });
 

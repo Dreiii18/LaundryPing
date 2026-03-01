@@ -25,7 +25,9 @@ if (typeof setInterval !== 'undefined') {
  * In-memory sliding window rate limiter.
  * Returns { allowed, remaining, resetAt } for the given key.
  *
- * Note: Resets on cold start (serverless). Acceptable for Phase 1 MVP.
+ * TODO(phase-2): Replace with Redis/Upstash-based rate limiter for
+ * cross-instance consistency in serverless deployments. Current in-memory
+ * approach resets on cold start and is per-instance only.
  */
 export function checkRateLimit(key: string): {
   allowed: boolean;
