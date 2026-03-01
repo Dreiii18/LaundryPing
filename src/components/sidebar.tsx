@@ -8,6 +8,7 @@ import {
   WashingMachine,
   Settings,
   CreditCard,
+  MessageSquare,
   Shield,
   LogOut,
 } from 'lucide-react';
@@ -18,6 +19,7 @@ const navItems = [
   { href: '/jobs', label: 'Jobs', icon: ListTodo },
   { href: '/machines', label: 'Machines', icon: WashingMachine },
   { href: '/plan-billing', label: 'Plan & Billing', icon: CreditCard },
+  { href: '/sms-history', label: 'SMS History', icon: MessageSquare },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
@@ -47,7 +49,7 @@ export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarCont
           </div>
           <div>
             <h1 className="text-lg font-bold leading-none">LaundryPing</h1>
-            <p className="text-xs text-[#0d968b] font-medium">Admin Console</p>
+            <p className="text-xs text-[#0d968b] font-medium">{isAdminUser ? 'Admin Console' : 'Staff Dashboard'}</p>
           </div>
         </Link>
 
