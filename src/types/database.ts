@@ -15,12 +15,9 @@ export interface Database {
           user_id: string;
           name: string;
           address: string | null;
-          sms_limit: number;
-          sms_used_this_month: number;
+          sms_free_credits: number;
+          sms_paid_credits: number;
           billing_cycle_start: string;
-          sms_plan_id: string | null;
-          sms_plan_activated_at: string | null;
-          sms_plan_expires_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -29,12 +26,9 @@ export interface Database {
           user_id: string;
           name: string;
           address?: string | null;
-          sms_limit?: number;
-          sms_used_this_month?: number;
+          sms_free_credits?: number;
+          sms_paid_credits?: number;
           billing_cycle_start?: string;
-          sms_plan_id?: string | null;
-          sms_plan_activated_at?: string | null;
-          sms_plan_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -43,12 +37,9 @@ export interface Database {
           user_id?: string;
           name?: string;
           address?: string | null;
-          sms_limit?: number;
-          sms_used_this_month?: number;
+          sms_free_credits?: number;
+          sms_paid_credits?: number;
           billing_cycle_start?: string;
-          sms_plan_id?: string | null;
-          sms_plan_activated_at?: string | null;
-          sms_plan_expires_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -176,12 +167,12 @@ export interface Database {
           created_at?: string;
         };
       };
-      sms_plans: {
+      sms_topup_packages: {
         Row: {
           id: string;
-          tier: 'starter' | 'growth' | 'scale';
+          slug: string;
           label: string;
-          sms_limit: number;
+          sms_credits: number;
           price_php: number;
           description: string | null;
           sort_order: number;
@@ -189,9 +180,9 @@ export interface Database {
         };
         Insert: {
           id?: string;
-          tier: 'starter' | 'growth' | 'scale';
+          slug: string;
           label: string;
-          sms_limit: number;
+          sms_credits: number;
           price_php: number;
           description?: string | null;
           sort_order?: number;
@@ -199,12 +190,41 @@ export interface Database {
         };
         Update: {
           id?: string;
-          tier?: 'starter' | 'growth' | 'scale';
+          slug?: string;
           label?: string;
-          sms_limit?: number;
+          sms_credits?: number;
           price_php?: number;
           description?: string | null;
           sort_order?: number;
+          created_at?: string;
+        };
+      };
+      sms_topup_logs: {
+        Row: {
+          id: string;
+          laundromat_id: string;
+          package_slug: string;
+          credits_added: number;
+          price_php: number;
+          activated_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          laundromat_id: string;
+          package_slug: string;
+          credits_added: number;
+          price_php: number;
+          activated_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          laundromat_id?: string;
+          package_slug?: string;
+          credits_added?: number;
+          price_php?: number;
+          activated_by?: string;
           created_at?: string;
         };
       };
@@ -247,23 +267,23 @@ export interface Database {
     Functions: {
       ensure_billing_cycle: {
         Args: { p_laundromat_id: string };
-        Returns: undefined;
+        Returns: null;
       };
-      check_and_increment_sms_quota: {
+      check_and_consume_sms_credit: {
         Args: { p_laundromat_id: string };
-        Returns: boolean;
+        Returns: string;
       };
-      activate_sms_plan: {
-        Args: { p_user_id: string; p_plan_tier: string; p_duration_days?: number };
-        Returns: undefined;
+      refund_sms_credit: {
+        Args: { p_laundromat_id: string; p_credit_type: string };
+        Returns: null;
+      };
+      add_sms_topup: {
+        Args: { p_laundromat_id: string; p_package_slug: string; p_admin_id: string };
+        Returns: null;
       };
       mark_overdue_jobs: {
         Args: { p_laundromat_id: string };
-        Returns: undefined;
-      };
-      decrement_sms_quota: {
-        Args: { p_laundromat_id: string };
-        Returns: undefined;
+        Returns: null;
       };
     };
   };
