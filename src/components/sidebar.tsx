@@ -7,18 +7,19 @@ import {
   ListTodo,
   WashingMachine,
   Settings,
-  CreditCard,
   MessageSquare,
+  Wallet,
   Shield,
   LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 const navItems = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { href: '/jobs', label: 'Jobs', icon: ListTodo },
   { href: '/machines', label: 'Machines', icon: WashingMachine },
-  { href: '/plan-billing', label: 'Plan & Billing', icon: CreditCard },
+  { href: '/plan-billing', label: 'SMS Credits', icon: Wallet },
   { href: '/sms-history', label: 'SMS History', icon: MessageSquare },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
@@ -44,9 +45,7 @@ export function SidebarContent({ onNavigate, isAdmin: isAdminUser }: SidebarCont
       <div>
         {/* Logo */}
         <Link href="/dashboard" className="px-6 mb-8 flex items-center gap-3">
-          <div className="size-10 bg-[#0d968b] rounded-lg flex items-center justify-center text-white">
-            <WashingMachine className="size-5" />
-          </div>
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={40} height={40} className="size-10 rounded-lg" />
           <div>
             <h1 className="text-lg font-bold leading-none">LaundryPing</h1>
             <p className="text-xs text-[#0d968b] font-medium">{isAdminUser ? 'Admin Console' : 'Staff Dashboard'}</p>

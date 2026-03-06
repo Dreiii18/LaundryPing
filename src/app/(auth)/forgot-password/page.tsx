@@ -5,8 +5,9 @@ import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Loader2, WashingMachine } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
@@ -46,9 +47,7 @@ export default function ForgotPasswordPage() {
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-10">
           <div className="flex items-center gap-2 text-[#0d968b]">
-            <div className="size-8 flex items-center justify-center rounded-lg bg-[#0d968b]/10">
-              <WashingMachine className="size-5 text-[#0d968b]" />
-            </div>
+            <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
             <h2 className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
               LaundryPing
             </h2>

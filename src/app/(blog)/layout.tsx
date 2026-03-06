@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { WashingMachine } from 'lucide-react';
+import Image from 'next/image';
 
 export default function BlogLayout({
   children,
@@ -11,9 +11,7 @@ export default function BlogLayout({
       <header className="border-b border-slate-200 bg-white">
         <div className="max-w-3xl mx-auto px-4 h-16 flex items-center justify-between">
           <Link href="/blog" className="flex items-center gap-2">
-            <div className="size-8 bg-[#0d968b] rounded-lg flex items-center justify-center text-white">
-              <WashingMachine className="size-4" />
-            </div>
+            <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
             <span className="font-bold text-slate-800">LaundryPing</span>
             <span className="text-sm text-slate-400 ml-1">Blog</span>
           </Link>

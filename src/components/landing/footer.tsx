@@ -1,22 +1,30 @@
 import Link from 'next/link';
-import { WashingMachine } from 'lucide-react';
+import Image from 'next/image';
+import { Facebook, Instagram } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="px-6 py-10 border-t border-gray-100">
-      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-6">
-        <div className="flex items-center gap-2">
-          <div className="size-7 flex items-center justify-center rounded-lg bg-[#0d968b]/10">
-            <WashingMachine className="size-4 text-[#0d968b]" />
+    <footer className="px-6 py-7 border-t border-black/[0.06]">
+      <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-1.5">
+            <Image
+              src="/laundryping-icon.png"
+              alt="LaundryPing"
+              width={20}
+              height={20}
+              className="size-5 rounded"
+            />
+            <span className="text-[#111817] font-semibold text-sm">
+              LaundryPing
+            </span>
           </div>
-          <span className="text-[#111817] font-bold text-base">
-            LaundryPing
-          </span>
-          <span className="text-[#618986] text-sm ml-1 hidden sm:inline">
-            &mdash; SMS alerts para sa laundromat mo
+          <div className="w-px h-4 bg-black/[0.06]" />
+          <span className="text-xs text-[#94a3b8]">
+            &copy; {new Date().getFullYear()}
           </span>
         </div>
-        <div className="flex items-center gap-6 text-sm">
+        <div className="flex items-center gap-5 text-[0.8125rem]">
           <Link
             href="/login"
             className="text-[#618986] hover:text-[#111817] transition-colors"
@@ -29,12 +37,25 @@ export function Footer() {
           >
             Sign Up
           </Link>
+          <a
+            href="https://www.facebook.com/share/18CNvPMTfH/"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Facebook"
+            className="text-[#618986] hover:text-[#111817] transition-colors inline-flex"
+          >
+            <Facebook className="size-[1.125rem]" />
+          </a>
+          <a
+            href="https://www.instagram.com/laundry.ping"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Instagram"
+            className="text-[#618986] hover:text-[#111817] transition-colors inline-flex"
+          >
+            <Instagram className="size-[1.125rem]" />
+          </a>
         </div>
-      </div>
-      <div className="max-w-6xl mx-auto mt-6 pt-6 border-t border-gray-100">
-        <p className="text-xs text-[#618986] text-center sm:text-left">
-          &copy; 2026 LaundryPing. All rights reserved.
-        </p>
       </div>
     </footer>
   );

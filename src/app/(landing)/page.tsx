@@ -2,8 +2,8 @@ import type { Metadata } from 'next';
 import { Navbar } from '@/components/landing/navbar';
 import { Hero } from '@/components/landing/hero';
 import { HowItWorks } from '@/components/landing/how-it-works';
-import { DemoVideo } from '@/components/landing/demo-video';
-import { Benefits } from '@/components/landing/benefits';
+import { Features } from '@/components/landing/features';
+import { Pricing } from '@/components/landing/pricing';
 import { Faq } from '@/components/landing/faq';
 import { FinalCta } from '@/components/landing/final-cta';
 import { Footer } from '@/components/landing/footer';
@@ -20,8 +20,8 @@ export default function LandingPage() {
       <Navbar />
       <Hero />
       <HowItWorks />
-      <DemoVideo />
-      <Benefits />
+      <Features />
+      <Pricing />
       <Faq />
       <FinalCta />
       <Footer />

@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { JobsTable } from '@/components/jobs-table';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
-import { TrendingUp, TrendingDown, Minus, WashingMachine, Plus } from 'lucide-react';
+import { TrendingUp, TrendingDown, Minus, Plus } from 'lucide-react';
+import Image from 'next/image';
 
 export default async function DashboardPage() {
   const supabase = await createClient();
@@ -34,26 +35,15 @@ export default async function DashboardPage() {
 
   const hasNoMachines = (machineCount ?? 0) === 0;
 
-  const smsUsed = (laundromat as Record<string, unknown>).sms_used_this_month as number ?? 0;
-  const smsLimit = (laundromat as Record<string, unknown>).sms_limit as number ?? 0;
-  const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null;
-
-  // Get plan name if plan exists
-  let planName: string | undefined;
-  if (hasPlan) {
-    const { data: plan } = await supabase
-      .from('sms_plans')
-      .select('label')
-      .eq('id', (laundromat as Record<string, unknown>).sms_plan_id as string)
-      .single();
-    planName = plan?.label ?? undefined;
-  }
+  const freeCredits = laundromat.sms_free_credits;
+  const paidCredits = laundromat.sms_paid_credits;
+  const totalCredits = freeCredits + paidCredits;
 
   // Calculate days until billing cycle reset (1st of next month)
   const now = new Date();
   const phNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const nextMonth = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 1);
-  const daysUntilReset = Math.ceil((nextMonth.getTime() - phNow.getTime()) / (1000 * 60 * 60 * 24));
+  const daysUntilFreeReset = Math.ceil((nextMonth.getTime() - phNow.getTime()) / (1000 * 60 * 60 * 24));
 
   // Get today's date in PH timezone
   const phFormatter = new Intl.DateTimeFormat('en-CA', {
@@ -149,9 +139,7 @@ export default async function DashboardPage() {
       {/* Onboarding Banner - only when no machines and no jobs */}
       {hasNoMachines && safeJobs.length === 0 && (
         <div className="bg-white border-2 border-[#0d968b]/30 rounded-xl p-6 flex items-start gap-4">
-          <div className="size-12 rounded-xl bg-[#0d968b]/10 flex items-center justify-center shrink-0">
-            <WashingMachine className="size-6 text-[#0d968b]" />
-          </div>
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={48} height={48} className="size-12 rounded-xl shrink-0" />
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-1">Welcome to LaundryPing!</h3>
             <p className="text-sm text-slate-600 mb-3">
@@ -168,11 +156,11 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* SMS Quota Warning - only when plan exists */}
-      {hasPlan && <SmsQuotaWarning used={smsUsed} limit={smsLimit} />}
+      {/* SMS Credit Warning */}
+      <SmsQuotaWarning totalCredits={totalCredits} />
 
       {/* Stats Grid */}
-      <div className={`grid grid-cols-1 ${hasPlan ? 'md:grid-cols-3' : 'md:grid-cols-2'} gap-6`}>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Jobs Completed Today */}
         <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
           <p className="text-slate-500 text-sm font-medium mb-1">Jobs completed today</p>
@@ -257,10 +245,13 @@ export default async function DashboardPage() {
           <p className="text-xs text-slate-400 mt-1">vs ₱{yesterdayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} yesterday</p>
         </div>
 
-        {/* SMS Usage - only when plan exists */}
-        {hasPlan && (
-          <SmsUsageCard used={smsUsed} limit={smsLimit} daysUntilReset={daysUntilReset} planName={planName} />
-        )}
+        {/* SMS Credits */}
+        <SmsUsageCard
+          freeCredits={freeCredits}
+          paidCredits={paidCredits}
+          totalCredits={totalCredits}
+          daysUntilFreeReset={daysUntilFreeReset}
+        />
       </div>
 
       {/* Today's Jobs Table */}
