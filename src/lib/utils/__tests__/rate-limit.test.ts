@@ -115,6 +115,38 @@ describe('checkRateLimit', () => {
     });
   });
 
+  describe('custom maxRequests and windowMs', () => {
+    it('respects a custom maxRequests limit', () => {
+      const key = 'test-key-custom-max';
+      for (let i = 0; i < 3; i++) {
+        checkRateLimit(key, 3);
+      }
+      const result = checkRateLimit(key, 3);
+      expect(result.allowed).toBe(false);
+    });
+
+    it('respects a custom windowMs', () => {
+      const key = 'test-key-custom-window';
+      const baseTime = 5_000_000;
+      vi.spyOn(Date, 'now').mockReturnValue(baseTime);
+
+      checkRateLimit(key, 1, 5_000);
+      expect(checkRateLimit(key, 1, 5_000).allowed).toBe(false);
+
+      // Advance 5 seconds
+      vi.spyOn(Date, 'now').mockReturnValue(baseTime + 5_000);
+      const result = checkRateLimit(key, 1, 5_000);
+      expect(result.allowed).toBe(true);
+    });
+
+    it('uses defaults when no custom params provided', () => {
+      const key = 'test-key-defaults';
+      const result = checkRateLimit(key);
+      expect(result.allowed).toBe(true);
+      expect(result.remaining).toBe(59);
+    });
+  });
+
   describe('resetAt', () => {
     it('is greater than Date.now() on the first request', () => {
       const before = Date.now();

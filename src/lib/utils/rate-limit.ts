@@ -29,7 +29,11 @@ if (typeof setInterval !== 'undefined') {
  * cross-instance consistency in serverless deployments. Current in-memory
  * approach resets on cold start and is per-instance only.
  */
-export function checkRateLimit(key: string): {
+export function checkRateLimit(
+  key: string,
+  maxRequests: number = MAX_REQUESTS,
+  windowMs: number = WINDOW_MS,
+): {
   allowed: boolean;
   remaining: number;
   resetAt: number;
@@ -39,20 +43,20 @@ export function checkRateLimit(key: string): {
 
   // Window expired or first request — start new window
   if (!entry || now >= entry.resetAt) {
-    const resetAt = now + WINDOW_MS;
+    const resetAt = now + windowMs;
     windows.set(key, { count: 1, resetAt });
-    return { allowed: true, remaining: MAX_REQUESTS - 1, resetAt };
+    return { allowed: true, remaining: maxRequests - 1, resetAt };
   }
 
   // Within window — check count
-  if (entry.count >= MAX_REQUESTS) {
+  if (entry.count >= maxRequests) {
     return { allowed: false, remaining: 0, resetAt: entry.resetAt };
   }
 
   entry.count += 1;
   return {
     allowed: true,
-    remaining: MAX_REQUESTS - entry.count,
+    remaining: maxRequests - entry.count,
     resetAt: entry.resetAt,
   };
 }
