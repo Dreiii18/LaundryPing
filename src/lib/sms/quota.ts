@@ -64,14 +64,14 @@ export async function getCreditStatus(
 /**
  * Atomically checks and consumes one SMS credit.
  * Free credits are consumed first, then paid credits.
- * Returns true if a credit was consumed, false if none available.
+ * Returns 'free' or 'paid' indicating which bucket was consumed, or null if no credits available.
  * Throws on RPC errors (distinguishing infrastructure failures from a
- * legitimate credit-exhausted false return).
+ * legitimate credit-exhausted null return).
  */
 export async function checkAndConsumeCredit(
   supabase: SupabaseClient,
   laundromatId: string
-): Promise<boolean> {
+): Promise<'free' | 'paid' | null> {
   const { data, error } = await supabase.rpc('check_and_consume_sms_credit', {
     p_laundromat_id: laundromatId,
   });
@@ -81,20 +81,21 @@ export async function checkAndConsumeCredit(
     throw new Error(`Credit consume failed: ${error.message}`);
   }
 
-  return data === true;
+  return data === 'none' ? null : (data as 'free' | 'paid');
 }
 
 /**
- * Refunds one SMS credit (used when SMS send fails after consume).
- * Refunds to free credits if below 50, otherwise to paid credits.
+ * Refunds one SMS credit to the specified bucket (must match what was consumed).
  * Throws on RPC error so callers can detect and handle the failure.
  */
 export async function refundCredit(
   supabase: SupabaseClient,
-  laundromatId: string
+  laundromatId: string,
+  creditType: 'free' | 'paid'
 ): Promise<void> {
   const { error } = await supabase.rpc('refund_sms_credit', {
     p_laundromat_id: laundromatId,
+    p_credit_type: creditType,
   });
 
   if (error) {

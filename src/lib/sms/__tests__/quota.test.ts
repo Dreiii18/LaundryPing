@@ -65,29 +65,40 @@ describe('ensureBillingCycle', () => {
 // ---------------------------------------------------------------------------
 
 describe('checkAndConsumeCredit', () => {
-  it('returns true when the RPC returns true', async () => {
-    const mock = createMockSupabase({ rpcData: true });
+  it("returns 'free' when the RPC returns 'free'", async () => {
+    const mock = createMockSupabase({ rpcData: 'free' });
 
     const result = await checkAndConsumeCredit(
       mock as unknown as SupabaseClient,
       LAUNDROMAT_ID
     );
 
-    expect(result).toBe(true);
+    expect(result).toBe('free');
     expect(mock.rpc).toHaveBeenCalledWith('check_and_consume_sms_credit', {
       p_laundromat_id: LAUNDROMAT_ID,
     });
   });
 
-  it('returns false when the RPC returns false', async () => {
-    const mock = createMockSupabase({ rpcData: false });
+  it("returns 'paid' when the RPC returns 'paid'", async () => {
+    const mock = createMockSupabase({ rpcData: 'paid' });
 
     const result = await checkAndConsumeCredit(
       mock as unknown as SupabaseClient,
       LAUNDROMAT_ID
     );
 
-    expect(result).toBe(false);
+    expect(result).toBe('paid');
+  });
+
+  it('returns null when the RPC returns "none"', async () => {
+    const mock = createMockSupabase({ rpcData: 'none' });
+
+    const result = await checkAndConsumeCredit(
+      mock as unknown as SupabaseClient,
+      LAUNDROMAT_ID
+    );
+
+    expect(result).toBeNull();
   });
 
   it('throws and logs to console.error when the RPC returns an error', async () => {
@@ -110,16 +121,6 @@ describe('checkAndConsumeCredit', () => {
     errorSpy.mockRestore();
   });
 
-  it('returns false when RPC returns a non-boolean truthy value that is not strictly true', async () => {
-    const mock = createMockSupabase({ rpcData: 1 });
-
-    const result = await checkAndConsumeCredit(
-      mock as unknown as SupabaseClient,
-      LAUNDROMAT_ID
-    );
-
-    expect(result).toBe(false);
-  });
 });
 
 // ---------------------------------------------------------------------------
@@ -127,14 +128,26 @@ describe('checkAndConsumeCredit', () => {
 // ---------------------------------------------------------------------------
 
 describe('refundCredit', () => {
-  it('calls the refund_sms_credit RPC with the correct argument', async () => {
+  it('calls the refund_sms_credit RPC with the correct arguments', async () => {
     const mock = createMockSupabase();
 
-    await refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID);
+    await refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID, 'free');
 
     expect(mock.rpc).toHaveBeenCalledOnce();
     expect(mock.rpc).toHaveBeenCalledWith('refund_sms_credit', {
       p_laundromat_id: LAUNDROMAT_ID,
+      p_credit_type: 'free',
+    });
+  });
+
+  it('passes paid credit type to the RPC', async () => {
+    const mock = createMockSupabase();
+
+    await refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID, 'paid');
+
+    expect(mock.rpc).toHaveBeenCalledWith('refund_sms_credit', {
+      p_laundromat_id: LAUNDROMAT_ID,
+      p_credit_type: 'paid',
     });
   });
 
@@ -142,7 +155,7 @@ describe('refundCredit', () => {
     const mock = createMockSupabase();
 
     await expect(
-      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID)
+      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID, 'free')
     ).resolves.toBeUndefined();
   });
 
@@ -153,7 +166,7 @@ describe('refundCredit', () => {
     });
 
     await expect(
-      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID)
+      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID, 'free')
     ).rejects.toThrow('Credit refund failed: refund failed');
 
     expect(errorSpy).toHaveBeenCalledOnce();
@@ -170,7 +183,7 @@ describe('refundCredit', () => {
     const mock = createMockSupabase({ rpcError: { message: 'crash' } });
 
     await expect(
-      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID)
+      refundCredit(mock as unknown as SupabaseClient, LAUNDROMAT_ID, 'paid')
     ).rejects.toThrow('Credit refund failed: crash');
 
     vi.restoreAllMocks();

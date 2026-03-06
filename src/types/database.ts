@@ -271,10 +271,10 @@ export interface Database {
       };
       check_and_consume_sms_credit: {
         Args: { p_laundromat_id: string };
-        Returns: boolean;
+        Returns: string;
       };
       refund_sms_credit: {
-        Args: { p_laundromat_id: string };
+        Args: { p_laundromat_id: string; p_credit_type: string };
         Returns: null;
       };
       add_sms_topup: {

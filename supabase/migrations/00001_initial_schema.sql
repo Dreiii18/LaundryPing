@@ -102,7 +102,7 @@ INSERT INTO sms_topup_packages (slug, label, sms_credits, price_php, description
 CREATE TABLE sms_topup_logs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   laundromat_id UUID NOT NULL REFERENCES laundromats(id) ON DELETE CASCADE,
-  package_slug TEXT NOT NULL,
+  package_slug TEXT NOT NULL REFERENCES sms_topup_packages(slug),
   credits_added INTEGER NOT NULL,
   price_php NUMERIC(10,2) NOT NULL,
   activated_by UUID NOT NULL REFERENCES auth.users(id),
@@ -243,7 +243,7 @@ CREATE TRIGGER trg_protect_credit_columns
 
 -- Billing cycle reset + atomic credit consumption (merged to prevent TOCTOU)
 CREATE OR REPLACE FUNCTION public.check_and_consume_sms_credit(p_laundromat_id UUID)
-RETURNS BOOLEAN AS $$
+RETURNS TEXT AS $$
 DECLARE
   v_free        INTEGER;
   v_paid        INTEGER;
@@ -274,14 +274,14 @@ BEGIN
     UPDATE public.laundromats
     SET sms_free_credits = sms_free_credits - 1, updated_at = now()
     WHERE id = p_laundromat_id;
-    RETURN TRUE;
+    RETURN 'free';
   ELSIF v_paid > 0 THEN
     UPDATE public.laundromats
     SET sms_paid_credits = sms_paid_credits - 1, updated_at = now()
     WHERE id = p_laundromat_id;
-    RETURN TRUE;
+    RETURN 'paid';
   ELSE
-    RETURN FALSE;
+    RETURN 'none';
   END IF;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
@@ -299,22 +299,21 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Refund one SMS credit (best-effort: free bucket if below cap, else paid)
-CREATE OR REPLACE FUNCTION public.refund_sms_credit(p_laundromat_id UUID)
+-- Refund one SMS credit to the specified bucket (must match what was consumed)
+CREATE OR REPLACE FUNCTION public.refund_sms_credit(p_laundromat_id UUID, p_credit_type TEXT)
 RETURNS VOID AS $$
-DECLARE
-  v_free INTEGER;
 BEGIN
-  SELECT sms_free_credits INTO v_free
-  FROM public.laundromats
-  WHERE id = p_laundromat_id
-  FOR UPDATE;
+  IF p_credit_type NOT IN ('free', 'paid') THEN
+    RAISE EXCEPTION 'Invalid credit type: %', p_credit_type;
+  END IF;
+
+  PERFORM 1 FROM public.laundromats WHERE id = p_laundromat_id FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION 'Laundromat not found: %', p_laundromat_id;
   END IF;
 
-  IF v_free < 50 THEN
+  IF p_credit_type = 'free' THEN
     UPDATE public.laundromats
     SET sms_free_credits = sms_free_credits + 1, updated_at = now()
     WHERE id = p_laundromat_id;

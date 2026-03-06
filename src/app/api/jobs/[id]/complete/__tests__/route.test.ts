@@ -119,8 +119,8 @@ describe('POST /api/jobs/[id]/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default credit mocks — available
-    mockCheckAndConsumeCredit.mockResolvedValue(true);
+    // Default credit mocks — available (free bucket)
+    mockCheckAndConsumeCredit.mockResolvedValue('free');
     mockRefundCredit.mockResolvedValue(undefined);
 
     // Default SMS mock — success
@@ -347,7 +347,7 @@ describe('POST /api/jobs/[id]/complete', () => {
 
   describe('credits exhaustion', () => {
     it('returns a warning with quotaExhausted: true when no credits available', async () => {
-      mockCheckAndConsumeCredit.mockResolvedValue(false);
+      mockCheckAndConsumeCredit.mockResolvedValue(null);
 
       const supabase = createMockSupabase();
 
@@ -497,7 +497,28 @@ describe('POST /api/jobs/[id]/complete', () => {
       await POST(makeRequest(), makeParams());
 
       expect(mockRefundCredit).toHaveBeenCalledTimes(1);
-      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id);
+      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id, 'free');
+    });
+
+    it('refunds to paid bucket when a paid credit was consumed', async () => {
+      mockCheckAndConsumeCredit.mockResolvedValue('paid');
+      mockSendSms.mockResolvedValue({
+        success: false,
+        provider: 'mock',
+        error: 'Provider error',
+      });
+
+      const supabase = createMockSupabase();
+      mockGetAuth.mockResolvedValue({
+        user: { id: 'user-1' } as never,
+        laundromat: baseLaundromat as never,
+        supabase: supabase as never,
+        error: null,
+      });
+
+      await POST(makeRequest(), makeParams());
+
+      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id, 'paid');
     });
 
     it('still completes the job (status: completed, sms_sent: false) after SMS failure', async () => {
@@ -591,7 +612,7 @@ describe('POST /api/jobs/[id]/complete', () => {
       await POST(makeRequest(), makeParams());
 
       expect(mockRefundCredit).toHaveBeenCalledTimes(1);
-      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id);
+      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id, 'free');
     });
 
     it('does not call sendSms when decryption fails', async () => {

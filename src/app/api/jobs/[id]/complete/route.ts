@@ -139,15 +139,15 @@ export async function POST(
 
     // Atomically check and consume one SMS credit
     // (billing cycle reset is handled atomically inside check_and_consume_sms_credit)
-    let creditAvailable: boolean;
+    let consumedCreditType: 'free' | 'paid' | null;
     try {
-      creditAvailable = await checkAndConsumeCredit(supabase, laundromat.id);
+      consumedCreditType = await checkAndConsumeCredit(supabase, laundromat.id);
     } catch (creditError) {
       console.error('[SMS] Credit check RPC failed for job:', id, creditError);
-      creditAvailable = false;
+      consumedCreditType = null;
     }
 
-    if (!creditAvailable) {
+    if (!consumedCreditType) {
       // No credits -- complete the job but skip SMS
       const { error: noCreditsUpdateError } = await supabase
         .from('jobs')
@@ -184,7 +184,7 @@ export async function POST(
       // Decryption failed -- key mismatch, corrupted data, or missing phone
       // Refund credit back since we won't send
       try {
-        await refundCredit(supabase, laundromat.id);
+        await refundCredit(supabase, laundromat.id, consumedCreditType!);
       } catch (refundError) {
         console.error('[CREDIT LEAK] Refund failed after decrypt error for job:', id, refundError);
       }
@@ -261,7 +261,7 @@ export async function POST(
     } else {
       // SMS sending failed -- refund credit back
       try {
-        await refundCredit(supabase, laundromat.id);
+        await refundCredit(supabase, laundromat.id, consumedCreditType!);
       } catch (refundError) {
         console.error('[CREDIT LEAK] Refund failed after SMS failure for job:', id, refundError);
       }

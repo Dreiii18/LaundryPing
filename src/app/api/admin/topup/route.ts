@@ -69,6 +69,7 @@ export async function POST(request: Request) {
           .eq('slug', package_slug)
           .single();
 
+        // Re-fetch updated balances for email (may be slightly stale under replication lag — cosmetic only)
         const { data: updatedLaundromat } = await supabaseAdmin
           .from('laundromats')
           .select('sms_free_credits, sms_paid_credits')
