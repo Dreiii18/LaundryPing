@@ -128,12 +128,12 @@ describe('POST /api/auth/forgot-password', () => {
     expect(mockSendEmail).not.toHaveBeenCalled();
   });
 
-  it('returns 200 when rate limited (no link generated)', async () => {
+  it('returns 429 when rate limited (no link generated)', async () => {
     mockCheckRateLimit.mockReturnValue({ allowed: false, remaining: 0, resetAt: Date.now() + 60_000 });
     const res = await POST(makeRequest() as never);
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(429);
     const json = await res.json();
-    expect(json.message).toContain('reset link has been sent');
+    expect(json.error).toContain('Too many requests');
     expect(mockGenerateLink).not.toHaveBeenCalled();
   });
 

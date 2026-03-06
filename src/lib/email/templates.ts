@@ -131,7 +131,7 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
                 This link expires in 24 hours.
               </p>
               <p style="margin:0;color:#a1a1aa;font-size:12px;line-height:1.5;">
-                If you didn&apos;t request this, you can safely ignore this email.
+                If you didn&#39;t request this, you can safely ignore this email.
               </p>
             </td>
           </tr>
@@ -151,7 +151,7 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
   return { subject, html };
 }
 
-function escapeHtml(str: string): string {
+export function escapeHtml(str: string): string {
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

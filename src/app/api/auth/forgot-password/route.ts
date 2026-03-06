@@ -15,10 +15,10 @@ export async function POST(request: NextRequest) {
   const { allowed } = checkRateLimit(`forgot-password:${ip}`, 3, 60_000);
 
   if (!allowed) {
-    // Still return 200 with generic message to prevent enumeration
-    return NextResponse.json({
-      message: 'If an account exists with that email, a reset link has been sent.',
-    });
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait a moment before trying again.' },
+      { status: 429 },
+    );
   }
 
   // Validate request body
