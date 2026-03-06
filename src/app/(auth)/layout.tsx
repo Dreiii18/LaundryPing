@@ -1,14 +1,12 @@
 import Link from 'next/link';
-import { WashingMachine } from 'lucide-react';
+import Image from 'next/image';
 
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col bg-background-light">
       <header className="px-6 py-4">
         <Link href="/" className="inline-flex items-center gap-2">
-          <div className="size-8 flex items-center justify-center rounded-lg bg-[#0d968b]/10">
-            <WashingMachine className="size-5 text-[#0d968b]" />
-          </div>
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
           <span className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
             LaundryPing
           </span>
