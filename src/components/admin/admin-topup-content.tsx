@@ -31,11 +31,10 @@ import {
 } from '@/components/ui/select';
 import { Search } from 'lucide-react';
 
-interface SmsPlan {
-  id: string;
-  tier: 'starter' | 'growth' | 'scale';
+interface TopupPackage {
+  slug: string;
   label: string;
-  sms_limit: number;
+  sms_credits: number;
   price_php: number;
 }
 
@@ -44,41 +43,21 @@ interface LaundryRow {
   user_id: string;
   name: string;
   email: string;
-  plan_tier: string | null;
-  plan_label: string | null;
-  sms_used_this_month: number;
-  sms_limit: number;
-  sms_plan_expires_at: string | null;
+  sms_free_credits: number;
+  sms_paid_credits: number;
 }
 
-interface AdminPlansContentProps {
+interface AdminTopupContentProps {
   laundromats: LaundryRow[];
-  plans: SmsPlan[];
+  packages: TopupPackage[];
 }
 
-function getPlanStatus(row: LaundryRow) {
-  if (!row.plan_tier || !row.sms_plan_expires_at) {
-    return { label: 'No Plan', color: 'bg-slate-100 text-slate-600' };
-  }
-  const expiresAt = new Date(row.sms_plan_expires_at);
-  const now = new Date();
-  if (expiresAt < now) {
-    return { label: 'Expired', color: 'bg-red-100 text-red-700' };
-  }
-  const daysLeft = Math.ceil((expiresAt.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-  if (daysLeft <= 7) {
-    return { label: `Expiring (${daysLeft}d)`, color: 'bg-amber-100 text-amber-700' };
-  }
-  return { label: 'Active', color: 'bg-green-100 text-green-700' };
-}
-
-export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps) {
+export function AdminTopupContent({ laundromats, packages }: AdminTopupContentProps) {
   const router = useRouter();
   const [search, setSearch] = useState('');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedRow, setSelectedRow] = useState<LaundryRow | null>(null);
-  const [selectedTier, setSelectedTier] = useState<string>('starter');
-  const [selectedDuration, setSelectedDuration] = useState<string>('30');
+  const [selectedPackage, setSelectedPackage] = useState<string>('pack-250');
   const [loading, setLoading] = useState(false);
 
   const filtered = laundromats.filter((row) => {
@@ -86,10 +65,9 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
     return row.name.toLowerCase().includes(q) || row.email.toLowerCase().includes(q);
   });
 
-  const handleActivate = (row: LaundryRow) => {
+  const handleTopup = (row: LaundryRow) => {
     setSelectedRow(row);
-    setSelectedTier(row.plan_tier || 'starter');
-    setSelectedDuration('30');
+    setSelectedPackage('pack-250');
     setDialogOpen(true);
   };
 
@@ -97,23 +75,22 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
     if (!selectedRow) return;
     setLoading(true);
     try {
-      const res = await fetchWithAuth('/api/admin/plans/activate', {
+      const res = await fetchWithAuth('/api/admin/topup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          user_id: selectedRow.user_id,
-          plan_tier: selectedTier,
-          duration_days: parseInt(selectedDuration, 10),
+          laundromat_id: selectedRow.id,
+          package_slug: selectedPackage,
         }),
       });
 
       if (!res.ok) {
         const data = await res.json();
-        toast.error(data.error || 'Failed to activate plan');
+        toast.error(data.error || 'Failed to add credits');
         return;
       }
 
-      toast.success(`Plan activated for ${selectedRow.name}`);
+      toast.success(`Credits added for ${selectedRow.name}`);
       setDialogOpen(false);
       router.refresh();
     } catch {
@@ -123,7 +100,7 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
     }
   };
 
-  const selectedPlan = plans.find((p) => p.tier === selectedTier);
+  const selectedPkg = packages.find((p) => p.slug === selectedPackage);
 
   return (
     <div className="space-y-6">
@@ -148,9 +125,9 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
             <TableRow>
               <TableHead>Laundromat</TableHead>
               <TableHead>Email</TableHead>
-              <TableHead>Plan</TableHead>
-              <TableHead>SMS Usage</TableHead>
-              <TableHead>Expiry</TableHead>
+              <TableHead>Free Credits</TableHead>
+              <TableHead>Paid Credits</TableHead>
+              <TableHead>Total</TableHead>
               <TableHead className="text-right">Action</TableHead>
             </TableRow>
           </TableHeader>
@@ -163,37 +140,26 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
               </TableRow>
             ) : (
               filtered.map((row) => {
-                const status = getPlanStatus(row);
+                const total = row.sms_free_credits + row.sms_paid_credits;
                 return (
                   <TableRow key={row.id}>
                     <TableCell className="font-medium">{row.name}</TableCell>
                     <TableCell className="text-slate-500">{row.email}</TableCell>
+                    <TableCell>{row.sms_free_credits}</TableCell>
+                    <TableCell>{row.sms_paid_credits}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${status.color}`}>
-                        {row.plan_label || status.label}
-                        {row.plan_label && status.label !== 'No Plan' && (
-                          <span className="ml-1">({status.label})</span>
-                        )}
+                      <span className={`font-semibold ${total === 0 ? 'text-red-600' : total <= 10 ? 'text-amber-600' : 'text-slate-900'}`}>
+                        {total}
                       </span>
-                    </TableCell>
-                    <TableCell>
-                      {row.sms_limit > 0
-                        ? `${row.sms_used_this_month} / ${row.sms_limit}`
-                        : '-'}
-                    </TableCell>
-                    <TableCell className="text-slate-500">
-                      {row.sms_plan_expires_at
-                        ? new Date(row.sms_plan_expires_at).toLocaleDateString()
-                        : '-'}
                     </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleActivate(row)}
+                        onClick={() => handleTopup(row)}
                         className="text-[#0d968b] border-[#0d968b]/30 hover:bg-[#0d968b]/5"
                       >
-                        Activate
+                        Top Up
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -207,46 +173,32 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Activate SMS Plan</DialogTitle>
+            <DialogTitle>Add SMS Credits</DialogTitle>
             <DialogDescription>
-              Activate a plan for <strong>{selectedRow?.name}</strong> ({selectedRow?.email})
+              Add credits for <strong>{selectedRow?.name}</strong> ({selectedRow?.email})
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Plan Tier</label>
-              <Select value={selectedTier} onValueChange={setSelectedTier}>
+              <label className="text-sm font-medium text-slate-700">SMS Package</label>
+              <Select value={selectedPackage} onValueChange={setSelectedPackage}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {plans.map((plan) => (
-                    <SelectItem key={plan.tier} value={plan.tier}>
-                      {plan.label} — {plan.sms_limit} SMS/mo — PHP {plan.price_php}
+                  {packages.map((pkg) => (
+                    <SelectItem key={pkg.slug} value={pkg.slug}>
+                      {pkg.label} — {pkg.sms_credits} credits — PHP {pkg.price_php}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedPlan && (
+              {selectedPkg && (
                 <p className="text-xs text-slate-500">
-                  {selectedPlan.sms_limit} SMS/month at PHP {selectedPlan.price_php}/mo
+                  +{selectedPkg.sms_credits} SMS credits at PHP {selectedPkg.price_php}
                 </p>
               )}
-            </div>
-
-            <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-700">Duration</label>
-              <Select value={selectedDuration} onValueChange={setSelectedDuration}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 days</SelectItem>
-                  <SelectItem value="60">60 days</SelectItem>
-                  <SelectItem value="90">90 days</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
           </div>
 
@@ -259,7 +211,7 @@ export function AdminPlansContent({ laundromats, plans }: AdminPlansContentProps
               disabled={loading}
               className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white"
             >
-              {loading ? 'Activating...' : 'Confirm Activation'}
+              {loading ? 'Adding...' : 'Confirm Top-Up'}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -47,7 +47,7 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 ### SMS Subsystem (`lib/sms/`)
 
 - `provider.ts` -- Factory pattern with `SmsProvider` interface. `SMS_PROVIDER=mock` (default) logs to console; `SMS_PROVIDER=semaphore` calls the real API with 5s AbortController timeout.
-- `quota.ts` -- SMS quota management via two Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset) and `check_and_increment_sms_quota` (atomic check with `SELECT ... FOR UPDATE` row locking + plan validation). Paid plans only -- no free tier.
+- `quota.ts` -- SMS credit management via Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset of free credits), `check_and_consume_sms_credit` (atomic consume with `SELECT ... FOR UPDATE` row locking, free credits first then paid), and `refund_sms_credit` (refund on failure). All users get 50 free SMS/month + optional purchased credits.
 - `templates.ts` -- Bilingual Tagalog/English SMS message builder.
 - Triple-layer duplicate SMS prevention: UI button disable + `sms_logs` check + UNIQUE constraint on `sms_logs.job_id`.
 
@@ -59,22 +59,22 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 
 ### Database
 
-5 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`, `sms_plans`. Schema in `supabase/migrations/00001_initial_schema.sql` through `00004_sms_plans.sql`. Types manually defined in `types/database.ts` (not auto-generated).
+7 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`, `sms_topup_packages`, `sms_topup_logs`, `blog_posts`. Schema in `supabase/migrations/00001_initial_schema.sql` through `00011_credit_based_sms.sql`. Types manually defined in `types/database.ts` (not auto-generated).
 
-### SMS Plans (Paid Model)
+### SMS Credits (Free + Top-up Model)
 
-3 tiers defined in `sms_plans` DB table (not hardcoded):
-- **Starter**: 300 SMS/month, PHP 299
-- **Growth**: 600 SMS/month, PHP 539
-- **Scale**: 1,200 SMS/month, PHP 959
+Every user gets **50 free SMS/month** (resets on billing cycle). Additional credits are purchased via one-time top-up packs:
+- **Pack 250**: 250 SMS for PHP 299
+- **Pack 600**: 600 SMS for PHP 699
+- **Pack 1,100**: 1,100 SMS for PHP 1,199
 
-Users without a plan (`sms_plan_id = NULL`) get `sms_limit = 0` and cannot send SMS. Phone number field is hidden in the job modal when no plan is active. Jobs support `notify_sms` boolean and nullable phone columns for no-SMS jobs.
+Key rules: Free credits reset monthly. Paid credits never expire. Free credits consumed first, then paid. All users can see SMS fields and send SMS by default (no plan gating). `sms_topup_packages` stores pack definitions. `sms_topup_logs` tracks purchase history.
 
-Admin activates plans via SQL: `SELECT activate_sms_plan('<user-uuid>', 'starter');` (defaults to 30-day duration). Payment is via GCash with manual admin verification.
+Admin adds credits via the Admin Panel top-up UI (`/admin/plans`), which calls `add_sms_topup` RPC. Payment is via GCash with manual admin verification.
 
 ### Job Completion Flow (`api/jobs/[id]/complete/route.ts`)
 
-This is the most complex route. It: verifies auth + ownership, checks if plan exists + notify_sms + phone (early exit if any missing -- completes job without SMS), checks idempotency via `sms_logs`, ensures billing cycle, atomically checks/increments SMS quota, decrypts the phone number, sends SMS, and handles all failure modes (quota exhausted, decryption failure, SMS failure) by decrementing quota back and completing the job without SMS.
+This is the most complex route. It: verifies auth + ownership, checks notify_sms + phone (early exit if missing -- completes job without SMS), checks idempotency via `sms_logs`, ensures billing cycle (resets free credits if new month), atomically consumes one SMS credit (free first, then paid), decrypts the phone number, sends SMS, and handles all failure modes (no credits, decryption failure, SMS failure) by refunding the credit and completing the job without SMS.
 
 ## Environment Variables
 

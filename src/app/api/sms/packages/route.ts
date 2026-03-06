@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
-import { getCreditStatus } from '@/lib/sms/quota';
 
 export async function GET() {
   try {
@@ -13,16 +12,16 @@ export async function GET() {
       return NextResponse.json({ error: 'Laundromat not found' }, { status: 404 });
     }
 
-    const credits = await getCreditStatus(supabase, laundromat.id);
+    const { data: packages, error: queryError } = await supabase
+      .from('sms_topup_packages')
+      .select('slug, label, sms_credits, price_php, description')
+      .order('sort_order', { ascending: true });
 
-    return NextResponse.json({
-      freeCredits: credits.freeCredits,
-      paidCredits: credits.paidCredits,
-      totalCredits: credits.totalCredits,
-      canSend: credits.canSend,
-      daysUntilFreeReset: credits.daysUntilFreeReset,
-      billingCycleStart: credits.billingCycleStart,
-    });
+    if (queryError) {
+      return NextResponse.json({ error: 'Failed to fetch packages' }, { status: 500 });
+    }
+
+    return NextResponse.json({ packages: packages || [] });
   } catch {
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });
   }
