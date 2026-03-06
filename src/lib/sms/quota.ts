@@ -1,21 +1,17 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { SmsPlanTier } from '@/lib/constants';
 
-export interface QuotaStatus {
-  used: number;
-  limit: number;
-  remaining: number;
+export interface CreditStatus {
+  freeCredits: number;
+  paidCredits: number;
+  totalCredits: number;
   canSend: boolean;
+  daysUntilFreeReset: number;
   billingCycleStart: string;
-  daysUntilReset: number;
-  hasPlan: boolean;
-  planTier: SmsPlanTier | null;
-  planExpiresAt: string | null;
 }
 
 /**
  * Ensures the billing cycle is current (lazy reset).
- * If the current month is different from billing_cycle_start, resets counter.
+ * If the current month is different from billing_cycle_start, resets free credits.
  */
 export async function ensureBillingCycle(
   supabase: SupabaseClient,
@@ -27,95 +23,82 @@ export async function ensureBillingCycle(
 }
 
 /**
- * Gets the current SMS quota status for a laundromat.
+ * Gets the current SMS credit status for a laundromat.
  */
-export async function getQuotaStatus(
+export async function getCreditStatus(
   supabase: SupabaseClient,
   laundromatId: string
-): Promise<QuotaStatus> {
-  // First ensure billing cycle is current
+): Promise<CreditStatus> {
   await ensureBillingCycle(supabase, laundromatId);
 
   const { data: laundromat, error } = await supabase
     .from('laundromats')
-    .select('sms_used_this_month, sms_limit, billing_cycle_start, sms_plan_id, sms_plan_expires_at')
+    .select('sms_free_credits, sms_paid_credits, billing_cycle_start')
     .eq('id', laundromatId)
     .single();
 
   if (error || !laundromat) {
-    throw new Error('Failed to fetch quota status');
+    throw new Error('Failed to fetch credit status');
   }
 
-  const hasPlan = laundromat.sms_plan_id !== null;
-  let planTier: SmsPlanTier | null = null;
+  const freeCredits = laundromat.sms_free_credits;
+  const paidCredits = laundromat.sms_paid_credits;
+  const totalCredits = freeCredits + paidCredits;
 
-  if (hasPlan) {
-    const { data: plan } = await supabase
-      .from('sms_plans')
-      .select('tier')
-      .eq('id', laundromat.sms_plan_id)
-      .single();
-
-    planTier = (plan?.tier as SmsPlanTier) ?? null;
-  }
-
-  const used = laundromat.sms_used_this_month;
-  const limit = laundromat.sms_limit;
-  const remaining = Math.max(0, limit - used);
-
-  // Calculate days until reset
   const now = new Date();
   const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-  const daysUntilReset = Math.ceil(
+  const daysUntilFreeReset = Math.ceil(
     (nextMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return {
-    used,
-    limit,
-    remaining,
-    canSend: hasPlan && used < limit,
+    freeCredits,
+    paidCredits,
+    totalCredits,
+    canSend: totalCredits > 0,
+    daysUntilFreeReset,
     billingCycleStart: laundromat.billing_cycle_start,
-    daysUntilReset,
-    hasPlan,
-    planTier,
-    planExpiresAt: laundromat.sms_plan_expires_at,
   };
 }
 
 /**
- * Atomically checks and increments SMS quota.
- * Uses PostgreSQL stored procedure with row-level locking.
- * Returns true if quota available (and incremented), false if exhausted.
+ * Atomically checks and consumes one SMS credit.
+ * Free credits are consumed first, then paid credits.
+ * Returns true if a credit was consumed, false if none available.
+ * Throws on RPC errors (distinguishing infrastructure failures from a
+ * legitimate credit-exhausted false return).
  */
-export async function checkAndIncrementQuota(
+export async function checkAndConsumeCredit(
   supabase: SupabaseClient,
   laundromatId: string
 ): Promise<boolean> {
-  const { data, error } = await supabase.rpc('check_and_increment_sms_quota', {
+  const { data, error } = await supabase.rpc('check_and_consume_sms_credit', {
     p_laundromat_id: laundromatId,
   });
 
   if (error) {
-    console.error('Quota check failed:', error);
-    return false;
+    console.error('Credit consume failed:', error);
+    throw new Error(`Credit consume failed: ${error.message}`);
   }
 
   return data === true;
 }
 
 /**
- * Decrements the SMS quota (used when SMS send fails after increment).
+ * Refunds one SMS credit (used when SMS send fails after consume).
+ * Refunds to free credits if below 50, otherwise to paid credits.
+ * Throws on RPC error so callers can detect and handle the failure.
  */
-export async function decrementQuota(
+export async function refundCredit(
   supabase: SupabaseClient,
   laundromatId: string
 ): Promise<void> {
-  const { error } = await supabase.rpc('decrement_sms_quota', {
+  const { error } = await supabase.rpc('refund_sms_credit', {
     p_laundromat_id: laundromatId,
   });
 
   if (error) {
-    console.error('Quota decrement failed:', error);
+    console.error('Credit refund failed:', error);
+    throw new Error(`Credit refund failed: ${error.message}`);
   }
 }

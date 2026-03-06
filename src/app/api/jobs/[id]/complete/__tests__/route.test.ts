@@ -18,14 +18,13 @@ vi.mock('@/lib/sms/templates', () => ({
 
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { sendSms } from '@/lib/sms/provider';
-import { ensureBillingCycle, checkAndIncrementQuota, decrementQuota } from '@/lib/sms/quota';
+import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 import { decryptPhone } from '@/lib/utils/encryption';
 
 const mockGetAuth = vi.mocked(getAuthenticatedUser);
 const mockSendSms = vi.mocked(sendSms);
-const mockEnsureBillingCycle = vi.mocked(ensureBillingCycle);
-const mockCheckAndIncrementQuota = vi.mocked(checkAndIncrementQuota);
-const mockDecrementQuota = vi.mocked(decrementQuota);
+const mockCheckAndConsumeCredit = vi.mocked(checkAndConsumeCredit);
+const mockRefundCredit = vi.mocked(refundCredit);
 const mockDecryptPhone = vi.mocked(decryptPhone);
 
 // ---------------------------------------------------------------------------
@@ -46,16 +45,14 @@ const makeParams = (id = 'test-job-id') =>
   ({ params: Promise.resolve({ id }) }) as { params: Promise<{ id: string }> };
 
 /**
- * A minimal laundromat row that has an active SMS plan.
- * Tests that need no plan override `sms_plan_id` to null.
+ * A minimal laundromat row with credit-based SMS fields.
  */
 const baseLaundromat = {
   id: 'laundromat-1',
   name: 'SpinClean',
   user_id: 'user-1',
-  sms_plan_id: 'plan-starter',
-  sms_used_this_month: 5,
-  sms_limit: 300,
+  sms_free_credits: 42,
+  sms_paid_credits: 100,
 };
 
 /** A job row that is eligible for SMS notification. */
@@ -73,44 +70,24 @@ const baseJob = {
 // Mock Supabase factory
 // ---------------------------------------------------------------------------
 
-/**
- * Creates a chainable Supabase mock.
- *
- * `jobQueryResult` controls what `.from('jobs').select().eq().eq().single()` returns.
- * `smsLogResult`   controls what `.from('sms_logs').select().eq().single()` returns.
- * `laundromatQuotaResult` controls the refetch after quota exhaustion.
- */
 function createMockSupabase({
   jobQueryResult = { data: baseJob, error: null },
   smsLogResult = { data: null, error: { code: 'PGRST116' } },
-  laundromatQuotaResult = {
-    data: { sms_used_this_month: 300, sms_limit: 300 },
-    error: null,
-  },
 } = {}) {
-  // Generic update chain: .from().update().eq().eq()  (returns void-like)
   const mockEqForUpdate = vi.fn().mockResolvedValue({ error: null });
   const mockEqChainForUpdate = vi.fn().mockReturnValue({ eq: mockEqForUpdate });
   const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqChainForUpdate });
 
-  // insert()
   const mockInsert = vi.fn().mockResolvedValue({ error: null });
 
-  // select chain for jobs: .from('jobs').select().eq().eq().single()
   const mockJobSingle = vi.fn().mockResolvedValue(jobQueryResult);
   const mockJobEqLaundromatId = vi.fn().mockReturnValue({ single: mockJobSingle });
   const mockJobEqId = vi.fn().mockReturnValue({ eq: mockJobEqLaundromatId });
   const mockJobSelect = vi.fn().mockReturnValue({ eq: mockJobEqId });
 
-  // select chain for sms_logs: .from('sms_logs').select().eq().single()
   const mockSmsLogSingle = vi.fn().mockResolvedValue(smsLogResult);
   const mockSmsLogEq = vi.fn().mockReturnValue({ single: mockSmsLogSingle });
   const mockSmsLogSelect = vi.fn().mockReturnValue({ eq: mockSmsLogEq });
-
-  // select chain for laundromats (quota refetch): .from('laundromats').select().eq().single()
-  const mockLaundromatSingle = vi.fn().mockResolvedValue(laundromatQuotaResult);
-  const mockLaundromatEq = vi.fn().mockReturnValue({ single: mockLaundromatSingle });
-  const mockLaundromatSelect = vi.fn().mockReturnValue({ eq: mockLaundromatEq });
 
   const mockFrom = vi.fn().mockImplementation((table: string) => {
     if (table === 'jobs') {
@@ -126,12 +103,6 @@ function createMockSupabase({
         insert: mockInsert,
       };
     }
-    if (table === 'laundromats') {
-      return {
-        select: mockLaundromatSelect,
-      };
-    }
-    // Fallback for any other table
     return { select: vi.fn().mockReturnValue({ eq: vi.fn().mockReturnValue({ single: vi.fn().mockResolvedValue({ data: null, error: null }) }) }), update: mockUpdate, insert: mockInsert };
   });
 
@@ -148,10 +119,9 @@ describe('POST /api/jobs/[id]/complete', () => {
   beforeEach(() => {
     vi.clearAllMocks();
 
-    // Default quota mocks — available
-    mockEnsureBillingCycle.mockResolvedValue(undefined);
-    mockCheckAndIncrementQuota.mockResolvedValue(true);
-    mockDecrementQuota.mockResolvedValue(undefined);
+    // Default credit mocks — available
+    mockCheckAndConsumeCredit.mockResolvedValue(true);
+    mockRefundCredit.mockResolvedValue(undefined);
 
     // Default SMS mock — success
     mockSendSms.mockResolvedValue({
@@ -277,29 +247,6 @@ describe('POST /api/jobs/[id]/complete', () => {
   // -------------------------------------------------------------------------
 
   describe('early exit without SMS', () => {
-    it('completes the job without SMS when laundromat has no SMS plan', async () => {
-      const laundromatNoPlan = { ...baseLaundromat, sms_plan_id: null };
-      const supabase = createMockSupabase();
-
-      mockGetAuth.mockResolvedValue({
-        user: { id: 'user-1' } as never,
-        laundromat: laundromatNoPlan as never,
-        supabase: supabase as never,
-        error: null,
-      });
-
-      const response = await POST(makeRequest(), makeParams());
-      const body = await response.json();
-
-      expect(response.status).toBe(200);
-      expect(body.smsSent).toBe(false);
-      expect(body.toastType).toBe('success');
-      expect(body.message).toBe('Job completed.');
-      // SMS subsystem should not be touched
-      expect(mockSendSms).not.toHaveBeenCalled();
-      expect(mockCheckAndIncrementQuota).not.toHaveBeenCalled();
-    });
-
     it('completes the job without SMS when notify_sms is false', async () => {
       const jobNoSms = { ...baseJob, notify_sms: false };
       const supabase = createMockSupabase({
@@ -369,7 +316,6 @@ describe('POST /api/jobs/[id]/complete', () => {
       expect(body.smsSent).toBe(true);
       expect(body.toastType).toBe('success');
       expect(body.message).toBe('Already processed');
-      // Should not attempt a second send
       expect(mockSendSms).not.toHaveBeenCalled();
     });
 
@@ -396,19 +342,14 @@ describe('POST /api/jobs/[id]/complete', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Quota exhaustion
+  // Credits exhaustion
   // -------------------------------------------------------------------------
 
-  describe('quota exhaustion', () => {
-    it('returns a warning with quotaExhausted: true when SMS quota is used up', async () => {
-      mockCheckAndIncrementQuota.mockResolvedValue(false);
+  describe('credits exhaustion', () => {
+    it('returns a warning with quotaExhausted: true when no credits available', async () => {
+      mockCheckAndConsumeCredit.mockResolvedValue(false);
 
-      const supabase = createMockSupabase({
-        laundromatQuotaResult: {
-          data: { sms_used_this_month: 300, sms_limit: 300 },
-          error: null,
-        },
-      });
+      const supabase = createMockSupabase();
 
       mockGetAuth.mockResolvedValue({
         user: { id: 'user-1' } as never,
@@ -424,7 +365,7 @@ describe('POST /api/jobs/[id]/complete', () => {
       expect(body.smsSent).toBe(false);
       expect(body.quotaExhausted).toBe(true);
       expect(body.toastType).toBe('warning');
-      expect(body.message).toContain('300/300');
+      expect(body.message).toContain('No SMS credits remaining');
       expect(mockSendSms).not.toHaveBeenCalled();
     });
   });
@@ -475,7 +416,7 @@ describe('POST /api/jobs/[id]/complete', () => {
       expect(mockSendSms).toHaveBeenCalledWith('09171234567', 'Your laundry is done!');
     });
 
-    it('increments the quota exactly once on success', async () => {
+    it('consumes the credit exactly once on success', async () => {
       const supabase = createMockSupabase();
 
       mockGetAuth.mockResolvedValue({
@@ -487,8 +428,8 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      expect(mockCheckAndIncrementQuota).toHaveBeenCalledTimes(1);
-      expect(mockDecrementQuota).not.toHaveBeenCalled();
+      expect(mockCheckAndConsumeCredit).toHaveBeenCalledTimes(1);
+      expect(mockRefundCredit).not.toHaveBeenCalled();
     });
 
     it('inserts a sent sms_log row after a successful send', async () => {
@@ -503,7 +444,6 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      // Verify insert was called on sms_logs table
       expect(supabase.from).toHaveBeenCalledWith('sms_logs');
     });
   });
@@ -538,7 +478,7 @@ describe('POST /api/jobs/[id]/complete', () => {
       expect(body.message).toBe('SMS delivery failed. Please inform the customer manually.');
     });
 
-    it('decrements the quota when SMS sending fails', async () => {
+    it('refunds the credit when SMS sending fails', async () => {
       mockSendSms.mockResolvedValue({
         success: false,
         provider: 'mock',
@@ -556,8 +496,8 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      expect(mockDecrementQuota).toHaveBeenCalledTimes(1);
-      expect(mockDecrementQuota).toHaveBeenCalledWith(supabase, baseLaundromat.id);
+      expect(mockRefundCredit).toHaveBeenCalledTimes(1);
+      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id);
     });
 
     it('still completes the job (status: completed, sms_sent: false) after SMS failure', async () => {
@@ -578,10 +518,9 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      // The jobs table update should have been called with sms_sent: false
       const jobsUpdate = supabase.from.mock.calls
         .filter(([table]: [string]) => table === 'jobs')
-        .map(() => null); // just verify it was called
+        .map(() => null);
       expect(jobsUpdate.length).toBeGreaterThan(0);
     });
 
@@ -635,7 +574,7 @@ describe('POST /api/jobs/[id]/complete', () => {
       expect(body.message).toBe('Unable to send SMS. Please inform the customer manually.');
     });
 
-    it('decrements the quota when decryption fails after increment', async () => {
+    it('refunds the credit when decryption fails after consume', async () => {
       mockDecryptPhone.mockImplementation(() => {
         throw new Error('Key mismatch');
       });
@@ -651,8 +590,8 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      expect(mockDecrementQuota).toHaveBeenCalledTimes(1);
-      expect(mockDecrementQuota).toHaveBeenCalledWith(supabase, baseLaundromat.id);
+      expect(mockRefundCredit).toHaveBeenCalledTimes(1);
+      expect(mockRefundCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id);
     });
 
     it('does not call sendSms when decryption fails', async () => {
@@ -691,19 +630,17 @@ describe('POST /api/jobs/[id]/complete', () => {
       const response = await POST(makeRequest(), makeParams());
       const body = await response.json();
 
-      // Job completion is still signalled in the response body
       expect(body.smsSent).toBe(false);
-      // Jobs update should still have been called
       expect(supabase.from).toHaveBeenCalledWith('jobs');
     });
   });
 
   // -------------------------------------------------------------------------
-  // Billing cycle
+  // Credit consumption
   // -------------------------------------------------------------------------
 
-  describe('billing cycle', () => {
-    it('ensures billing cycle before checking quota on the SMS path', async () => {
+  describe('credit consumption', () => {
+    it('calls checkAndConsumeCredit on the SMS path', async () => {
       const supabase = createMockSupabase();
 
       mockGetAuth.mockResolvedValue({
@@ -715,27 +652,25 @@ describe('POST /api/jobs/[id]/complete', () => {
 
       await POST(makeRequest(), makeParams());
 
-      expect(mockEnsureBillingCycle).toHaveBeenCalledWith(supabase, baseLaundromat.id);
-      // ensureBillingCycle must be called before checkAndIncrementQuota
-      const ensureOrder = mockEnsureBillingCycle.mock.invocationCallOrder[0];
-      const checkOrder = mockCheckAndIncrementQuota.mock.invocationCallOrder[0];
-      expect(ensureOrder).toBeLessThan(checkOrder);
+      expect(mockCheckAndConsumeCredit).toHaveBeenCalledWith(supabase, baseLaundromat.id);
     });
 
-    it('does not call ensureBillingCycle on the early-exit (no plan) path', async () => {
-      const laundromatNoPlan = { ...baseLaundromat, sms_plan_id: null };
-      const supabase = createMockSupabase();
+    it('does not call checkAndConsumeCredit on the early-exit (no SMS) path', async () => {
+      const jobNoSms = { ...baseJob, notify_sms: false };
+      const supabase = createMockSupabase({
+        jobQueryResult: { data: jobNoSms, error: null },
+      });
 
       mockGetAuth.mockResolvedValue({
         user: { id: 'user-1' } as never,
-        laundromat: laundromatNoPlan as never,
+        laundromat: baseLaundromat as never,
         supabase: supabase as never,
         error: null,
       });
 
       await POST(makeRequest(), makeParams());
 
-      expect(mockEnsureBillingCycle).not.toHaveBeenCalled();
+      expect(mockCheckAndConsumeCredit).not.toHaveBeenCalled();
     });
   });
 });

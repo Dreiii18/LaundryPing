@@ -5,7 +5,7 @@ import { decryptPhone } from '@/lib/utils/encryption';
 import { normalizeToLocal } from '@/lib/utils/phone';
 import { sendSms } from '@/lib/sms/provider';
 import { buildLaundryDoneMessage } from '@/lib/sms/templates';
-import { ensureBillingCycle, checkAndIncrementQuota, decrementQuota } from '@/lib/sms/quota';
+import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 
 const completeJobSchema = z.object({
   payment_method: z.enum(['cash', 'ewallet', 'card', 'bank_transfer']).optional(),
@@ -71,18 +71,20 @@ export async function POST(
 
     // Update payment info if provided for pay-later jobs
     if (!job.is_paid && paymentMethod) {
-      await supabase
+      const { error: paymentError } = await supabase
         .from('jobs')
         .update({ payment_method: paymentMethod, is_paid: true })
         .eq('id', id);
+
+      if (paymentError) {
+        console.error('Payment update failed:', paymentError);
+        return NextResponse.json({ error: 'Failed to update payment status' }, { status: 500 });
+      }
     }
 
-    // Early exit: no plan, no SMS notification, or no phone number
-    const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null &&
-                    (laundromat as Record<string, unknown>).sms_plan_id !== undefined;
-
-    if (!hasPlan || !job.notify_sms || !job.customer_phone_encrypted) {
-      await supabase
+    // Early exit: no SMS notification or no phone number
+    if (!job.notify_sms || !job.customer_phone_encrypted) {
+      const { error: noSmsUpdateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
@@ -92,6 +94,10 @@ export async function POST(
         })
         .eq('id', id)
         .eq('status', 'in_progress');
+
+      if (noSmsUpdateError) {
+        console.error('Job completion update failed (no-SMS path):', noSmsUpdateError);
+      }
 
       return NextResponse.json({
         message: 'Job completed.',
@@ -100,7 +106,8 @@ export async function POST(
       });
     }
 
-    // Idempotency check: see if SMS was already sent for this job
+    // Idempotency check: see if SMS was already sent for this job.
+    // This runs BEFORE credit consumption to avoid double-charging.
     const { data: existingSmsLog } = await supabase
       .from('sms_logs')
       .select('id, status')
@@ -109,16 +116,20 @@ export async function POST(
 
     if (existingSmsLog) {
       // Already processed -- mark job complete if not already and return
-      if (job.status === 'in_progress') {
-        await supabase
-          .from('jobs')
-          .update({
-            status: 'completed',
-            completed_at: new Date().toISOString(),
-            sms_sent: existingSmsLog.status === 'sent',
-          })
-          .eq('id', id);
+      const { error: idempotentUpdateError } = await supabase
+        .from('jobs')
+        .update({
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+          sms_sent: existingSmsLog.status === 'sent',
+        })
+        .eq('id', id)
+        .eq('status', 'in_progress');
+
+      if (idempotentUpdateError) {
+        console.error('Job completion update failed (idempotency path):', idempotentUpdateError);
       }
+
       return NextResponse.json({
         message: 'Already processed',
         toastType: existingSmsLog.status === 'sent' ? 'success' : 'error',
@@ -126,15 +137,19 @@ export async function POST(
       });
     }
 
-    // Ensure billing cycle is current (lazy reset)
-    await ensureBillingCycle(supabase, laundromat.id);
+    // Atomically check and consume one SMS credit
+    // (billing cycle reset is handled atomically inside check_and_consume_sms_credit)
+    let creditAvailable: boolean;
+    try {
+      creditAvailable = await checkAndConsumeCredit(supabase, laundromat.id);
+    } catch (creditError) {
+      console.error('[SMS] Credit check RPC failed for job:', id, creditError);
+      creditAvailable = false;
+    }
 
-    // Atomically check and increment SMS quota
-    const quotaAvailable = await checkAndIncrementQuota(supabase, laundromat.id);
-
-    if (!quotaAvailable) {
-      // Quota exhausted -- complete the job but skip SMS
-      await supabase
+    if (!creditAvailable) {
+      // No credits -- complete the job but skip SMS
+      const { error: noCreditsUpdateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
@@ -145,33 +160,37 @@ export async function POST(
         .eq('id', id)
         .eq('status', 'in_progress');
 
-      // Refetch updated quota for display
-      const { data: updatedLaundromat } = await supabase
-        .from('laundromats')
-        .select('sms_used_this_month, sms_limit')
-        .eq('id', laundromat.id)
-        .single();
+      if (noCreditsUpdateError) {
+        console.error('Job completion update failed (no-credits path):', noCreditsUpdateError);
+      }
 
       return NextResponse.json({
-        message: `SMS limit reached (${updatedLaundromat?.sms_used_this_month ?? '?'}/${updatedLaundromat?.sms_limit ?? 0}). Please inform the customer manually.`,
+        message: 'No SMS credits remaining. Please inform the customer manually.',
         toastType: 'warning',
         smsSent: false,
         quotaExhausted: true,
       });
     }
 
-    // Quota available -- decrypt phone and send SMS
+    // Credit available -- decrypt phone and send SMS
     let phoneNumber: string;
     try {
+      if (!job.customer_phone_encrypted) {
+        throw new Error('Phone number missing after guard check');
+      }
       const decryptedPhone = decryptPhone(job.customer_phone_encrypted);
       phoneNumber = normalizeToLocal(decryptedPhone);
     } catch (decryptError) {
-      // Decryption failed -- key mismatch or corrupted data
-      // Decrement quota back since we won't send
-      await decrementQuota(supabase, laundromat.id);
+      // Decryption failed -- key mismatch, corrupted data, or missing phone
+      // Refund credit back since we won't send
+      try {
+        await refundCredit(supabase, laundromat.id);
+      } catch (refundError) {
+        console.error('[CREDIT LEAK] Refund failed after decrypt error for job:', id, refundError);
+      }
 
       // Complete the job without SMS
-      await supabase
+      const { error: decryptUpdateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
@@ -181,6 +200,10 @@ export async function POST(
         })
         .eq('id', id)
         .eq('status', 'in_progress');
+
+      if (decryptUpdateError) {
+        console.error('Job completion update failed (decrypt-error path):', decryptUpdateError);
+      }
 
       console.error('[SMS] Phone decryption failed for job:', id, decryptError);
 
@@ -197,8 +220,8 @@ export async function POST(
 
     if (smsResult.success) {
       // SMS sent successfully
-      // Insert sms_logs (may fail on unique constraint for idempotency -- that's ok)
-      await supabase
+      // Insert sms_logs; unique constraint violation (23505) means idempotent duplicate -- ignore it
+      const { error: logError } = await supabase
         .from('sms_logs')
         .insert({
           job_id: id,
@@ -209,8 +232,12 @@ export async function POST(
           provider_response: smsResult.rawResponse as unknown as Record<string, unknown> || null,
         });
 
+      if (logError && !logError.code?.includes('23505')) {
+        console.error('SMS log insert failed (non-idempotency):', logError);
+      }
+
       // Update job as completed with SMS sent
-      await supabase
+      const { error: successUpdateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
@@ -221,14 +248,23 @@ export async function POST(
         .eq('id', id)
         .eq('status', 'in_progress');
 
+      if (successUpdateError) {
+        // SMS was already sent -- log for ops but don't fail the response
+        console.error('Job completion update failed (SMS-sent path):', successUpdateError);
+      }
+
       return NextResponse.json({
         message: 'SMS sent to customer.',
         toastType: 'success',
         smsSent: true,
       });
     } else {
-      // SMS sending failed -- decrement quota back
-      await decrementQuota(supabase, laundromat.id);
+      // SMS sending failed -- refund credit back
+      try {
+        await refundCredit(supabase, laundromat.id);
+      } catch (refundError) {
+        console.error('[CREDIT LEAK] Refund failed after SMS failure for job:', id, refundError);
+      }
 
       // Log the failure
       await supabase
@@ -242,7 +278,7 @@ export async function POST(
         });
 
       // Complete the job without SMS
-      await supabase
+      const { error: smsFailUpdateError } = await supabase
         .from('jobs')
         .update({
           status: 'completed',
@@ -252,6 +288,10 @@ export async function POST(
         })
         .eq('id', id)
         .eq('status', 'in_progress');
+
+      if (smsFailUpdateError) {
+        console.error('Job completion update failed (SMS-failed path):', smsFailUpdateError);
+      }
 
       console.error('[SMS] Send failed for job:', id, smsResult.error);
 

@@ -124,15 +124,7 @@ export async function POST(request: Request) {
 
     const { machine_id, phone, notes, is_paid, pay_amount, payment_method } = parsed.data;
 
-    // Determine SMS notification based on plan status
-    const hasPlan = (laundromat as Record<string, unknown>).sms_plan_id !== null &&
-                    (laundromat as Record<string, unknown>).sms_plan_id !== undefined;
-    let notifySms = parsed.data.notify_sms ?? true;
-
-    // If no plan, force no SMS
-    if (!hasPlan) {
-      notifySms = false;
-    }
+    const notifySms = parsed.data.notify_sms ?? true;
 
     // If notify_sms is true, phone is required
     if (notifySms && !phone) {
