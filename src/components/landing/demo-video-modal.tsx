@@ -1,11 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Play, X } from 'lucide-react';
 import { ExplainerPlayer } from '@/components/explainer-video/explainer-player';
 
 export function DemoVideoModal() {
   const [open, setOpen] = useState(false);
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+
+  const close = useCallback(() => setOpen(false), []);
+
+  useEffect(() => {
+    if (!open) return;
+
+    // Focus the close button when modal opens
+    closeButtonRef.current?.focus();
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+
+    // Prevent body scroll while modal is open
+    document.body.style.overflow = 'hidden';
+    document.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = '';
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [open, close]);
 
   return (
     <>
@@ -20,14 +43,18 @@ export function DemoVideoModal() {
       {open && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4"
-          onClick={() => setOpen(false)}
+          onClick={close}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Demo video"
         >
           <div
             className="relative w-full max-w-4xl"
             onClick={(e) => e.stopPropagation()}
           >
             <button
-              onClick={() => setOpen(false)}
+              ref={closeButtonRef}
+              onClick={close}
               className="absolute -top-12 right-0 text-white/80 hover:text-white transition-colors p-2"
               aria-label="Close video"
             >
