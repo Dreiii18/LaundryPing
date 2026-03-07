@@ -63,7 +63,7 @@ beforeEach(() => {
   mockGenerateLink.mockResolvedValue({
     data: {
       properties: {
-        action_link: 'https://laundryping.com/api/auth/callback?token=abc',
+        action_link: 'https://laundryping.ph/reset-password?token=abc',
         email_otp: '',
         hashed_token: '',
         redirect_to: '',
