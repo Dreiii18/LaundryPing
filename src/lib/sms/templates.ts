@@ -1,6 +1,24 @@
 /**
- * Builds the bilingual Tagalog/English SMS message for laundry completion.
- * Must fit within a single 160-character GSM-7 SMS segment.
+ * SMS templates for laundry completion notifications.
+ * Each must fit within a single 160-character GSM-7 SMS segment
+ * even with a 25-character shop name.
+ */
+const TEMPLATES = [
+  (name: string) =>
+    `Tapos na po ang labada mo sa ${name}. Ready na po for pickup. Salamat sa pagtitiwala!`,
+  (name: string) =>
+    `Ready na po ang labada mo sa ${name}. Maaari na po itong i-pickup. Maraming salamat!`,
+  (name: string) =>
+    `Hi! Tapos na po ang labada mo sa ${name}. Pwede na po itong i-pickup. Salamat!`,
+  (name: string) =>
+    `Magandang balita! Ready na po ang labada mo sa ${name}. Paki-pickup na po kapag available. Salamat!`,
+  (name: string) =>
+    `Update mula sa ${name}: Tapos na po ang labada mo at ready na for pickup. Maraming salamat!`,
+];
+
+/**
+ * Builds a randomized Tagalog SMS message for laundry completion.
+ * Rotates through 5 templates to keep messages fresh.
  * Shop names > 25 chars are truncated with ellipsis.
  */
 export function buildLaundryDoneMessage(shopName: string): string {
@@ -8,12 +26,8 @@ export function buildLaundryDoneMessage(shopName: string): string {
     ? shopName.slice(0, 22) + '...'
     : shopName;
 
-  return [
-    `Magandang araw po! Tapos na ang inyong labada sa ${truncatedName}.`,
-    `Pwede na po kayong sunduin. Salamat po!`,
-    `--`,
-    `Your laundry at ${truncatedName} is ready for pickup. Thank you!`,
-  ].join('\n');
+  const index = Math.floor(Math.random() * TEMPLATES.length);
+  return TEMPLATES[index](truncatedName);
 }
 
 /**

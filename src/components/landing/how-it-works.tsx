@@ -1,5 +1,5 @@
 import { WashingMachine, Play, MessageSquare } from 'lucide-react';
-import { DemoVideoModal } from './demo-video-modal';
+import { ExplainerPlayer } from '@/components/explainer-video/explainer-player';
 
 export function HowItWorks() {
   return (
@@ -68,9 +68,9 @@ export function HowItWorks() {
           </div>
         </div>
 
-        {/* Watch Demo button */}
-        <div className="flex justify-center mt-12">
-          <DemoVideoModal />
+        {/* Inline explainer video */}
+        <div className="mt-14 max-w-[48rem] mx-auto">
+          <ExplainerPlayer />
         </div>
       </div>
     </section>

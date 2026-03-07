@@ -13,14 +13,10 @@ export function FinalCta() {
     >
       <div className="max-w-[36rem] mx-auto text-center">
         <h2 className="text-[1.625rem] md:text-3xl font-bold text-white leading-tight tracking-tight">
-          Stop Wasting Time Texting Customers!
+          Ready to Stop Texting Customers Manually?
         </h2>
         <p className="mt-3 text-[0.9375rem] text-white/60 leading-relaxed">
-          LaundryPing automates SMS notifications so customers know exactly when to pick up. Simple, fast, stress-free.
-        </p>
-        <p className="mt-4 text-[0.9375rem] text-white/60 leading-relaxed">
-          No more manual follow-ups.{' '}
-          <span className="text-white/80 font-medium">Automate SMS alerts for every customer.</span>
+          No more manual follow-ups. Automate SMS alerts for every customer.
         </p>
         <Link
           href="/signup"

@@ -24,7 +24,7 @@ export function PlayerInner() {
   const prefersReducedMotion = useReducedMotion();
 
   return (
-    <div className="w-full aspect-video rounded-xl overflow-hidden border border-[#0d968b]/20 shadow-sm bg-white">
+    <div className="w-full aspect-[4/3] rounded-xl overflow-hidden border border-[#0d968b]/20 shadow-sm bg-white">
       <Player
         component={ExplainerComposition}
         compositionWidth={VIDEO.width}
