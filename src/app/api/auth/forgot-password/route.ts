@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
   }
 
   const { email } = parsed.data;
-  const origin = request.headers.get('origin') || new URL(request.url).origin;
+  // Use configured site URL to prevent open-redirect via spoofed Origin header
+  const origin = process.env.NEXT_PUBLIC_SITE_URL || new URL(request.url).origin;
 
   try {
     // Generate password reset link via Supabase Admin API
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       type: 'recovery',
       email,
       options: {
-        redirectTo: `${origin}/api/auth/callback?next=/reset-password`,
+        redirectTo: `${origin}/reset-password`,
       },
     });
 

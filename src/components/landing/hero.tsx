@@ -64,8 +64,8 @@ export function Hero() {
                     <Image
                       src="/laundryping-icon.png"
                       alt="LaundryPing"
-                      width={32}
-                      height={32}
+                      width={96}
+                      height={96}
                       className="size-8 object-cover"
                     />
                   </div>

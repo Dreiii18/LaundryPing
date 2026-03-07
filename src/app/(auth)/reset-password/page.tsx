@@ -1,14 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import Image from 'next/image';
 import { toast } from 'sonner';
+
+// Module-level variable to survive React strict mode double-mount
+let recoveryToken: string | null = null;
 
 export default function ResetPasswordPage() {
   const router = useRouter();
@@ -18,6 +20,28 @@ export default function ResetPasswordPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [ready, setReady] = useState(() => {
+    // Check if token was already captured (e.g. strict mode re-mount)
+    return !!recoveryToken;
+  });
+
+  useEffect(() => {
+    if (ready) return;
+
+    // Parse the implicit-flow hash fragment from Supabase's recovery link
+    const hash = window.location.hash.substring(1);
+    const params = new URLSearchParams(hash);
+    const accessToken = params.get('access_token');
+    const type = params.get('type');
+
+    if (accessToken && type === 'recovery') {
+      recoveryToken = accessToken;
+      // Clear tokens from URL to prevent exposure in history/address bar
+      window.history.replaceState(null, '', window.location.pathname);
+      // Use a microtask to set state outside the effect body
+      queueMicrotask(() => setReady(true));
+    }
+  }, [ready]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,20 +57,44 @@ export default function ResetPasswordPage() {
       return;
     }
 
+    if (!recoveryToken) {
+      setError('Reset session expired. Please request a new reset link.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.updateUser({ password });
+      // Call Supabase Auth API directly with the recovery access token.
+      // This bypasses @supabase/ssr's cookie-based session management which
+      // doesn't work with the implicit flow (hash fragment) tokens that
+      // generateLink returns. Internally, supabase.auth.updateUser() does
+      // the exact same PUT request — we just skip the broken session lookup.
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/user`,
+        {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${recoveryToken}`,
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ password }),
+        },
+      );
 
-      if (authError) {
-        setError(authError.message);
+      if (!response.ok) {
+        const data = await response.json();
+        setError(data.msg || data.error_description || 'Failed to update password');
         setLoading(false);
         return;
       }
 
-      toast.success('Password updated!');
-      router.push('/dashboard');
+      // Clear the module-level token
+      recoveryToken = null;
+
+      toast.success('Password updated! Please log in with your new password.');
+      router.push('/login');
     } catch {
       setError('An unexpected error occurred');
       setLoading(false);
@@ -59,7 +107,7 @@ export default function ResetPasswordPage() {
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-10">
           <div className="flex items-center gap-2 text-[#0d968b]">
-            <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
+            <Image src="/laundryping-icon.png" alt="LaundryPing" width={96} height={96} className="size-8 rounded-lg" />
             <h2 className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
               LaundryPing
             </h2>
@@ -81,8 +129,15 @@ export default function ResetPasswordPage() {
           </div>
         )}
 
+        {!ready && !error && (
+          <div className="mb-6 flex items-center justify-center gap-2 text-sm text-[#618986]">
+            <Loader2 className="size-4 animate-spin" />
+            Verifying reset link...
+          </div>
+        )}
+
         {/* Form */}
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className={`space-y-6 ${!ready ? 'opacity-50 pointer-events-none' : ''}`}>
           <div>
             <Label htmlFor="password" className="text-sm font-medium text-[#111817] mb-2">
               New password
@@ -139,7 +194,7 @@ export default function ResetPasswordPage() {
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || !ready}
             className="w-full h-11 min-h-11 rounded-lg bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold text-sm"
           >
             {loading ? (
