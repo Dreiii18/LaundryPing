@@ -128,7 +128,7 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
                 Or copy this link: ${escapeHtml(data.resetLink)}
               </p>
               <p style="margin:0 0 8px;color:#a1a1aa;font-size:12px;line-height:1.5;">
-                This link expires in 24 hours.
+                This link expires in 1 hour.
               </p>
               <p style="margin:0;color:#a1a1aa;font-size:12px;line-height:1.5;">
                 If you didn&#39;t request this, you can safely ignore this email.
