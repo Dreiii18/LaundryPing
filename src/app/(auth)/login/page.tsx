@@ -71,7 +71,7 @@ function LoginForm() {
         {/* Logo */}
         <div className="flex flex-col items-center justify-center mb-10">
           <div className="flex items-center gap-2 text-[#0d968b]">
-            <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
+            <Image src="/laundryping-icon.png" alt="LaundryPing" width={96} height={96} className="size-8 rounded-lg" />
             <h2 className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
               LaundryPing
             </h2>

@@ -139,7 +139,7 @@ export default async function DashboardPage() {
       {/* Onboarding Banner - only when no machines and no jobs */}
       {hasNoMachines && safeJobs.length === 0 && (
         <div className="bg-white border-2 border-[#0d968b]/30 rounded-xl p-6 flex items-start gap-4">
-          <Image src="/laundryping-icon.png" alt="LaundryPing" width={48} height={48} className="size-12 rounded-xl shrink-0" />
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={144} height={144} className="size-12 rounded-xl shrink-0" />
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-1">Welcome to LaundryPing!</h3>
             <p className="text-sm text-slate-600 mb-3">

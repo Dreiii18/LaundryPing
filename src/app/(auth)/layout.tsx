@@ -6,7 +6,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
     <div className="flex min-h-screen flex-col bg-background-light">
       <header className="px-6 py-4">
         <Link href="/" className="inline-flex items-center gap-2">
-          <Image src="/laundryping-icon.png" alt="LaundryPing" width={32} height={32} className="size-8 rounded-lg" />
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={96} height={96} className="size-8 rounded-lg" />
           <span className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
             LaundryPing
           </span>

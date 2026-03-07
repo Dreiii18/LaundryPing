@@ -38,7 +38,7 @@ export function AdminSidebarContent({ onNavigate }: AdminSidebarContentProps) {
       <div>
         {/* Logo */}
         <Link href="/admin/plans" className="px-6 mb-6 flex items-center gap-3">
-          <Image src="/laundryping-icon.png" alt="LaundryPing" width={40} height={40} className="size-10 rounded-lg" />
+          <Image src="/laundryping-icon.png" alt="LaundryPing" width={120} height={120} className="size-10 rounded-lg" />
           <div>
             <h1 className="text-lg font-bold leading-none">LaundryPing</h1>
             <p className="text-xs text-[#0d968b] font-medium">Super Admin</p>

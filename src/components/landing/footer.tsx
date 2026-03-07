@@ -11,8 +11,8 @@ export function Footer() {
             <Image
               src="/laundryping-icon.png"
               alt="LaundryPing"
-              width={20}
-              height={20}
+              width={60}
+              height={60}
               className="size-5 rounded"
             />
             <span className="text-[#111817] font-semibold text-sm">
