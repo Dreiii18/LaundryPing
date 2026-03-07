@@ -9,8 +9,8 @@ export function Navbar() {
           <Image
             src="/laundryping-icon.png"
             alt="LaundryPing"
-            width={32}
-            height={32}
+            width={96}
+            height={96}
             className="size-8 rounded-lg"
           />
           <span className="text-[#111817] text-xl font-bold leading-tight tracking-tight">
