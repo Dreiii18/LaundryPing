@@ -36,18 +36,19 @@ export function Pricing() {
             Abot-kayang presyo
           </h2>
           <p className="mt-3 text-[0.9375rem] text-[#618986] leading-relaxed">
-            Walang lock-in. Cancel anytime.
+            Subscribe and cancel anytime — no lock-in.
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-center">
           {packs.map((pack) => (
-            <div
+            <Link
               key={pack.name}
-              className={`relative bg-white rounded-[0.875rem] p-8 transition-shadow hover:shadow-lg ${
+              href="/signup"
+              className={`relative block bg-white rounded-[0.875rem] p-8 transition-all hover:shadow-lg ${
                 pack.featured
-                  ? 'border-2 border-[#0d968b] shadow-lg shadow-[#0d968b]/10 md:scale-[1.02]'
-                  : 'border border-black/[0.06]'
+                  ? 'border-2 border-[#0d968b] shadow-lg shadow-[#0d968b]/10 md:scale-[1.02] hover:scale-[1.04]'
+                  : 'border border-black/[0.06] transition-transform hover:scale-[1.03]'
               }`}
             >
               {pack.badge && (
@@ -71,13 +72,7 @@ export function Pricing() {
               <div className="text-[0.8125rem] text-[#618986] mt-1.5">
                 One-time top-up
               </div>
-              <Link
-                href="/signup"
-                className="inline-block mt-4 text-[0.8125rem] font-semibold text-[#0d968b] hover:underline"
-              >
-                Mag-top up &rarr;
-              </Link>
-            </div>
+            </Link>
           ))}
         </div>
 

@@ -4,9 +4,9 @@ import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
   Store,
-  CreditCard,
   MessageSquare,
   DollarSign,
+  Zap,
 } from 'lucide-react';
 
 export default async function AdminAnalyticsPage() {
@@ -24,13 +24,6 @@ export default async function AdminAnalyticsPage() {
     .from('laundromats')
     .select('*', { count: 'exact', head: true });
 
-  // Active plans (has plan + not expired)
-  const { count: activePlans } = await supabaseAdmin
-    .from('laundromats')
-    .select('*', { count: 'exact', head: true })
-    .not('sms_plan_id', 'is', null)
-    .gte('sms_plan_expires_at', new Date().toISOString());
-
   // SMS sent this month
   const firstOfMonth = new Date();
   firstOfMonth.setDate(1);
@@ -41,36 +34,21 @@ export default async function AdminAnalyticsPage() {
     .eq('status', 'sent')
     .gte('sent_at', firstOfMonth.toISOString());
 
-  // Revenue: get active laundromats with their plan IDs, then sum prices
-  const { data: activeLaundromats } = await supabaseAdmin
+  // Revenue from top-ups this month
+  const { data: topupLogs } = await supabaseAdmin
+    .from('sms_topup_logs')
+    .select('price_php')
+    .gte('created_at', firstOfMonth.toISOString());
+
+  const monthlyRevenue = (topupLogs || []).reduce((sum, l) => sum + Number(l.price_php), 0);
+
+  // Total credits in system
+  const { data: allLaundromats } = await supabaseAdmin
     .from('laundromats')
-    .select('sms_plan_id')
-    .not('sms_plan_id', 'is', null)
-    .gte('sms_plan_expires_at', new Date().toISOString());
+    .select('sms_free_credits, sms_paid_credits');
 
-  const { data: allPlans } = await supabaseAdmin
-    .from('sms_plans')
-    .select('id, tier, label, price_php, sms_limit')
-    .order('sort_order', { ascending: true });
-
-  const planPriceMap = new Map<string, number>();
-  const planInfoMap = new Map<string, { tier: string; label: string }>();
-  for (const p of allPlans || []) {
-    planPriceMap.set(p.id, p.price_php);
-    planInfoMap.set(p.id, { tier: p.tier, label: p.label });
-  }
-
-  let estimatedRevenue = 0;
-  const tierCounts: Record<string, number> = {};
-  for (const l of activeLaundromats || []) {
-    if (l.sms_plan_id) {
-      estimatedRevenue += planPriceMap.get(l.sms_plan_id) || 0;
-      const info = planInfoMap.get(l.sms_plan_id);
-      if (info) {
-        tierCounts[info.label] = (tierCounts[info.label] || 0) + 1;
-      }
-    }
-  }
+  const totalFreeCredits = (allLaundromats || []).reduce((sum, l) => sum + l.sms_free_credits, 0);
+  const totalPaidCredits = (allLaundromats || []).reduce((sum, l) => sum + l.sms_paid_credits, 0);
 
   // Recent signups (last 5)
   const { data: recentLaundromats } = await supabaseAdmin
@@ -91,10 +69,6 @@ export default async function AdminAnalyticsPage() {
     date: new Date(l.created_at).toLocaleDateString(),
   }));
 
-  const activePercent = totalLaundromats
-    ? Math.round(((activePlans || 0) / totalLaundromats) * 100)
-    : 0;
-
   const metrics = [
     {
       label: 'Total Laundromats',
@@ -103,22 +77,22 @@ export default async function AdminAnalyticsPage() {
       sub: '',
     },
     {
-      label: 'Active Plans',
-      value: activePlans || 0,
-      icon: CreditCard,
-      sub: `${activePercent}% with active plans`,
-    },
-    {
       label: 'SMS Sent (This Month)',
       value: smsSentThisMonth || 0,
       icon: MessageSquare,
       sub: '',
     },
     {
-      label: 'Est. Monthly Revenue',
-      value: `PHP ${estimatedRevenue.toLocaleString()}`,
+      label: 'Top-up Revenue (This Month)',
+      value: `PHP ${monthlyRevenue.toLocaleString()}`,
       icon: DollarSign,
       sub: '',
+    },
+    {
+      label: 'Total Credits in System',
+      value: totalFreeCredits + totalPaidCredits,
+      icon: Zap,
+      sub: `${totalFreeCredits} free + ${totalPaidCredits} paid`,
     },
   ];
 
@@ -146,27 +120,6 @@ export default async function AdminAnalyticsPage() {
             {m.sub && <p className="text-xs text-slate-400 mt-1">{m.sub}</p>}
           </div>
         ))}
-      </div>
-
-      {/* Plan Distribution */}
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
-        <h2 className="text-lg font-semibold text-slate-800 mb-4">Plan Distribution</h2>
-        {Object.keys(tierCounts).length === 0 ? (
-          <p className="text-sm text-slate-500">No active plans</p>
-        ) : (
-          <div className="space-y-3">
-            {Object.entries(tierCounts).map(([label, count]) => (
-              <div key={label} className="flex items-center justify-between">
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#0d968b]/10 text-[#0d968b]">
-                  {label}
-                </span>
-                <span className="text-sm font-semibold text-slate-700">
-                  {count} laundromat{count !== 1 ? 's' : ''}
-                </span>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       {/* Recent Signups */}

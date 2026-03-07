@@ -1,5 +1,5 @@
 import { WashingMachine, Play, MessageSquare } from 'lucide-react';
-import { DemoVideoModal } from './demo-video-modal';
+import { ExplainerPlayer } from '@/components/explainer-video/explainer-player';
 
 export function HowItWorks() {
   return (
@@ -24,10 +24,10 @@ export function HowItWorks() {
               Step 1
             </span>
             <h3 className="text-[0.9375rem] font-semibold text-[#111817] mb-2 tracking-tight">
-              I-register ang machine
+              Register Your Machines
             </h3>
             <p className="text-[0.8125rem] text-[#618986] leading-relaxed max-w-[260px]">
-              Idagdag ang mga washer at dryer mo sa dashboard. Isang beses lang.
+              Add your washers and dryers to the dashboard. Only once.
             </p>
             {/* Connector line */}
             <div className="hidden md:block absolute top-7 left-[calc(50%+2.5rem)] w-[calc(100%-5rem)] border-t-2 border-dashed border-[#0d968b]/20" />
@@ -42,10 +42,10 @@ export function HowItWorks() {
               Step 2
             </span>
             <h3 className="text-[0.9375rem] font-semibold text-[#111817] mb-2 tracking-tight">
-              Simulan ang job
+              Start a Job
             </h3>
             <p className="text-[0.8125rem] text-[#618986] leading-relaxed max-w-[260px]">
-              I-click ang &quot;Start Job&quot; kapag may bagong customer. I-enter ang phone number.
+              Click &quot;Start Job&quot; when a new customer arrives. Enter their phone number.
             </p>
             {/* Connector line */}
             <div className="hidden md:block absolute top-7 left-[calc(50%+2.5rem)] w-[calc(100%-5rem)] border-t-2 border-dashed border-[#0d968b]/20" />
@@ -60,17 +60,17 @@ export function HowItWorks() {
               Step 3
             </span>
             <h3 className="text-[0.9375rem] font-semibold text-[#111817] mb-2 tracking-tight">
-              Auto-send SMS
+              SMS Sent Automatically
             </h3>
             <p className="text-[0.8125rem] text-[#618986] leading-relaxed max-w-[260px]">
-              Kapag tapos na, automatic na SMS ang mapupunta sa customer. Done!
+              When the laundry is done, the customer gets an SMS automatically. Done!
             </p>
           </div>
         </div>
 
-        {/* Watch Demo button */}
-        <div className="flex justify-center mt-12">
-          <DemoVideoModal />
+        {/* Inline explainer video */}
+        <div className="mt-14 max-w-[48rem] mx-auto">
+          <ExplainerPlayer />
         </div>
       </div>
     </section>

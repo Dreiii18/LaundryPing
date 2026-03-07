@@ -8,13 +8,11 @@ export function Hero() {
         {/* Left column — Text */}
         <div className="text-center md:text-left">
           <h1 className="text-4xl md:text-5xl font-extrabold text-[#111817] leading-tight tracking-tight">
-            Stop chasing orders.
-            <br />
-            Start running your laundry.
+            Stop Wasting Time Texting Customers!
           </h1>
-          <p className="mt-5 text-base text-[#618986] leading-relaxed max-w-[540px]">
-            LaundryPing automates bookings, SMS notifications, and order
-            tracking for laundry businesses. Nothing slips through the cracks.
+          <p className="mt-5 text-lg text-[#618986] leading-relaxed max-w-[540px]">
+            LaundryPing automates SMS notifications so customers know exactly
+            when to pick up. Simple, fast, stress-free.
           </p>
 
           {/* CTA buttons */}
@@ -23,13 +21,13 @@ export function Hero() {
               href="/signup"
               className="inline-flex items-center gap-2 bg-[#2dd4bf] hover:bg-[#26bfa9] text-[#111817] font-bold text-base rounded-xl px-8 py-3 transition-colors"
             >
-              Get Started
+              Start Free
             </Link>
             <a
               href="https://calendly.com/official-laundryping/30min"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-transparent text-[#618986] font-semibold text-[0.9375rem] px-7 py-3 rounded-xl border border-black/[0.06] hover:border-[#0d968b] hover:text-[#0d968b] transition-colors"
+              className="inline-flex items-center gap-2 bg-transparent text-[#618986] font-semibold text-[0.9375rem] px-7 py-3 rounded-xl border border-[#0d968b] hover:bg-[#0d968b]/10 hover:text-[#0d968b] transition-colors"
             >
               Book a Demo
             </a>
@@ -60,7 +58,7 @@ export function Hero() {
 
             {/* Main SMS notification card */}
             <div className="relative animate-sms-slide-in">
-              <div className="bg-white border border-[#0d968b]/15 rounded-2xl p-5 shadow-xl max-w-75">
+              <div className="bg-white border border-[#0d968b]/15 rounded-2xl p-5 shadow-xl max-w-[340px]">
                 <div className="flex items-center gap-2.5 mb-3">
                   <div className="size-8 rounded-full overflow-hidden flex-shrink-0">
                     <Image
@@ -84,27 +82,23 @@ export function Hero() {
                   </span>
                 </div>
                 <p className="text-sm text-[#111817]/80 leading-relaxed">
-                  Tapos na ang labada mo sa{' '}
-                  <span className="font-semibold">Washer 3</span>. Paki-pickup
-                  na po. Salamat sa{' '}
-                  <span className="font-semibold">QuickClean Laundromat</span>!
-                </p>
-                <p className="text-[10px] text-[#618986] mt-2">
-                  via Semaphore SMS
+                  Tapos na po ang labada mo sa{' '}
+                  <span className="font-semibold">QuickClean Laundromat</span>.
+                  Ready na po for pickup. Salamat sa pagtitiwala!
                 </p>
               </div>
             </div>
 
             {/* Stacked faded SMS cards for depth */}
             <div className="relative mt-3 space-y-2.5 opacity-40">
-              <div className="bg-white rounded-xl p-4 border border-gray-100 scale-[0.97] origin-top">
+              <div className="bg-white rounded-xl p-4 border border-gray-100 scale-[0.97] origin-top max-w-[340px]">
                 <p className="text-xs text-[#111817]/60 leading-relaxed">
-                  Tapos na &mdash; Washer 1. Paki-pickup na po.
+                  Hi! Tapos na po ang labada mo sa FreshSpin. Pwede na po itong i-pickup. Salamat!
                 </p>
               </div>
-              <div className="bg-white rounded-xl p-4 border border-gray-100 scale-[0.97] origin-top">
+              <div className="bg-white rounded-xl p-4 border border-gray-100 scale-[0.97] origin-top max-w-[340px]">
                 <p className="text-xs text-[#111817]/60 leading-relaxed">
-                  Tapos na &mdash; Dryer 2. Salamat!
+                  Update mula sa BrightWash: Tapos na po ang labada mo at ready na for pickup.
                 </p>
               </div>
             </div>

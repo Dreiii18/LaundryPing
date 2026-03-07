@@ -3,21 +3,21 @@ import { ClipboardList, CheckCircle, MessageSquareOff } from 'lucide-react';
 const features = [
   {
     icon: ClipboardList,
-    title: 'Wala nang manual na coordination',
+    title: 'No More Manual Coordination',
     description:
-      'Hindi mo na kailangan ng whiteboard o group chat. Isang dashboard para sa lahat ng orders.',
+      'Forget whiteboards and group chats. One dashboard handles all your orders.',
   },
   {
     icon: CheckCircle,
-    title: 'Organized ang bawat order',
+    title: 'Every Order Organized',
     description:
-      'Malinaw ang bawat order mula booking hanggang completion. Walang nakakalimutan.',
+      'See each order clearly from booking to completion. Nothing gets forgotten.',
   },
   {
     icon: MessageSquareOff,
-    title: 'Mas kaunting "follow-up" messages',
+    title: 'Less Follow-Up Messages',
     description:
-      'Automatic SMS sa customers. Wala nang "Ready na ba?" sa inbox mo.',
+      'Customers get automatic SMS. No more "Ready na ba?" messages in your inbox.',
   },
 ];
 
@@ -33,7 +33,7 @@ export function Features() {
             Bakit LaundryPing?
           </h2>
           <p className="mt-3 text-[0.9375rem] text-[#618986] leading-relaxed">
-            Para sa pickup &amp; delivery services, multi-branch laundromats, at seryosong operators.
+            Perfect for pickup &amp; delivery services, multi-branch laundromats, and serious operators.
           </p>
         </div>
 

@@ -57,9 +57,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
-  const [smsUsed, setSmsUsed] = useState<number | null>(null);
-  const [smsLimit, setSmsLimit] = useState<number | null>(null);
-  const [hasPlan, setHasPlan] = useState<boolean | null>(null);
+  const [totalCredits, setTotalCredits] = useState<number | null>(null);
 
   useEffect(() => {
     if (open) {
@@ -71,11 +69,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setPaymentMethod('');
       setNotifySms(true);
       setError('');
-      setSmsUsed(null);
-      setSmsLimit(null);
-      setHasPlan(null);
+      setTotalCredits(null);
       fetchMachines();
-      fetchSmsQuota();
+      fetchSmsCredits();
     }
   }, [open]);
 
@@ -109,14 +105,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     }
   };
 
-  const fetchSmsQuota = async () => {
+  const fetchSmsCredits = async () => {
     try {
       const res = await fetchWithAuth('/api/sms/usage');
       if (res.ok) {
         const data = await res.json();
-        setSmsUsed(data.used ?? null);
-        setSmsLimit(data.limit ?? null);
-        setHasPlan(data.hasPlan ?? false);
+        setTotalCredits(data.totalCredits ?? 0);
       }
     } catch {
       // Non-blocking — silently ignore failures
@@ -132,10 +126,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       return;
     }
 
-    // Phone is only required when has plan and notify SMS is on
-    const shouldSendSms = hasPlan && notifySms;
-
-    if (shouldSendSms) {
+    if (notifySms) {
       if (!phone.trim()) {
         setError('Phone number is required');
         return;
@@ -167,8 +158,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           machine_id: machineId,
-          ...(shouldSendSms && phoneClean ? { phone: phoneClean } : {}),
-          notify_sms: shouldSendSms,
+          ...(notifySms && phoneClean ? { phone: phoneClean } : {}),
+          notify_sms: notifySms,
           notes: notes.trim() || undefined,
           is_paid: isPaid,
           pay_amount: Number(payAmount),
@@ -191,8 +182,6 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setLoading(false);
     }
   };
-
-  const showSmsFields = hasPlan === true;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -217,23 +206,21 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               </div>
             )}
 
-            {/* SMS quota warnings - only when plan exists */}
-            {showSmsFields && smsUsed !== null && smsLimit !== null && smsLimit > 0 && (() => {
-              const pct = (smsUsed / smsLimit) * 100;
-              const remaining = Math.max(0, smsLimit - smsUsed);
-              if (pct >= 100) {
+            {/* SMS credit warnings */}
+            {totalCredits !== null && (() => {
+              if (totalCredits === 0) {
                 return (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm">
                     <XCircle className="size-4 text-red-600 shrink-0" />
-                    <span className="text-red-700">SMS limit reached. Job will be tracked but no SMS will be sent.</span>
+                    <span className="text-red-700">No SMS credits. Job will be tracked but no SMS will be sent.</span>
                   </div>
                 );
               }
-              if (pct >= 80) {
+              if (totalCredits <= 10) {
                 return (
                   <div className="flex items-center gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
                     <AlertTriangle className="size-4 text-amber-600 shrink-0" />
-                    <span className="text-amber-700">SMS quota low: {remaining} message{remaining !== 1 ? 's' : ''} left this month.</span>
+                    <span className="text-amber-700">Low SMS credits: {totalCredits} credit{totalCredits !== 1 ? 's' : ''} remaining.</span>
                   </div>
                 );
               }
@@ -276,48 +263,44 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               )}
             </div>
 
-            {/* SMS Notification Toggle + Phone Number - only when plan exists */}
-            {showSmsFields && (
-              <>
-                <div className="flex flex-col gap-2">
-                  <Label className="text-sm font-semibold text-[#111817]">SMS Notification</Label>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setNotifySms(true)}
-                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
-                        notifySms
-                          ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      Notify via SMS
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => { setNotifySms(false); setPhone(''); }}
-                      className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
-                        !notifySms
-                          ? 'bg-amber-50 border-amber-400 text-amber-700'
-                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                      }`}
-                    >
-                      No SMS
-                    </button>
-                  </div>
-                </div>
+            {/* SMS Notification Toggle + Phone Number */}
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-semibold text-[#111817]">SMS Notification</Label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setNotifySms(true)}
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                    notifySms
+                      ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  Notify via SMS
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setNotifySms(false); setPhone(''); }}
+                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                    !notifySms
+                      ? 'bg-amber-50 border-amber-400 text-amber-700'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                  }`}
+                >
+                  No SMS
+                </button>
+              </div>
+            </div>
 
-                {notifySms && (
-                  <div className="flex flex-col gap-2">
-                    <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
-                    <PhoneInput
-                      value={phone}
-                      onChange={setPhone}
-                      disabled={loading}
-                    />
-                  </div>
-                )}
-              </>
+            {notifySms && (
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
+                <PhoneInput
+                  value={phone}
+                  onChange={setPhone}
+                  disabled={loading}
+                />
+              </div>
             )}
 
             {/* Pay Amount */}

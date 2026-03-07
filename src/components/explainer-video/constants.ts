@@ -10,7 +10,7 @@ export const COLORS = {
 } as const;
 
 export const VIDEO = {
-  width: 1280,
+  width: 960,
   height: 720,
   fps: 30,
 } as const;

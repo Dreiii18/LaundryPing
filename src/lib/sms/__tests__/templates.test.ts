@@ -1,53 +1,72 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, afterAll } from 'vitest';
 import { buildLaundryDoneMessage, getMessageSegmentCount } from '../templates';
 
 describe('buildLaundryDoneMessage', () => {
-  describe('short shop name (25 chars or fewer)', () => {
-    it('includes the shop name in the Tagalog line', () => {
+  const originalRandom = Math.random;
+
+  afterAll(() => {
+    Math.random = originalRandom;
+  });
+
+  describe('rotates through 5 templates', () => {
+    it('template 1: "Tapos na po ... Salamat sa pagtitiwala!"', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      expect(msg).toBe(
+        'Tapos na po ang labada mo sa SpinClean. Ready na po for pickup. Salamat sa pagtitiwala!'
+      );
+    });
+
+    it('template 2: "Ready na po ... Maraming salamat!"', () => {
+      Math.random = () => 0.2;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      expect(msg).toBe(
+        'Ready na po ang labada mo sa SpinClean. Maaari na po itong i-pickup. Maraming salamat!'
+      );
+    });
+
+    it('template 3: "Hi! Tapos na po ... Salamat!"', () => {
+      Math.random = () => 0.4;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      expect(msg).toBe(
+        'Hi! Tapos na po ang labada mo sa SpinClean. Pwede na po itong i-pickup. Salamat!'
+      );
+    });
+
+    it('template 4: "Magandang balita! ... Salamat!"', () => {
+      Math.random = () => 0.6;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      expect(msg).toBe(
+        'Magandang balita! Ready na po ang labada mo sa SpinClean. Paki-pickup na po kapag available. Salamat!'
+      );
+    });
+
+    it('template 5: "Update mula sa ... Maraming salamat!"', () => {
+      Math.random = () => 0.8;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      expect(msg).toBe(
+        'Update mula sa SpinClean: Tapos na po ang labada mo at ready na for pickup. Maraming salamat!'
+      );
+    });
+  });
+
+  describe('shop name handling', () => {
+    it('includes the shop name in the message', () => {
+      Math.random = () => 0;
       const msg = buildLaundryDoneMessage('SpinClean');
       expect(msg).toContain('SpinClean');
     });
 
-    it('includes the shop name in the English line', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Your laundry at SpinClean is ready');
-    });
-
-    it('contains the Tagalog greeting', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Magandang araw po!');
-    });
-
-    it('contains "Tapos na ang inyong labada"', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Tapos na ang inyong labada');
-    });
-
-    it('contains the pickup instructions in Tagalog', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Pwede na po kayong sunduin');
-    });
-
-    it('contains "Salamat po!"', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Salamat po!');
-    });
-
-    it('contains the English thank you line', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('Thank you!');
-    });
-
     it('uses a shop name exactly 25 chars without truncation', () => {
+      Math.random = () => 0;
       const shopName = 'A'.repeat(25);
       const msg = buildLaundryDoneMessage(shopName);
       expect(msg).toContain(shopName);
       expect(msg).not.toContain('...');
     });
-  });
 
-  describe('long shop name (more than 25 chars)', () => {
     it('truncates a 26-character name to 22 + "..."', () => {
+      Math.random = () => 0;
       const shopName = 'A'.repeat(26);
       const msg = buildLaundryDoneMessage(shopName);
       const truncated = 'A'.repeat(22) + '...';
@@ -55,42 +74,35 @@ describe('buildLaundryDoneMessage', () => {
     });
 
     it('does not include the full un-truncated name in the message', () => {
+      Math.random = () => 0;
       const shopName = 'VeryLongLaundromatNameThatExceedsLimit';
       const msg = buildLaundryDoneMessage(shopName);
       expect(msg).not.toContain(shopName);
     });
 
     it('uses "..." ellipsis for truncation', () => {
+      Math.random = () => 0;
       const shopName = 'B'.repeat(30);
       const msg = buildLaundryDoneMessage(shopName);
       expect(msg).toContain('...');
     });
-
-    it('truncated name appears in both Tagalog and English lines', () => {
-      const shopName = 'SuperLongLaundromats Forever';
-      const truncated = shopName.slice(0, 22) + '...';
-      const msg = buildLaundryDoneMessage(shopName);
-      // Count occurrences of truncated name
-      const occurrences = msg.split(truncated).length - 1;
-      expect(occurrences).toBeGreaterThanOrEqual(2);
-    });
   });
 
   describe('message structure', () => {
-    it('joins lines with newlines', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('\n');
+    it('all templates fit in a single 160-char SMS segment with a 25-char name', () => {
+      const shopName = 'A'.repeat(25);
+      for (let i = 0; i < 5; i++) {
+        Math.random = () => i / 5;
+        const msg = buildLaundryDoneMessage(shopName);
+        expect(msg.length).toBeLessThanOrEqual(160);
+        expect(getMessageSegmentCount(msg)).toBe(1);
+      }
     });
 
-    it('contains the separator "--"', () => {
+    it('produces a single-line message (no newlines)', () => {
+      Math.random = () => 0;
       const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('--');
-    });
-
-    it('produces 4 lines joined by newlines', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      const lines = msg.split('\n');
-      expect(lines).toHaveLength(4);
+      expect(msg).not.toContain('\n');
     });
   });
 });
@@ -116,7 +128,7 @@ describe('getMessageSegmentCount', () => {
       expect(getMessageSegmentCount(msg)).toBe(2);
     });
 
-    it('returns 2 for a message of 306 GSM-7 characters (2 × 153)', () => {
+    it('returns 2 for a message of 306 GSM-7 characters (2 x 153)', () => {
       const msg = 'A'.repeat(306);
       expect(getMessageSegmentCount(msg)).toBe(2);
     });
@@ -126,24 +138,20 @@ describe('getMessageSegmentCount', () => {
       expect(getMessageSegmentCount(msg)).toBe(3);
     });
 
-    it('standard bilingual laundry message fits in 2 segments or fewer', () => {
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(getMessageSegmentCount(msg)).toBeLessThanOrEqual(2);
-    });
-
-    it('standard message with short name fits in 1 segment', () => {
-      // Build message and check it fits in the typical 1-2 segment range
-      const msg = buildLaundryDoneMessage('SpinClean');
-      const count = getMessageSegmentCount(msg);
-      expect(count).toBeGreaterThanOrEqual(1);
+    it('all templates fit in 1 segment with a short name', () => {
+      const originalRandom = Math.random;
+      for (let i = 0; i < 5; i++) {
+        Math.random = () => i / 5;
+        const msg = buildLaundryDoneMessage('SpinClean');
+        expect(getMessageSegmentCount(msg)).toBe(1);
+      }
+      Math.random = originalRandom;
     });
   });
 
   describe('UCS-2 (unicode) messages', () => {
     it('returns 1 for a unicode message of exactly 70 characters', () => {
-      // Filipino text with non-GSM-7 chars would trigger UCS-2
-      // Using a Japanese character as a clear non-GSM-7 character
-      const unicodeChar = '\u3053'; // Japanese 'ko'
+      const unicodeChar = '\u3053';
       const msg = unicodeChar.repeat(70);
       expect(getMessageSegmentCount(msg)).toBe(1);
     });
@@ -154,7 +162,7 @@ describe('getMessageSegmentCount', () => {
       expect(getMessageSegmentCount(msg)).toBe(2);
     });
 
-    it('returns 2 for a unicode message of 134 characters (2 × 67)', () => {
+    it('returns 2 for a unicode message of 134 characters (2 x 67)', () => {
       const unicodeChar = '\u3053';
       const msg = unicodeChar.repeat(134);
       expect(getMessageSegmentCount(msg)).toBe(2);
@@ -174,7 +182,6 @@ describe('getMessageSegmentCount', () => {
     });
 
     it('message with only newlines counts as GSM-7', () => {
-      // newline \n is in GSM-7 charset
       const msg = '\n'.repeat(50);
       expect(getMessageSegmentCount(msg)).toBe(1);
     });
