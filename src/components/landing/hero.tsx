@@ -8,13 +8,11 @@ export function Hero() {
         {/* Left column — Text */}
         <div className="text-center md:text-left">
           <h1 className="text-4xl md:text-5xl font-extrabold text-[#111817] leading-tight tracking-tight">
-            Stop chasing orders.
-            <br />
-            Start running your laundry.
+            Stop Wasting Time Texting Customers!
           </h1>
           <p className="mt-5 text-base text-[#618986] leading-relaxed max-w-[540px]">
-            LaundryPing automates bookings, SMS notifications, and order
-            tracking for laundry businesses. Nothing slips through the cracks.
+            LaundryPing automates SMS notifications so customers know exactly
+            when to pick up. Simple, fast, stress-free.
           </p>
 
           {/* CTA buttons */}
@@ -23,13 +21,13 @@ export function Hero() {
               href="/signup"
               className="inline-flex items-center gap-2 bg-[#2dd4bf] hover:bg-[#26bfa9] text-[#111817] font-bold text-base rounded-xl px-8 py-3 transition-colors"
             >
-              Get Started
+              Start Free
             </Link>
             <a
               href="https://calendly.com/official-laundryping/30min"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 bg-transparent text-[#618986] font-semibold text-[0.9375rem] px-7 py-3 rounded-xl border border-black/[0.06] hover:border-[#0d968b] hover:text-[#0d968b] transition-colors"
+              className="inline-flex items-center gap-2 bg-transparent text-[#618986] font-semibold text-[0.9375rem] px-7 py-3 rounded-xl border border-[#0d968b] hover:bg-[#0d968b]/10 hover:text-[#0d968b] transition-colors"
             >
               Book a Demo
             </a>

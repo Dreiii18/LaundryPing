@@ -2,19 +2,19 @@ import { ChevronDown } from 'lucide-react';
 
 const FAQ_ITEMS = [
   {
-    question: 'Kailangan ba ng app ang customer?',
+    question: 'Does the customer need an app?',
     answer:
-      'Hindi. SMS lang ang ginagamit, kaya gumagana sa lahat ng phone.',
+      'No. It works with SMS, so any phone can receive messages.',
   },
   {
-    question: 'Gaano kabilis ang setup?',
+    question: 'How fast is the setup?',
     answer:
-      'Ilang minuto lang. I-register ang machines mo at pwede ka nang mag-start.',
+      'Just a few minutes! Add your machines and you\'re ready to start.',
   },
   {
-    question: 'Pwede ba mag-upgrade?',
+    question: 'Can I upgrade?',
     answer:
-      'Oo. Pwede kang mag-upgrade anytime. Hindi mawawala ang data mo.',
+      'Yes! You can upgrade anytime without losing your data.',
   },
 ];
 

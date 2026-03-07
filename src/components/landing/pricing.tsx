@@ -36,7 +36,7 @@ export function Pricing() {
             Abot-kayang presyo
           </h2>
           <p className="mt-3 text-[0.9375rem] text-[#618986] leading-relaxed">
-            Walang lock-in. Cancel anytime.
+            Subscribe and cancel anytime — no lock-in.
           </p>
         </div>
 
