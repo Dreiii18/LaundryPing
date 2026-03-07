@@ -101,9 +101,9 @@ describe('buildPasswordResetEmail', () => {
     expect(result.html).toContain('safely ignore this email');
   });
 
-  it('html mentions 24-hour expiry', () => {
+  it('html mentions 1-hour expiry', () => {
     const result = buildPasswordResetEmail({ resetLink });
-    expect(result.html).toContain('24 hours');
+    expect(result.html).toContain('1 hour');
   });
 
   it('escapes HTML in resetLink to prevent XSS', () => {
