@@ -22,6 +22,7 @@ CREATE TABLE laundromats (
   billing_cycle_start DATE NOT NULL DEFAULT date_trunc('month', CURRENT_DATE)::date,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  available_services TEXT[] NOT NULL DEFAULT ARRAY['Wash', 'Dry'],
   CONSTRAINT laundromats_user_id_unique UNIQUE (user_id),
   CONSTRAINT chk_sms_free_credits CHECK (sms_free_credits >= 0 AND sms_free_credits <= 50),
   CONSTRAINT chk_sms_paid_credits CHECK (sms_paid_credits >= 0)
@@ -45,11 +46,11 @@ CREATE INDEX idx_machines_laundromat_id ON machines(laundromat_id);
 CREATE TABLE jobs (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   laundromat_id UUID NOT NULL REFERENCES laundromats(id) ON DELETE CASCADE,
-  machine_id UUID NOT NULL REFERENCES machines(id) ON DELETE RESTRICT,
+  machine_id UUID REFERENCES machines(id) ON DELETE RESTRICT,
   customer_phone_encrypted TEXT,
   customer_phone_masked TEXT,
   notes TEXT,
-  status TEXT NOT NULL DEFAULT 'in_progress' CHECK (status IN ('in_progress', 'completed', 'cancelled')),
+  status TEXT NOT NULL DEFAULT 'in_progress' CHECK (status IN ('pending', 'in_progress', 'completed', 'cancelled')),
   notify_sms BOOLEAN NOT NULL DEFAULT true,
   started_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   completed_at TIMESTAMPTZ,
@@ -59,11 +60,12 @@ CREATE TABLE jobs (
   is_paid BOOLEAN NOT NULL DEFAULT false,
   is_overdue BOOLEAN NOT NULL DEFAULT false,
   overdue_reason TEXT,
+  services TEXT[] NOT NULL DEFAULT '{}',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_jobs_laundromat_id ON jobs(laundromat_id);
 CREATE INDEX idx_jobs_laundromat_started ON jobs(laundromat_id, started_at DESC);
-CREATE INDEX idx_jobs_status ON jobs(status) WHERE status = 'in_progress';
+CREATE INDEX idx_jobs_status ON jobs(status) WHERE status IN ('pending', 'in_progress');
 CREATE INDEX idx_jobs_machine_id ON jobs(machine_id);
 
 -- SMS_LOGS
@@ -373,6 +375,6 @@ BEGIN
   WHERE laundromat_id = p_laundromat_id
     AND status = 'in_progress'
     AND is_overdue = false
-    AND started_at < (now() AT TIME ZONE 'Asia/Manila')::date::timestamptz;
+    AND started_at < date_trunc('day', now() AT TIME ZONE 'Asia/Manila') AT TIME ZONE 'Asia/Manila';
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

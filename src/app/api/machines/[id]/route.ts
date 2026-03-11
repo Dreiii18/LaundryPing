@@ -130,7 +130,7 @@ export async function DELETE(
       .from('jobs')
       .select('id')
       .eq('machine_id', id)
-      .eq('status', 'in_progress')
+      .in('status', ['pending', 'in_progress'])
       .limit(1);
 
     if (jobsError) {

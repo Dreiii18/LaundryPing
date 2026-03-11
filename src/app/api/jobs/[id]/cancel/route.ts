@@ -28,8 +28,8 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Only in_progress jobs can be cancelled
-    if (job.status !== 'in_progress') {
+    // Only pending or in_progress jobs can be cancelled
+    if (!['pending', 'in_progress'].includes(job.status)) {
       return NextResponse.json(
         { error: 'Job is already completed or cancelled', toastType: 'warning' },
         { status: 409 }
@@ -44,7 +44,7 @@ export async function POST(
         completed_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('status', 'in_progress');
+      .in('status', ['pending', 'in_progress']);
 
     if (updateError) {
       console.error('[Cancel Job] Update failed:', updateError);

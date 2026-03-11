@@ -75,7 +75,8 @@ function createMockSupabase({
   smsLogResult = { data: null, error: { code: 'PGRST116' } },
 } = {}) {
   const mockEqForUpdate = vi.fn().mockResolvedValue({ error: null });
-  const mockEqChainForUpdate = vi.fn().mockReturnValue({ eq: mockEqForUpdate });
+  const mockInForUpdate = vi.fn().mockResolvedValue({ error: null });
+  const mockEqChainForUpdate = vi.fn().mockReturnValue({ eq: mockEqForUpdate, in: mockInForUpdate });
   const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqChainForUpdate });
 
   const mockInsert = vi.fn().mockResolvedValue({ error: null });

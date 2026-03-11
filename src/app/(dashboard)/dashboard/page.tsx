@@ -75,6 +75,7 @@ export default async function DashboardPage() {
       is_paid,
       is_overdue,
       overdue_reason,
+      services,
       created_at,
       machines (
         id,
@@ -83,14 +84,14 @@ export default async function DashboardPage() {
       )
     `)
     .eq('laundromat_id', laundromat.id)
-    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress`)
+    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
     .order('started_at', { ascending: false });
 
   const safeJobs = (jobs || []).map((job) => ({
     id: job.id,
-    machine_id: job.machine_id,
+    machine_id: job.machine_id as string | null,
     customer_phone_masked: job.customer_phone_masked as string | null,
-    status: job.status as 'in_progress' | 'completed' | 'cancelled',
+    status: job.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
     started_at: job.started_at,
     completed_at: job.completed_at,
     sms_sent: job.sms_sent,
@@ -100,6 +101,7 @@ export default async function DashboardPage() {
     is_paid: job.is_paid as boolean,
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
+    services: (job.services || []) as string[],
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
   }));
 

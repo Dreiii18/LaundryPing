@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Droplets, Wind, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, Play, Clock, Droplets, Wind, AlertTriangle, XCircle } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
@@ -32,6 +32,16 @@ const PAYMENT_METHODS = [
   { value: 'card', label: 'Credit/Debit Card' },
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ] as const;
+
+const SERVICE_MACHINE_TYPE: Record<string, string> = {
+  'Wash': 'washer',
+  'Dry': 'dryer',
+};
+
+const MACHINE_TYPE_SERVICE: Record<string, string> = {
+  'washer': 'Wash',
+  'dryer': 'Dry',
+};
 
 interface Machine {
   id: string;
@@ -54,6 +64,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [payAmount, setPayAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
   const [notifySms, setNotifySms] = useState(true);
+  const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [availableServices, setAvailableServices] = useState<string[]>([]);
+  const [allMachineTypes, setAllMachineTypes] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -68,10 +81,13 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setPayAmount('');
       setPaymentMethod('');
       setNotifySms(true);
+      setSelectedServices([]);
+      setAllMachineTypes(new Set());
       setError('');
       setTotalCredits(null);
       fetchMachines();
       fetchSmsCredits();
+      fetchAvailableServices();
     }
   }, [open]);
 
@@ -88,12 +104,20 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
       const activeMachineIds = new Set(
         (jobsData.jobs || [])
-          .filter((j: { status: string }) => j.status === 'in_progress')
+          .filter((j: { status: string; machine_id: string | null }) =>
+            ['pending', 'in_progress'].includes(j.status) && j.machine_id
+          )
           .map((j: { machine_id: string }) => j.machine_id)
       );
 
+      const allMachines = machinesData.machines || [];
+
+      // Track all machine types for service filtering
+      const types = new Set<string>(allMachines.map((m: Machine) => m.type));
+      setAllMachineTypes(types);
+
       // Filter to only available machines
-      const available = (machinesData.machines || []).filter(
+      const available = allMachines.filter(
         (m: Machine) => !activeMachineIds.has(m.id)
       );
 
@@ -117,12 +141,68 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     }
   };
 
+  const fetchAvailableServices = async () => {
+    try {
+      const res = await fetchWithAuth('/api/settings');
+      if (res.ok) {
+        const data = await res.json();
+        setAvailableServices(data.settings?.available_services || ['Wash', 'Dry']);
+      } else {
+        setAvailableServices(['Wash', 'Dry']);
+      }
+    } catch {
+      setAvailableServices(['Wash', 'Dry']);
+    }
+  };
+
+  const toggleService = (service: string) => {
+    setSelectedServices((prev) =>
+      prev.includes(service)
+        ? prev.filter((s) => s !== service)
+        : [...prev, service]
+    );
+  };
+
+  const displayedMachines = useMemo(() => {
+    const relevantMachineTypes = selectedServices
+      .map((s) => SERVICE_MACHINE_TYPE[s])
+      .filter(Boolean);
+    return relevantMachineTypes.length > 0
+      ? machines.filter((m) => relevantMachineTypes.includes(m.type))
+      : machines;
+  }, [selectedServices, machines]);
+
+  // Clear machine selection when it no longer matches selected services
+  useEffect(() => {
+    if (!machineId || machineId === 'none') return;
+    const relevantTypes = selectedServices
+      .map((s) => SERVICE_MACHINE_TYPE[s])
+      .filter(Boolean);
+    if (relevantTypes.length === 0) return;
+    const selectedMachine = machines.find((m) => m.id === machineId);
+    if (selectedMachine && !relevantTypes.includes(selectedMachine.type)) {
+      setMachineId('');
+    }
+  }, [selectedServices, machineId, machines]);
+
+  // Auto-select service when a machine is picked without a matching service
+  useEffect(() => {
+    if (!machineId || machineId === 'none') return;
+    const selectedMachine = machines.find((m) => m.id === machineId);
+    if (!selectedMachine) return;
+    const matchingService = MACHINE_TYPE_SERVICE[selectedMachine.type];
+    if (!matchingService || !availableServices.includes(matchingService)) return;
+    setSelectedServices((prev) =>
+      prev.includes(matchingService) ? prev : [...prev, matchingService]
+    );
+  }, [machineId, machines, availableServices]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!machineId) {
-      setError('Please select a machine');
+    if (selectedServices.length === 0) {
+      setError('Please select at least one service');
       return;
     }
 
@@ -157,13 +237,14 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          machine_id: machineId,
+          ...(machineId && machineId !== 'none' ? { machine_id: machineId } : {}),
           ...(notifySms && phoneClean ? { phone: phoneClean } : {}),
           notify_sms: notifySms,
           notes: notes.trim() || undefined,
           is_paid: isPaid,
           pay_amount: Number(payAmount),
           payment_method: isPaid ? paymentMethod : undefined,
+          services: selectedServices,
         }),
       });
 
@@ -185,17 +266,17 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-130 p-0 overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[90dvh]" onOpenAutoFocus={(e) => e.preventDefault()}>
+      <DialogContent className="sm:max-w-130 p-0 overflow-hidden flex flex-col max-h-[85dvh] sm:max-h-[90dvh]">
         {/* Decorative accent */}
         <div className="absolute top-0 left-0 w-1.5 h-full bg-[#0d968b]" />
 
         <form onSubmit={handleSubmit} className="flex flex-col min-h-0 flex-1">
           <DialogHeader className="px-5 pt-5 pb-3 sm:px-8 sm:pt-8 sm:pb-4 shrink-0">
             <DialogTitle className="text-2xl font-bold text-[#111817]">
-              Start New Job
+              {machineId ? 'Start New Job' : 'New Job'}
             </DialogTitle>
             <DialogDescription className="text-[#618986]">
-              Assign a machine and customer details.
+              Select services and optionally assign a machine.
             </DialogDescription>
           </DialogHeader>
 
@@ -227,25 +308,55 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               return null;
             })()}
 
+            {/* Services Checklist */}
+            {(() => {
+              const filteredServices = availableServices.filter((service) => {
+                const requiredType = SERVICE_MACHINE_TYPE[service];
+                return !requiredType || allMachineTypes.has(requiredType);
+              });
+              return filteredServices.length > 0 ? (
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-semibold text-[#111817]">Services</Label>
+                <div className="flex flex-wrap gap-2">
+                  {filteredServices.map((service) => (
+                    <button
+                      key={service}
+                      type="button"
+                      onClick={() => toggleService(service)}
+                      className={`py-2 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                        selectedServices.includes(service)
+                          ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      {service}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              ) : null;
+            })()}
+
             {/* Machine Selection */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="machine-select" className="text-sm font-semibold text-[#111817]">Machine</Label>
+              <Label htmlFor="machine-select" className="text-sm font-semibold text-[#111817]">Machine (optional)</Label>
               {loadingMachines ? (
                 <div className="h-12 flex items-center text-sm text-slate-500">
                   <Loader2 className="size-4 animate-spin mr-2" />
                   Loading machines...
                 </div>
-              ) : machines.length === 0 ? (
-                <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                  No available machines. All machines are currently in use or none have been configured.
+              ) : displayedMachines.length === 0 ? (
+                <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
+                  No available machines — job will be queued.
                 </div>
               ) : (
                 <Select value={machineId} onValueChange={setMachineId}>
                   <SelectTrigger id="machine-select" className="w-full h-12 min-h-11">
-                    <SelectValue placeholder="Select a machine" />
+                    <SelectValue placeholder="No machine (queue job)" />
                   </SelectTrigger>
                   <SelectContent>
-                    {machines.map((m) => (
+                    <SelectItem value="none">No machine (queue job)</SelectItem>
+                    {displayedMachines.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         <div className="flex items-center gap-2">
                           {m.type === 'washer' ? (
@@ -395,18 +506,23 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
             </Button>
             <Button
               type="submit"
-              disabled={loading || machines.length === 0}
+              disabled={loading}
               className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold shadow-lg shadow-[#0d968b]/20 min-h-11"
             >
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Starting...
+                  {machineId && machineId !== 'none' ? 'Starting...' : 'Queuing...'}
                 </>
-              ) : (
+              ) : machineId && machineId !== 'none' ? (
                 <>
                   Start Job
                   <Play className="size-4" />
+                </>
+              ) : (
+                <>
+                  Queue Job
+                  <Clock className="size-4" />
                 </>
               )}
             </Button>

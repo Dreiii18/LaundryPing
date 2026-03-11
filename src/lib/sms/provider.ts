@@ -13,11 +13,11 @@ export interface SmsProvider {
 // Semaphore SMS API integration
 class SemaphoreProvider implements SmsProvider {
   private apiKey: string;
-  private senderName: string;
+  private senderName: string | undefined;
 
   constructor() {
     this.apiKey = process.env.SEMAPHORE_API_KEY || '';
-    this.senderName = process.env.SEMAPHORE_SENDER_NAME || 'LaundryPing';
+    this.senderName = process.env.SEMAPHORE_SENDER_NAME || undefined;
   }
 
   async send(to: string, message: string): Promise<SendSmsResult> {
@@ -36,7 +36,7 @@ class SemaphoreProvider implements SmsProvider {
           apikey: this.apiKey,
           number: to,
           message: message,
-          sendername: this.senderName,
+          ...(this.senderName && { sendername: this.senderName }),
         }),
         signal: controller.signal,
       });
@@ -52,10 +52,24 @@ class SemaphoreProvider implements SmsProvider {
       }
 
       const data = await response.json();
+
+      // Semaphore returns HTTP 200 even for errors (invalid key, insufficient
+      // balance, etc.).  A successful send is always a JSON array with at least
+      // one entry containing a numeric `message_id`.
+      if (!Array.isArray(data) || data.length === 0 || !data[0]?.message_id) {
+        const errMsg = data?.message || data?.error || JSON.stringify(data);
+        return {
+          success: false,
+          provider: 'semaphore',
+          error: `Semaphore API error: ${errMsg}`,
+          rawResponse: data,
+        };
+      }
+
       return {
         success: true,
         provider: 'semaphore',
-        messageId: String(data[0]?.message_id || ''),
+        messageId: String(data[0].message_id),
         rawResponse: data,
       };
     } catch (err) {
