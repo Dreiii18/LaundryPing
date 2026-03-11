@@ -45,6 +45,7 @@ export default async function SettingsPage() {
           <SettingsForm
             initialName={laundromat.name || ''}
             initialAddress={laundromat.address || ''}
+            initialServices={laundromat.available_services || ['Wash', 'Dry']}
           />
         </section>
       </div>

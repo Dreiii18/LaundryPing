@@ -6,28 +6,63 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Loader2, Save, CheckCircle } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Loader2, Save, CheckCircle, X, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 
 interface SettingsFormProps {
   initialName: string;
   initialAddress: string;
+  initialServices: string[];
 }
 
-export function SettingsForm({ initialName, initialAddress }: SettingsFormProps) {
+export function SettingsForm({ initialName, initialAddress, initialServices }: SettingsFormProps) {
   const router = useRouter();
   const [name, setName] = useState(initialName);
   const [address, setAddress] = useState(initialAddress);
+  const [services, setServices] = useState<string[]>(initialServices);
+  const [newService, setNewService] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const hasChanges = name !== initialName || address !== initialAddress;
+  const hasChanges =
+    name !== initialName ||
+    address !== initialAddress ||
+    JSON.stringify(services) !== JSON.stringify(initialServices);
+
+  const addService = () => {
+    const trimmed = newService.trim();
+    if (!trimmed) return;
+    if (services.some((s) => s.toLowerCase() === trimmed.toLowerCase())) {
+      toast.error('Service already exists');
+      return;
+    }
+    if (services.length >= 20) {
+      toast.error('Maximum 20 services allowed');
+      return;
+    }
+    setServices([...services, trimmed]);
+    setNewService('');
+  };
+
+  const removeService = (index: number) => {
+    if (services.length <= 1) {
+      toast.error('At least one service is required');
+      return;
+    }
+    setServices(services.filter((_, i) => i !== index));
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!name.trim()) {
       toast.error('Shop name is required');
+      return;
+    }
+
+    if (services.length === 0) {
+      toast.error('At least one service is required');
       return;
     }
 
@@ -40,6 +75,7 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
         body: JSON.stringify({
           name: name.trim(),
           address: address.trim() || null,
+          available_services: services,
         }),
       });
 
@@ -92,6 +128,55 @@ export function SettingsForm({ initialName, initialAddress }: SettingsFormProps)
             rows={3}
             className="min-h-11"
           />
+        </div>
+        <div>
+          <Label className="text-sm font-semibold text-slate-700 mb-2">
+            Services Offered
+          </Label>
+          <div className="flex flex-wrap gap-2 mt-2">
+            {services.map((service, index) => (
+              <Badge
+                key={index}
+                variant="secondary"
+                className="text-sm py-1.5 px-3 gap-1.5"
+              >
+                {service}
+                <button
+                  type="button"
+                  onClick={() => removeService(index)}
+                  className="hover:text-red-600 transition-colors"
+                  aria-label={`Remove ${service}`}
+                >
+                  <X className="size-3.5" />
+                </button>
+              </Badge>
+            ))}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <Input
+              value={newService}
+              onChange={(e) => setNewService(e.target.value)}
+              placeholder="Add a service (e.g., Iron, Fold)"
+              maxLength={50}
+              className="h-10"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  addService();
+                }
+              }}
+            />
+            <Button
+              type="button"
+              variant="outline"
+              onClick={addService}
+              disabled={!newService.trim()}
+              className="h-10 px-3 shrink-0"
+            >
+              <Plus className="size-4" />
+              Add
+            </Button>
+          </div>
         </div>
       </div>
       <div className="px-6 pb-6 flex justify-end">

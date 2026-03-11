@@ -8,7 +8,7 @@ import { sanitizeNotes } from '@/lib/utils/sanitize';
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
 
 const createJobSchema = z.object({
-  machine_id: z.string().uuid('Invalid machine ID'),
+  machine_id: z.string().uuid('Invalid machine ID').optional(),
   phone: z.string().refine(
     (val) => isValidPhNumber(val),
     { message: 'Please enter a valid Philippine mobile number (e.g., 09171234567)' }
@@ -18,6 +18,7 @@ const createJobSchema = z.object({
   is_paid: z.boolean(),
   pay_amount: z.number().min(0, 'Amount must be 0 or more'),
   payment_method: z.enum(PAYMENT_METHODS).optional(),
+  services: z.array(z.string().min(1).max(50)).min(1, 'At least one service is required').max(10),
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
@@ -61,6 +62,7 @@ export async function GET() {
         payment_method,
         pay_amount,
         is_paid,
+        services,
         created_at,
         machines (
           id,
@@ -69,7 +71,7 @@ export async function GET() {
         )
       `)
       .eq('laundromat_id', laundromat.id)
-      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress`)
+      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
       .order('started_at', { ascending: false });
 
     if (queryError) {
@@ -91,6 +93,7 @@ export async function GET() {
       payment_method: job.payment_method,
       pay_amount: job.pay_amount,
       is_paid: job.is_paid,
+      services: job.services,
       created_at: job.created_at,
       machine: job.machines,
     }));
@@ -134,35 +137,41 @@ export async function POST(request: Request) {
       );
     }
 
-    // Validate machine exists, belongs to user, and is active
-    const { data: machine, error: machineError } = await supabase
-      .from('machines')
-      .select('*')
-      .eq('id', machine_id)
-      .eq('laundromat_id', laundromat.id)
-      .eq('status', 'active')
-      .single();
+    // Validate machine if provided
+    let machine: { id: string; label: string; type: string } | null = null;
 
-    if (machineError || !machine) {
-      return NextResponse.json(
-        { error: 'Machine not found or not active' },
-        { status: 404 }
-      );
-    }
+    if (machine_id) {
+      const { data: machineData, error: machineError } = await supabase
+        .from('machines')
+        .select('*')
+        .eq('id', machine_id)
+        .eq('laundromat_id', laundromat.id)
+        .eq('status', 'active')
+        .single();
 
-    // Check if machine already has an active job
-    const { data: activeJobs } = await supabase
-      .from('jobs')
-      .select('id')
-      .eq('machine_id', machine_id)
-      .eq('status', 'in_progress')
-      .limit(1);
+      if (machineError || !machineData) {
+        return NextResponse.json(
+          { error: 'Machine not found or not active' },
+          { status: 404 }
+        );
+      }
 
-    if (activeJobs && activeJobs.length > 0) {
-      return NextResponse.json(
-        { error: 'This machine already has an active job' },
-        { status: 409 }
-      );
+      machine = machineData;
+
+      // Check if machine already has an active job
+      const { data: activeJobs } = await supabase
+        .from('jobs')
+        .select('id')
+        .eq('machine_id', machine_id)
+        .in('status', ['pending', 'in_progress'])
+        .limit(1);
+
+      if (activeJobs && activeJobs.length > 0) {
+        return NextResponse.json(
+          { error: 'This machine already has an active job' },
+          { status: 409 }
+        );
+      }
     }
 
     // Check laundromat-wide active job cap
@@ -170,7 +179,7 @@ export async function POST(request: Request) {
       .from('jobs')
       .select('id', { count: 'exact', head: true })
       .eq('laundromat_id', laundromat.id)
-      .eq('status', 'in_progress');
+      .in('status', ['pending', 'in_progress']);
 
     const { count: machineCount } = await supabase
       .from('machines')
@@ -204,15 +213,16 @@ export async function POST(request: Request) {
       .from('jobs')
       .insert({
         laundromat_id: laundromat.id,
-        machine_id,
+        machine_id: machine_id || null,
         customer_phone_encrypted: encryptedPhone,
         customer_phone_masked: maskedPhone,
         notes: sanitizedNotes,
-        status: 'in_progress',
+        status: machine_id ? 'in_progress' : 'pending',
         notify_sms: notifySms,
         is_paid,
         pay_amount,
         payment_method: payment_method ?? null,
+        services: parsed.data.services,
       })
       .select(`
         id,
@@ -228,6 +238,7 @@ export async function POST(request: Request) {
         payment_method,
         pay_amount,
         is_paid,
+        services,
         created_at
       `)
       .single();
@@ -239,11 +250,11 @@ export async function POST(request: Request) {
     return NextResponse.json({
       job: {
         ...job,
-        machine: {
+        machine: machine ? {
           id: machine.id,
           label: machine.label,
           type: machine.type,
-        },
+        } : null,
       },
     }, { status: 201 });
   } catch {

@@ -18,6 +18,7 @@ export interface Database {
           sms_free_credits: number;
           sms_paid_credits: number;
           billing_cycle_start: string;
+          available_services: string[];
           created_at: string;
           updated_at: string;
         };
@@ -29,6 +30,7 @@ export interface Database {
           sms_free_credits?: number;
           sms_paid_credits?: number;
           billing_cycle_start?: string;
+          available_services?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -40,6 +42,7 @@ export interface Database {
           sms_free_credits?: number;
           sms_paid_credits?: number;
           billing_cycle_start?: string;
+          available_services?: string[];
           created_at?: string;
           updated_at?: string;
         };
@@ -77,11 +80,11 @@ export interface Database {
         Row: {
           id: string;
           laundromat_id: string;
-          machine_id: string;
+          machine_id: string | null;
           customer_phone_encrypted: string | null;
           customer_phone_masked: string | null;
           notes: string | null;
-          status: 'in_progress' | 'completed' | 'cancelled';
+          status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
           started_at: string;
           completed_at: string | null;
           sms_sent: boolean;
@@ -91,16 +94,17 @@ export interface Database {
           is_paid: boolean;
           is_overdue: boolean;
           overdue_reason: string | null;
+          services: string[];
           created_at: string;
         };
         Insert: {
           id?: string;
           laundromat_id: string;
-          machine_id: string;
+          machine_id?: string | null;
           customer_phone_encrypted?: string | null;
           customer_phone_masked?: string | null;
           notes?: string | null;
-          status?: 'in_progress' | 'completed' | 'cancelled';
+          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
@@ -110,16 +114,17 @@ export interface Database {
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;
+          services?: string[];
           created_at?: string;
         };
         Update: {
           id?: string;
           laundromat_id?: string;
-          machine_id?: string;
+          machine_id?: string | null;
           customer_phone_encrypted?: string | null;
           customer_phone_masked?: string | null;
           notes?: string | null;
-          status?: 'in_progress' | 'completed' | 'cancelled';
+          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
@@ -129,6 +134,7 @@ export interface Database {
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;
+          services?: string[];
           created_at?: string;
         };
       };
