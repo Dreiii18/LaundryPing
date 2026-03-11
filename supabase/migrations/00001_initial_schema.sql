@@ -162,7 +162,9 @@ CREATE POLICY "Users can view own jobs" ON jobs
 CREATE POLICY "Users can insert own jobs" ON jobs
   FOR INSERT WITH CHECK (laundromat_id IN (SELECT id FROM laundromats WHERE user_id = (SELECT auth.uid())));
 CREATE POLICY "Users can update own jobs" ON jobs
-  FOR UPDATE USING (laundromat_id IN (SELECT id FROM laundromats WHERE user_id = (SELECT auth.uid())));
+  FOR UPDATE TO authenticated
+  USING (laundromat_id IN (SELECT id FROM laundromats WHERE user_id = (SELECT auth.uid())))
+  WITH CHECK (laundromat_id IN (SELECT id FROM laundromats WHERE user_id = (SELECT auth.uid())));
 
 -- SMS Logs
 CREATE POLICY "Users can view own sms logs" ON sms_logs
@@ -221,15 +223,16 @@ CREATE TRIGGER trg_blog_posts_updated_at
   FOR EACH ROW
   EXECUTE FUNCTION update_blog_posts_updated_at();
 
--- Protect credit columns from direct user UPDATE
+-- Protect credit columns + billing_cycle_start from direct user UPDATE
+-- Silently preserves old values instead of raising an exception, so legitimate
+-- UPDATE queries that include these columns in the SET clause are not broken.
 CREATE OR REPLACE FUNCTION public.protect_credit_columns()
 RETURNS TRIGGER AS $$
 BEGIN
   IF current_role IN ('authenticated', 'anon') THEN
-    IF NEW.sms_free_credits IS DISTINCT FROM OLD.sms_free_credits
-       OR NEW.sms_paid_credits IS DISTINCT FROM OLD.sms_paid_credits THEN
-      RAISE EXCEPTION 'Direct modification of SMS credit columns is not allowed';
-    END IF;
+    NEW.sms_free_credits := OLD.sms_free_credits;
+    NEW.sms_paid_credits := OLD.sms_paid_credits;
+    NEW.billing_cycle_start := OLD.billing_cycle_start;
   END IF;
   RETURN NEW;
 END;
@@ -251,6 +254,14 @@ DECLARE
   v_paid        INTEGER;
   v_cycle_start DATE;
 BEGIN
+  -- Authorization: verify caller owns this laundromat
+  IF NOT EXISTS (
+    SELECT 1 FROM public.laundromats
+    WHERE id = p_laundromat_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   SELECT sms_free_credits, sms_paid_credits, billing_cycle_start
   INTO v_free, v_paid, v_cycle_start
   FROM public.laundromats
@@ -292,6 +303,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.ensure_billing_cycle(p_laundromat_id UUID)
 RETURNS VOID AS $$
 BEGIN
+  -- Authorization: verify caller owns this laundromat
+  IF NOT EXISTS (
+    SELECT 1 FROM public.laundromats
+    WHERE id = p_laundromat_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   UPDATE public.laundromats
   SET sms_free_credits = 50,
       billing_cycle_start = date_trunc('month', CURRENT_DATE)::date,
@@ -305,6 +324,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION public.refund_sms_credit(p_laundromat_id UUID, p_credit_type TEXT)
 RETURNS VOID AS $$
 BEGIN
+  -- Authorization: verify caller owns this laundromat
+  IF NOT EXISTS (
+    SELECT 1 FROM public.laundromats
+    WHERE id = p_laundromat_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   IF p_credit_type NOT IN ('free', 'paid') THEN
     RAISE EXCEPTION 'Invalid credit type: %', p_credit_type;
   END IF;
@@ -327,7 +354,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
--- Admin: add top-up credits from a package
+-- Admin: add top-up credits from a package (service_role only)
 CREATE OR REPLACE FUNCTION public.add_sms_topup(
   p_laundromat_id UUID,
   p_package_slug  TEXT,
@@ -339,6 +366,11 @@ DECLARE
   v_price   NUMERIC(10,2);
   v_rows    INTEGER;
 BEGIN
+  -- Authorization: restrict to service_role / admin only
+  IF coalesce(current_setting('role', true), '') NOT IN ('service_role', 'supabase_admin', 'postgres') THEN
+    RAISE EXCEPTION 'Access denied: admin only';
+  END IF;
+
   SELECT sms_credits, price_php
   INTO v_credits, v_price
   FROM public.sms_topup_packages
@@ -362,6 +394,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
+-- Revoke execute from non-admin roles (defense in depth)
+REVOKE EXECUTE ON FUNCTION public.add_sms_topup FROM PUBLIC, authenticated, anon;
+
 -- =============================================================================
 -- Stored Procedures — Jobs
 -- =============================================================================
@@ -370,6 +405,14 @@ $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 CREATE OR REPLACE FUNCTION mark_overdue_jobs(p_laundromat_id UUID)
 RETURNS void AS $$
 BEGIN
+  -- Authorization: verify caller owns this laundromat
+  IF NOT EXISTS (
+    SELECT 1 FROM public.laundromats
+    WHERE id = p_laundromat_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
   UPDATE jobs
   SET is_overdue = true
   WHERE laundromat_id = p_laundromat_id
