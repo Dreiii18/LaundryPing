@@ -6,6 +6,7 @@ import { sanitizeLaundromatName, sanitizeAddress } from '@/lib/utils/sanitize';
 const updateSettingsSchema = z.object({
   name: z.string().min(1, 'Shop name is required').max(50, 'Shop name must be 50 characters or less').optional(),
   address: z.string().max(200, 'Address must be 200 characters or less').optional().nullable(),
+  available_services: z.array(z.string().min(1).max(50)).min(1).max(20).optional(),
 });
 
 export async function GET() {
@@ -24,6 +25,7 @@ export async function GET() {
         id: laundromat.id,
         name: laundromat.name,
         address: laundromat.address,
+        available_services: laundromat.available_services,
       },
     });
   } catch {
@@ -52,7 +54,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const updateData: Record<string, string | null> = {};
+    const updateData: Record<string, string | string[] | null> = {};
 
     if (parsed.data.name !== undefined) {
       const sanitizedName = sanitizeLaundromatName(parsed.data.name);
@@ -71,6 +73,17 @@ export async function PUT(request: Request) {
         : null;
     }
 
+    if (parsed.data.available_services !== undefined) {
+      const deduplicated = [...new Set(parsed.data.available_services.map((s) => s.trim()).filter(Boolean))];
+      if (deduplicated.length === 0) {
+        return NextResponse.json(
+          { error: 'At least one service is required' },
+          { status: 400 }
+        );
+      }
+      updateData.available_services = deduplicated;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -82,7 +95,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address')
+      .select('id, name, address, available_services')
       .single();
 
     if (updateError) {

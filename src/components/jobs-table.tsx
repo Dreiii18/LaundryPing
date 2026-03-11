@@ -39,7 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, Clock, CircleX, CircleAlert } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Droplets, Wind } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { EmptyState } from '@/components/empty-state';
@@ -51,11 +51,17 @@ const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ] as const;
 
+interface Machine {
+  id: string;
+  label: string;
+  type: string;
+}
+
 interface Job {
   id: string;
-  machine_id: string;
+  machine_id: string | null;
   customer_phone_masked: string | null;
-  status: 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   started_at: string;
   completed_at: string | null;
   sms_sent: boolean;
@@ -65,6 +71,7 @@ interface Job {
   is_paid: boolean;
   is_overdue: boolean;
   overdue_reason: string | null;
+  services: string[];
   machine: {
     id: string;
     label: string;
@@ -88,6 +95,11 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
   const [payLaterMethod, setPayLaterMethod] = useState('');
   const [overdueJobId, setOverdueJobId] = useState<string | null>(null);
   const [overdueReason, setOverdueReason] = useState('');
+  const [assignJobId, setAssignJobId] = useState<string | null>(null);
+  const [assignMachineId, setAssignMachineId] = useState('');
+  const [assigningMachine, setAssigningMachine] = useState(false);
+  const [availableMachines, setAvailableMachines] = useState<Machine[]>([]);
+  const [loadingMachines, setLoadingMachines] = useState(false);
 
   const completeJob = async (jobId: string, options?: { payment_method?: string; overdue_reason?: string }) => {
     setCompletingId(jobId);
@@ -193,6 +205,67 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
     setOverdueReason('');
   };
 
+  const openAssignDialog = async (jobId: string) => {
+    setAssignJobId(jobId);
+    setAssignMachineId('');
+    setLoadingMachines(true);
+
+    try {
+      const machinesRes = await fetchWithAuth('/api/machines');
+      const machinesData = await machinesRes.json();
+
+      const jobsRes = await fetchWithAuth('/api/jobs');
+      const jobsData = await jobsRes.json();
+
+      const activeMachineIds = new Set(
+        (jobsData.jobs || [])
+          .filter((j: { status: string; machine_id: string | null }) =>
+            ['pending', 'in_progress'].includes(j.status) && j.machine_id
+          )
+          .map((j: { machine_id: string }) => j.machine_id)
+      );
+
+      const available = (machinesData.machines || []).filter(
+        (m: Machine) => !activeMachineIds.has(m.id)
+      );
+
+      setAvailableMachines(available);
+    } catch {
+      toast.error('Failed to load machines');
+      setAssignJobId(null);
+    } finally {
+      setLoadingMachines(false);
+    }
+  };
+
+  const handleAssignMachine = async () => {
+    if (!assignJobId || !assignMachineId) return;
+    setAssigningMachine(true);
+
+    try {
+      const res = await fetchWithAuth(`/api/jobs/${assignJobId}/assign-machine`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ machine_id: assignMachineId }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to assign machine');
+        return;
+      }
+
+      toast.success('Machine assigned.');
+      setAssignJobId(null);
+      router.refresh();
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setAssigningMachine(false);
+    }
+  };
+
   const formatTime = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleTimeString('en-US', {
@@ -254,6 +327,9 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
               Machine
             </TableHead>
             <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              Services
+            </TableHead>
+            <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
               Phone Number
             </TableHead>
             <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
@@ -282,7 +358,16 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                 </TableCell>
               )}
               <TableCell className="px-6 py-4 text-sm font-bold text-slate-700">
-                {job.machine?.label || 'Unknown'}
+                {job.machine ? job.machine.label : (
+                  <span className="text-slate-400 italic font-normal">Not assigned</span>
+                )}
+              </TableCell>
+              <TableCell className="px-6 py-4 text-sm text-slate-600">
+                {job.services && job.services.length > 0 ? (
+                  <span>{job.services.join(', ')}</span>
+                ) : (
+                  <span className="text-slate-400 italic">--</span>
+                )}
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600">
                 {job.customer_phone_masked || <span className="text-slate-400 italic">--</span>}
@@ -291,7 +376,12 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                 {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}
               </TableCell>
               <TableCell className="px-6 py-4">
-                {job.status === 'in_progress' && job.is_overdue ? (
+                {job.status === 'pending' ? (
+                  <Badge className="bg-blue-100 text-blue-700 border-transparent gap-1">
+                    <Clock className="size-3" aria-hidden="true" />
+                    Queued
+                  </Badge>
+                ) : job.status === 'in_progress' && job.is_overdue ? (
                   <Badge className="bg-red-100 text-red-700 border-transparent gap-1">
                     <CircleAlert className="size-3" aria-hidden="true" />
                     Overdue
@@ -326,8 +416,20 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                 )}
               </TableCell>
               <TableCell className="px-6 py-4 text-right">
-                {job.status === 'in_progress' ? (
+                {['pending', 'in_progress'].includes(job.status) ? (
                   <div className="inline-flex items-center gap-2 justify-end">
+                    {job.status === 'pending' && !job.machine_id && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openAssignDialog(job.id)}
+                        disabled={completingId !== null || cancellingId !== null}
+                        aria-label="Assign machine"
+                        className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11"
+                      >
+                        Assign
+                      </Button>
+                    )}
                     <Button
                       variant="outline"
                       size="sm"
@@ -491,6 +593,81 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
               className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
             >
               Confirm & Complete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Assign Machine Dialog */}
+      <Dialog open={assignJobId !== null} onOpenChange={(open) => { if (!open) setAssignJobId(null); }}>
+        <DialogContent className="sm:max-w-100">
+          <DialogHeader>
+            <DialogTitle className="text-lg font-bold text-[#111817]">
+              Assign Machine
+            </DialogTitle>
+            <DialogDescription className="text-[#618986]">
+              Select a machine to assign to this job.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-4">
+            {loadingMachines ? (
+              <div className="h-12 flex items-center text-sm text-slate-500">
+                <Loader2 className="size-4 animate-spin mr-2" />
+                Loading machines...
+              </div>
+            ) : availableMachines.length === 0 ? (
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                No available machines right now.
+              </div>
+            ) : (
+              <>
+                <Label htmlFor="assign-machine" className="text-sm font-semibold text-[#111817]">Machine</Label>
+                <Select value={assignMachineId} onValueChange={setAssignMachineId}>
+                  <SelectTrigger id="assign-machine" className="w-full h-12 mt-2">
+                    <SelectValue placeholder="Select a machine" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableMachines.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        <div className="flex items-center gap-2">
+                          {m.type === 'washer' ? (
+                            <Droplets className="size-4 text-blue-500" />
+                          ) : (
+                            <Wind className="size-4 text-orange-500" />
+                          )}
+                          <span>{m.label}</span>
+                          <span className="text-slate-400 capitalize">({m.type})</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setAssignJobId(null)}
+              className="min-h-11"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!assignMachineId || assigningMachine}
+              onClick={handleAssignMachine}
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
+            >
+              {assigningMachine ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Assigning...
+                </>
+              ) : (
+                'Assign Machine'
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

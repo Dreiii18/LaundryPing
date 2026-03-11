@@ -163,6 +163,7 @@ export function JobsPageContent({
         >
           <TabsList>
             <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="pending">Queued</TabsTrigger>
             <TabsTrigger value="in_progress">In Progress</TabsTrigger>
             <TabsTrigger value="completed">Completed</TabsTrigger>
             <TabsTrigger value="cancelled">Cancelled</TabsTrigger>

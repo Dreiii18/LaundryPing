@@ -228,4 +228,60 @@ describe('SemaphoreProvider', () => {
     vi.unstubAllGlobals();
     delete process.env.SEMAPHORE_API_KEY;
   });
+
+  it('returns failure when Semaphore returns 200 with error object instead of array', async () => {
+    process.env.SEMAPHORE_API_KEY = 'test-api-key';
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ status: 401, message: 'Unauthorized' }),
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const provider = getSmsProvider();
+    const result = await provider.send('09171234567', 'Test message');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Semaphore API error');
+    expect(result.error).toContain('Unauthorized');
+    expect(result.rawResponse).toEqual({ status: 401, message: 'Unauthorized' });
+
+    vi.unstubAllGlobals();
+  });
+
+  it('returns failure when Semaphore returns 200 with empty array', async () => {
+    process.env.SEMAPHORE_API_KEY = 'test-api-key';
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [],
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const provider = getSmsProvider();
+    const result = await provider.send('09171234567', 'Test message');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Semaphore API error');
+
+    vi.unstubAllGlobals();
+  });
+
+  it('returns failure when Semaphore returns array entry without message_id', async () => {
+    process.env.SEMAPHORE_API_KEY = 'test-api-key';
+
+    const mockFetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ status: 'Failed', error: 'Invalid number' }],
+    });
+    vi.stubGlobal('fetch', mockFetch);
+
+    const provider = getSmsProvider();
+    const result = await provider.send('09171234567', 'Test message');
+
+    expect(result.success).toBe(false);
+    expect(result.error).toContain('Semaphore API error');
+
+    vi.unstubAllGlobals();
+  });
 });
