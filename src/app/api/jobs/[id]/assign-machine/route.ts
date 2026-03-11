@@ -85,7 +85,16 @@ export async function POST(
       );
     }
 
+    // Guard against promoting a job with no services
+    if (!job.services || job.services.length === 0) {
+      return NextResponse.json(
+        { error: 'Cannot assign machine to a job with no services' },
+        { status: 409 }
+      );
+    }
+
     // Update job: assign machine, transition pending → in_progress
+    // Reset started_at so overdue check uses machine assignment time, not creation time
     const updateData: Record<string, string | boolean> = { machine_id: newMachineId };
     if (job.status === 'pending') {
       updateData.status = 'in_progress';
@@ -118,7 +127,10 @@ export async function POST(
       .single();
 
     if (updateError || !updatedJob) {
-      return NextResponse.json({ error: 'Failed to assign machine' }, { status: 500 });
+      return NextResponse.json(
+        { error: 'Machine is no longer available' },
+        { status: 409 }
+      );
     }
 
     return NextResponse.json({

@@ -214,15 +214,11 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
       const machinesRes = await fetchWithAuth('/api/machines');
       const machinesData = await machinesRes.json();
 
-      const jobsRes = await fetchWithAuth('/api/jobs');
-      const jobsData = await jobsRes.json();
-
+      // Derive occupied machines from local state instead of re-fetching jobs
       const activeMachineIds = new Set(
-        (jobsData.jobs || [])
-          .filter((j: { status: string; machine_id: string | null }) =>
-            ['pending', 'in_progress'].includes(j.status) && j.machine_id
-          )
-          .map((j: { machine_id: string }) => j.machine_id)
+        initialJobs
+          .filter((j) => ['pending', 'in_progress'].includes(j.status) && j.machine_id && j.id !== jobId)
+          .map((j) => j.machine_id as string)
       );
 
       const available = (machinesData.machines || []).filter(

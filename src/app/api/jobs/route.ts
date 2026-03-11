@@ -18,7 +18,7 @@ const createJobSchema = z.object({
   is_paid: z.boolean(),
   pay_amount: z.number().min(0, 'Amount must be 0 or more'),
   payment_method: z.enum(PAYMENT_METHODS).optional(),
-  services: z.array(z.string().max(50)).min(1, 'At least one service is required').max(10),
+  services: z.array(z.string().min(1).max(50)).min(1, 'At least one service is required').max(10),
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
