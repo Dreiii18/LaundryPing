@@ -44,7 +44,7 @@ export default async function JobsPage({
   // Fetch all machines for filter dropdown
   const { data: machines } = await supabase
     .from('machines')
-    .select('id, label, type')
+    .select('id, label')
     .eq('laundromat_id', laundromat.id)
     .eq('status', 'active')
     .order('label');
@@ -72,8 +72,7 @@ export default async function JobsPage({
       created_at,
       machines (
         id,
-        label,
-        type
+        label
       )
     `,
       { count: 'exact' }
@@ -130,14 +129,13 @@ export default async function JobsPage({
     services: (job.services || []) as string[],
     machine:
       Array.isArray(job.machines)
-        ? ((job.machines[0] as { id: string; label: string; type: string }) ?? null)
-        : (job.machines as { id: string; label: string; type: string } | null),
+        ? ((job.machines[0] as { id: string; label: string }) ?? null)
+        : (job.machines as { id: string; label: string } | null),
   }));
 
   const safeMachines = (machines || []).map((m) => ({
     id: m.id,
     label: m.label,
-    type: m.type as 'washer' | 'dryer',
   }));
 
   return (

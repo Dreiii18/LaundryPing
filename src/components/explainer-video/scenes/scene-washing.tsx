@@ -86,7 +86,7 @@ export const SceneWashing: React.FC = () => {
               color: COLORS.dark,
             }}
           >
-            Washer #3
+            Machine #3
           </div>
 
           {/* Status badge */}

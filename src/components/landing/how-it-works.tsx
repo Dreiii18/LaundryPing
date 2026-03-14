@@ -27,7 +27,7 @@ export function HowItWorks() {
               Register Your Machines
             </h3>
             <p className="text-[0.8125rem] text-[#618986] leading-relaxed max-w-[260px]">
-              Add your washers and dryers to the dashboard. Only once.
+              Add your machines to the dashboard. Only once.
             </p>
             {/* Connector line */}
             <div className="hidden md:block absolute top-7 left-[calc(50%+2.5rem)] w-[calc(100%-5rem)] border-t-2 border-dashed border-[#0d968b]/20" />

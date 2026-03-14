@@ -152,12 +152,12 @@ describe('sanitizeNotes', () => {
 });
 
 describe('sanitizeMachineLabel', () => {
-  it('returns clean label unchanged: "Washer 1"', () => {
-    expect(sanitizeMachineLabel('Washer 1')).toBe('Washer 1');
+  it('returns clean label unchanged: "M-01"', () => {
+    expect(sanitizeMachineLabel('M-01')).toBe('M-01');
   });
 
   it('strips HTML from machine label', () => {
-    expect(sanitizeMachineLabel('<b>Dryer A</b>')).toBe('Dryer A');
+    expect(sanitizeMachineLabel('<b>Machine A</b>')).toBe('Machine A');
   });
 
   it('truncates labels longer than 20 characters', () => {
@@ -171,7 +171,7 @@ describe('sanitizeMachineLabel', () => {
   });
 
   it('trims whitespace', () => {
-    expect(sanitizeMachineLabel('  Dryer A  ')).toBe('Dryer A');
+    expect(sanitizeMachineLabel('  Machine A  ')).toBe('Machine A');
   });
 
   it('handles empty input', () => {

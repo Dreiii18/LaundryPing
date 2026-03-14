@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Dialog,
@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Clock, Droplets, Wind, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, Play, Clock, AlertTriangle, XCircle } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
@@ -33,20 +33,9 @@ const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ] as const;
 
-const SERVICE_MACHINE_TYPE: Record<string, string> = {
-  'Wash': 'washer',
-  'Dry': 'dryer',
-};
-
-const MACHINE_TYPE_SERVICE: Record<string, string> = {
-  'washer': 'Wash',
-  'dryer': 'Dry',
-};
-
 interface Machine {
   id: string;
   label: string;
-  type: string;
 }
 
 interface StartJobModalProps {
@@ -66,7 +55,6 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [notifySms, setNotifySms] = useState(true);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
-  const [allMachineTypes, setAllMachineTypes] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -82,7 +70,6 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setPaymentMethod('');
       setNotifySms(true);
       setSelectedServices([]);
-      setAllMachineTypes(new Set());
       setError('');
       setTotalCredits(null);
       fetchMachines();
@@ -112,16 +99,17 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
       const allMachines = machinesData.machines || [];
 
-      // Track all machine types for service filtering
-      const types = new Set<string>(allMachines.map((m: Machine) => m.type));
-      setAllMachineTypes(types);
-
       // Filter to only available machines
       const available = allMachines.filter(
         (m: Machine) => !activeMachineIds.has(m.id)
       );
 
       setMachines(available);
+
+      // Auto-select when only one machine is available
+      if (available.length === 1) {
+        setMachineId(available[0].id);
+      }
     } catch {
       setError('Failed to load machines');
     } finally {
@@ -163,39 +151,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     );
   };
 
-  const displayedMachines = useMemo(() => {
-    const relevantMachineTypes = selectedServices
-      .map((s) => SERVICE_MACHINE_TYPE[s])
-      .filter(Boolean);
-    return relevantMachineTypes.length > 0
-      ? machines.filter((m) => relevantMachineTypes.includes(m.type))
-      : machines;
-  }, [selectedServices, machines]);
-
-  // Clear machine selection when it no longer matches selected services
-  useEffect(() => {
-    if (!machineId || machineId === 'none') return;
-    const relevantTypes = selectedServices
-      .map((s) => SERVICE_MACHINE_TYPE[s])
-      .filter(Boolean);
-    if (relevantTypes.length === 0) return;
-    const selectedMachine = machines.find((m) => m.id === machineId);
-    if (selectedMachine && !relevantTypes.includes(selectedMachine.type)) {
-      setMachineId('');
-    }
-  }, [selectedServices, machineId, machines]);
-
-  // Auto-select service when a machine is picked without a matching service
-  useEffect(() => {
-    if (!machineId || machineId === 'none') return;
-    const selectedMachine = machines.find((m) => m.id === machineId);
-    if (!selectedMachine) return;
-    const matchingService = MACHINE_TYPE_SERVICE[selectedMachine.type];
-    if (!matchingService || !availableServices.includes(matchingService)) return;
-    setSelectedServices((prev) =>
-      prev.includes(matchingService) ? prev : [...prev, matchingService]
-    );
-  }, [machineId, machines, availableServices]);
+  const displayedMachines = machines;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -203,6 +159,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
     if (selectedServices.length === 0) {
       setError('Please select at least one service');
+      return;
+    }
+
+    if (displayedMachines.length > 0 && (!machineId || machineId === 'none')) {
+      setError('Please select a machine');
       return;
     }
 
@@ -276,7 +237,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               {machineId ? 'Start New Job' : 'New Job'}
             </DialogTitle>
             <DialogDescription className="text-[#618986]">
-              Select services and optionally assign a machine.
+              Select services and assign a machine.
             </DialogDescription>
           </DialogHeader>
 
@@ -309,16 +270,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
             })()}
 
             {/* Services Checklist */}
-            {(() => {
-              const filteredServices = availableServices.filter((service) => {
-                const requiredType = SERVICE_MACHINE_TYPE[service];
-                return !requiredType || allMachineTypes.has(requiredType);
-              });
-              return filteredServices.length > 0 ? (
+            {availableServices.length > 0 && (
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-semibold text-[#111817]">Services</Label>
                 <div className="flex flex-wrap gap-2">
-                  {filteredServices.map((service) => (
+                  {availableServices.map((service) => (
                     <button
                       key={service}
                       type="button"
@@ -334,12 +290,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                   ))}
                 </div>
               </div>
-              ) : null;
-            })()}
+            )}
 
             {/* Machine Selection */}
             <div className="flex flex-col gap-2">
-              <Label htmlFor="machine-select" className="text-sm font-semibold text-[#111817]">Machine (optional)</Label>
+              <Label htmlFor="machine-select" className="text-sm font-semibold text-[#111817]">Machine</Label>
               {loadingMachines ? (
                 <div className="h-12 flex items-center text-sm text-slate-500">
                   <Loader2 className="size-4 animate-spin mr-2" />
@@ -352,21 +307,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               ) : (
                 <Select value={machineId} onValueChange={setMachineId}>
                   <SelectTrigger id="machine-select" className="w-full h-12 min-h-11">
-                    <SelectValue placeholder="No machine (queue job)" />
+                    <SelectValue placeholder="Select a machine" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">No machine (queue job)</SelectItem>
                     {displayedMachines.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
-                        <div className="flex items-center gap-2">
-                          {m.type === 'washer' ? (
-                            <Droplets className="size-4 text-blue-500" />
-                          ) : (
-                            <Wind className="size-4 text-orange-500" />
-                          )}
-                          <span>{m.label}</span>
-                          <span className="text-slate-400 capitalize">({m.type})</span>
-                        </div>
+                        {m.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -485,7 +431,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
             <div className="flex flex-col gap-2">
               <Label className="text-sm font-semibold text-[#111817]">Notes (Optional)</Label>
               <Textarea
-                placeholder="e.g., Extra spin, delicate wash, low heat dryer"
+                placeholder="e.g., Extra spin, delicate cycle, low heat"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}

@@ -130,7 +130,7 @@ export const SceneStartJob: React.FC = () => {
               alignItems: 'center',
             }}
           >
-            <span>Washer #3</span>
+            <span>Machine #3</span>
             <svg
               width="16"
               height="16"
