@@ -151,8 +151,6 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
     );
   };
 
-  const displayedMachines = machines;
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
@@ -162,7 +160,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       return;
     }
 
-    if (displayedMachines.length > 0 && (!machineId || machineId === 'none')) {
+    if (machines.length > 0 && !machineId) {
       setError('Please select a machine');
       return;
     }
@@ -198,7 +196,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          ...(machineId && machineId !== 'none' ? { machine_id: machineId } : {}),
+          ...(machineId ? { machine_id: machineId } : {}),
           ...(notifySms && phoneClean ? { phone: phoneClean } : {}),
           notify_sms: notifySms,
           notes: notes.trim() || undefined,
@@ -237,7 +235,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               {machineId ? 'Start New Job' : 'New Job'}
             </DialogTitle>
             <DialogDescription className="text-[#618986]">
-              Select services and assign a machine.
+              {machines.length > 0
+                ? 'Select services and assign a machine.'
+                : 'Select services. Job will be queued until a machine is free.'}
             </DialogDescription>
           </DialogHeader>
 
@@ -300,7 +300,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                   <Loader2 className="size-4 animate-spin mr-2" />
                   Loading machines...
                 </div>
-              ) : displayedMachines.length === 0 ? (
+              ) : machines.length === 0 ? (
                 <div className="p-3 rounded-lg bg-blue-50 border border-blue-200 text-blue-700 text-sm">
                   No available machines — job will be queued.
                 </div>
@@ -310,7 +310,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                     <SelectValue placeholder="Select a machine" />
                   </SelectTrigger>
                   <SelectContent>
-                    {displayedMachines.map((m) => (
+                    {machines.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.label}
                       </SelectItem>
@@ -458,9 +458,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               {loading ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  {machineId && machineId !== 'none' ? 'Starting...' : 'Queuing...'}
+                  {machineId ? 'Starting...' : 'Queuing...'}
                 </>
-              ) : machineId && machineId !== 'none' ? (
+              ) : machineId ? (
                 <>
                   Start Job
                   <Play className="size-4" />
