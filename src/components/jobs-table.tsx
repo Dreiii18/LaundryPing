@@ -39,7 +39,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Droplets, Wind } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, CircleX, CircleAlert } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { EmptyState } from '@/components/empty-state';
@@ -54,7 +54,6 @@ const PAYMENT_METHODS = [
 interface Machine {
   id: string;
   label: string;
-  type: string;
 }
 
 interface Job {
@@ -75,7 +74,6 @@ interface Job {
   machine: {
     id: string;
     label: string;
-    type: string;
   } | null;
 }
 
@@ -625,15 +623,7 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                   <SelectContent>
                     {availableMachines.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
-                        <div className="flex items-center gap-2">
-                          {m.type === 'washer' ? (
-                            <Droplets className="size-4 text-blue-500" />
-                          ) : (
-                            <Wind className="size-4 text-orange-500" />
-                          )}
-                          <span>{m.label}</span>
-                          <span className="text-slate-400 capitalize">({m.type})</span>
-                        </div>
+                        {m.label}
                       </SelectItem>
                     ))}
                   </SelectContent>

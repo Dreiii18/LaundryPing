@@ -66,8 +66,7 @@ export async function GET() {
         created_at,
         machines (
           id,
-          label,
-          type
+          label
         )
       `)
       .eq('laundromat_id', laundromat.id)
@@ -138,7 +137,7 @@ export async function POST(request: Request) {
     }
 
     // Validate machine if provided
-    let machine: { id: string; label: string; type: string } | null = null;
+    let machine: { id: string; label: string } | null = null;
 
     if (machine_id) {
       const { data: machineData, error: machineError } = await supabase
@@ -253,7 +252,6 @@ export async function POST(request: Request) {
         machine: machine ? {
           id: machine.id,
           label: machine.label,
-          type: machine.type,
         } : null,
       },
     }, { status: 201 });

@@ -52,7 +52,6 @@ export interface Database {
           id: string;
           laundromat_id: string;
           label: string;
-          type: 'washer' | 'dryer';
           status: 'active' | 'inactive' | 'maintenance';
           created_at: string;
           updated_at: string;
@@ -61,7 +60,6 @@ export interface Database {
           id?: string;
           laundromat_id: string;
           label: string;
-          type: 'washer' | 'dryer';
           status?: 'active' | 'inactive' | 'maintenance';
           created_at?: string;
           updated_at?: string;
@@ -70,7 +68,6 @@ export interface Database {
           id?: string;
           laundromat_id?: string;
           label?: string;
-          type?: 'washer' | 'dryer';
           status?: 'active' | 'inactive' | 'maintenance';
           created_at?: string;
           updated_at?: string;

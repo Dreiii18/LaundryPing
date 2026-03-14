@@ -19,7 +19,6 @@ import { JobsTable, type Job } from '@/components/jobs-table';
 interface Machine {
   id: string;
   label: string;
-  type: 'washer' | 'dryer';
 }
 
 interface JobsPageContentProps {

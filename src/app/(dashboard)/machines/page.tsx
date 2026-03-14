@@ -82,7 +82,6 @@ export default async function MachinesPage() {
     return {
       id: m.id,
       label: m.label,
-      type: m.type as 'washer' | 'dryer',
       status: m.status,
       created_at: m.created_at,
       operationalStatus: stats?.hasInProgressJob ? 'in_use' as const : 'available' as const,

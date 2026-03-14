@@ -34,7 +34,6 @@ CREATE TABLE machines (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   laundromat_id UUID NOT NULL REFERENCES laundromats(id) ON DELETE CASCADE,
   label TEXT NOT NULL,
-  type TEXT NOT NULL CHECK (type IN ('washer', 'dryer')),
   status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'maintenance')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),

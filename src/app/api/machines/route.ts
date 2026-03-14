@@ -5,7 +5,6 @@ import { sanitizeMachineLabel } from '@/lib/utils/sanitize';
 
 const createMachineSchema = z.object({
   label: z.string().min(1, 'Label is required').max(20, 'Label must be 20 characters or less'),
-  type: z.enum(['washer', 'dryer'], { message: 'Type must be "washer" or "dryer"' }),
 });
 
 export async function GET() {
@@ -71,7 +70,6 @@ export async function POST(request: Request) {
       .insert({
         laundromat_id: laundromat.id,
         label: sanitizedLabel,
-        type: parsed.data.type,
       })
       .select()
       .single();

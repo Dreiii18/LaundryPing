@@ -5,7 +5,6 @@ import { sanitizeMachineLabel } from '@/lib/utils/sanitize';
 
 const updateMachineSchema = z.object({
   label: z.string().min(1).max(20).optional(),
-  type: z.enum(['washer', 'dryer']).optional(),
   status: z.enum(['active', 'maintenance']).optional(),
 });
 
@@ -57,10 +56,6 @@ export async function PUT(
         );
       }
       updateData.label = sanitizedLabel;
-    }
-
-    if (parsed.data.type !== undefined) {
-      updateData.type = parsed.data.type;
     }
 
     if (parsed.data.status !== undefined) {
