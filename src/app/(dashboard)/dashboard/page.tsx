@@ -79,8 +79,7 @@ export default async function DashboardPage() {
       created_at,
       machines (
         id,
-        label,
-        type
+        label
       )
     `)
     .eq('laundromat_id', laundromat.id)
@@ -102,7 +101,7 @@ export default async function DashboardPage() {
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
     services: (job.services || []) as string[],
-    machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string; type: string } ?? null : job.machines as { id: string; label: string; type: string } | null,
+    machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
   }));
 
   // Today's completed jobs (by completed_at) -- count + revenue
@@ -145,7 +144,7 @@ export default async function DashboardPage() {
           <div>
             <h3 className="text-lg font-bold text-slate-900 mb-1">Welcome to LaundryPing!</h3>
             <p className="text-sm text-slate-600 mb-3">
-              Get started by adding your first washing machine or dryer.
+              Get started by adding your first machine.
             </p>
             <Link
               href="/machines"

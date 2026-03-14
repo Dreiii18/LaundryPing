@@ -45,8 +45,6 @@ import {
   Plus,
   Pencil,
   Trash2,
-  Droplets,
-  Wind,
   Search,
   // SlidersHorizontal,
   ChevronLeft,
@@ -65,7 +63,6 @@ import { EmptyState } from '@/components/empty-state';
 interface Machine {
   id: string;
   label: string;
-  type: 'washer' | 'dryer';
   status: string;
   created_at: string;
   operationalStatus: 'available' | 'in_use';
@@ -77,7 +74,7 @@ interface MachinesTableProps {
   machines: Machine[];
 }
 
-type SortField = 'label' | 'type' | 'operationalStatus' | 'cyclesToday' | 'lastActivityAt';
+type SortField = 'label' | 'operationalStatus' | 'cyclesToday' | 'lastActivityAt';
 type SortDirection = 'asc' | 'desc';
 
 const PAGE_SIZE = 10;
@@ -111,7 +108,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const [modalOpen, setModalOpen] = useState(false);
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [label, setLabel] = useState('');
-  const [type, setType] = useState<'washer' | 'dryer'>('washer');
   const [status, setStatus] = useState<'active' | 'maintenance'>('active');
   const [modalError, setModalError] = useState('');
   const [saving, setSaving] = useState(false);
@@ -153,11 +149,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     let result = initialMachines;
 
     // Tab filter
-    if (activeTab === 'washers') {
-      result = result.filter((m) => m.type === 'washer');
-    } else if (activeTab === 'dryers') {
-      result = result.filter((m) => m.type === 'dryer');
-    } else if (activeTab === 'maintenance') {
+    if (activeTab === 'maintenance') {
       result = result.filter((m) => m.status === 'maintenance');
     }
 
@@ -165,9 +157,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
-        (m) =>
-          m.label.toLowerCase().includes(q) ||
-          m.type.toLowerCase().includes(q)
+        (m) => m.label.toLowerCase().includes(q)
       );
     }
 
@@ -178,8 +168,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
       switch (sortField) {
         case 'label':
           return dir * a.label.localeCompare(b.label);
-        case 'type':
-          return dir * a.type.localeCompare(b.type);
         case 'operationalStatus':
           return dir * a.operationalStatus.localeCompare(b.operationalStatus);
         case 'cyclesToday':
@@ -230,7 +218,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const openAddModal = () => {
     setEditingMachine(null);
     setLabel('');
-    setType('washer');
     setStatus('active');
     setModalError('');
     setModalOpen(true);
@@ -239,7 +226,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
   const openEditModal = (machine: Machine) => {
     setEditingMachine(machine);
     setLabel(machine.label);
-    setType(machine.type);
     setStatus(machine.status === 'maintenance' ? 'maintenance' : 'active');
     setModalError('');
     setModalOpen(true);
@@ -271,7 +257,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         const res = await fetchWithAuth(`/api/machines/${editingMachine.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label.trim(), type, status }),
+          body: JSON.stringify({ label: label.trim(), status }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -284,7 +270,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         const res = await fetchWithAuth('/api/machines', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label.trim(), type }),
+          body: JSON.stringify({ label: label.trim() }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -355,7 +341,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
           <EmptyState
             icon="machines"
             title="Add your first machine"
-            description="Set up your washers and dryers to start tracking laundry jobs."
+            description="Set up your machines to start tracking laundry jobs."
             action={{ label: 'Add Machine', onClick: openAddModal }}
           />
         </div>
@@ -382,8 +368,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
           <Tabs value={activeTab} onValueChange={handleTabChange} className="mb-4">
             <TabsList>
               <TabsTrigger value="all">All Machines</TabsTrigger>
-              <TabsTrigger value="washers">Washers</TabsTrigger>
-              <TabsTrigger value="dryers">Dryers</TabsTrigger>
               <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
             </TabsList>
           </Tabs>
@@ -401,7 +385,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                     <TableRow className="bg-slate-50/50">
                       {([
                         ['label', 'Label'],
-                        ['type', 'Type'],
                         ['operationalStatus', 'Status'],
                         ['cyclesToday', 'Cycles Today'],
                         ['lastActivityAt', 'Last Activity'],
@@ -443,18 +426,6 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
                             </div>
                             <span className="text-sm font-semibold text-slate-900">
                               {machine.label}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="px-6 py-5">
-                          <div className="flex items-center gap-2 text-slate-600">
-                            {machine.type === 'washer' ? (
-                              <Droplets className="size-4" />
-                            ) : (
-                              <Wind className="size-4" />
-                            )}
-                            <span className="text-sm font-medium capitalize">
-                              {machine.type}
                             </span>
                           </div>
                         </TableCell>
@@ -622,7 +593,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
               </DialogTitle>
               <DialogDescription>
                 {editingMachine
-                  ? 'Update the machine label and type.'
+                  ? 'Update the machine label.'
                   : 'Add a new machine to your laundromat.'}
               </DialogDescription>
             </DialogHeader>
@@ -637,35 +608,12 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-medium">Label</Label>
                 <Input
-                  placeholder="e.g., W1, Dryer 2"
+                  placeholder="e.g., Machine 1, M-01"
                   value={label}
                   onChange={(e) => setLabel(e.target.value)}
                   maxLength={20}
                   className="h-10"
                 />
-              </div>
-
-              <div className="flex flex-col gap-2">
-                <Label className="text-sm font-medium">Type</Label>
-                <Select value={type} onValueChange={(v) => setType(v as 'washer' | 'dryer')}>
-                  <SelectTrigger className="w-full h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="washer">
-                      <div className="flex items-center gap-2">
-                        <Droplets className="size-4" />
-                        Washer
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="dryer">
-                      <div className="flex items-center gap-2">
-                        <Wind className="size-4" />
-                        Dryer
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
 
               {editingMachine && (

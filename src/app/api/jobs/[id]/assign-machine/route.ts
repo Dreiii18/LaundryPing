@@ -56,7 +56,7 @@ export async function POST(
     // Validate machine exists, belongs to laundromat, and is active
     const { data: machine, error: machineError } = await supabase
       .from('machines')
-      .select('id, label, type')
+      .select('id, label')
       .eq('id', newMachineId)
       .eq('laundromat_id', laundromat.id)
       .eq('status', 'active')
@@ -139,7 +139,6 @@ export async function POST(
         machine: {
           id: machine.id,
           label: machine.label,
-          type: machine.type,
         },
       },
     });
