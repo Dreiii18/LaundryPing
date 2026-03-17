@@ -92,6 +92,9 @@ export interface Database {
           is_overdue: boolean;
           overdue_reason: string | null;
           services: string[];
+          claim_number: number | null;
+          customer_name: string | null;
+          claim_date: string;
           created_at: string;
         };
         Insert: {
@@ -112,6 +115,8 @@ export interface Database {
           is_overdue?: boolean;
           overdue_reason?: string | null;
           services?: string[];
+          claim_number?: number | null;
+          customer_name?: string | null;
           created_at?: string;
         };
         Update: {
@@ -132,6 +137,8 @@ export interface Database {
           is_overdue?: boolean;
           overdue_reason?: string | null;
           services?: string[];
+          claim_number?: number | null;
+          customer_name?: string | null;
           created_at?: string;
         };
       };
@@ -287,6 +294,10 @@ export interface Database {
       mark_overdue_jobs: {
         Args: { p_laundromat_id: string };
         Returns: null;
+      };
+      generate_claim_number: {
+        Args: { p_laundromat_id: string };
+        Returns: number;
       };
     };
   };

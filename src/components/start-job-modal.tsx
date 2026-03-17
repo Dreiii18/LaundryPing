@@ -49,6 +49,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [machineId, setMachineId] = useState('');
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
+  const [customerName, setCustomerName] = useState('');
   const [isPaid, setIsPaid] = useState(true);
   const [payAmount, setPayAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
@@ -65,6 +66,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setMachineId('');
       setPhone('');
       setNotes('');
+      setCustomerName('');
       setIsPaid(true);
       setPayAmount('');
       setPaymentMethod('');
@@ -200,6 +202,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
           ...(notifySms && phoneClean ? { phone: phoneClean } : {}),
           notify_sms: notifySms,
           notes: notes.trim() || undefined,
+          customer_name: customerName.trim() || undefined,
           is_paid: isPaid,
           pay_amount: Number(payAmount),
           payment_method: isPaid ? paymentMethod : undefined,
@@ -291,6 +294,21 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 </div>
               </div>
             )}
+
+            {/* Customer Name */}
+            <div className="flex flex-col gap-2">
+              <Label htmlFor="customer-name" className="text-sm font-semibold text-[#111817]">Customer Name (Optional)</Label>
+              <Input
+                id="customer-name"
+                type="text"
+                placeholder="e.g., Juan Dela Cruz"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                maxLength={60}
+                disabled={loading}
+                className="h-12"
+              />
+            </div>
 
             {/* Machine Selection */}
             <div className="flex flex-col gap-2">
