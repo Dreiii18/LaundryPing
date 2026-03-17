@@ -105,7 +105,7 @@ export default async function JobsPage({
       `customer_name.ilike.%${sanitized}%`,
     ];
     if (isNumeric) {
-      filters.push(`claim_number.eq.${search.trim()}`);
+      filters.push(`claim_number.eq.${trimmed}`);
     }
     query = query.or(filters.join(','));
   }
