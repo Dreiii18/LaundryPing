@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { isValidPhNumber, normalizeToLocal, maskPhone } from '@/lib/utils/phone';
 import { encryptPhone } from '@/lib/utils/encryption';
-import { sanitizeNotes } from '@/lib/utils/sanitize';
+import { sanitizeNotes, sanitizeCustomerName } from '@/lib/utils/sanitize';
 
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
 
@@ -15,6 +15,7 @@ const createJobSchema = z.object({
   ).optional(),
   notify_sms: z.boolean().optional(),
   notes: z.string().max(500, 'Notes must be 500 characters or less').optional(),
+  customer_name: z.string().max(60, 'Customer name must be 60 characters or less').optional(),
   is_paid: z.boolean(),
   pay_amount: z.number().min(0, 'Amount must be 0 or more'),
   payment_method: z.enum(PAYMENT_METHODS).optional(),
@@ -63,6 +64,8 @@ export async function GET() {
         pay_amount,
         is_paid,
         services,
+        claim_number,
+        customer_name,
         created_at,
         machines (
           id,
@@ -93,6 +96,8 @@ export async function GET() {
       pay_amount: job.pay_amount,
       is_paid: job.is_paid,
       services: job.services,
+      claim_number: job.claim_number,
+      customer_name: job.customer_name,
       created_at: job.created_at,
       machine: job.machines,
     }));
@@ -124,7 +129,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { machine_id, phone, notes, is_paid, pay_amount, payment_method } = parsed.data;
+    const { machine_id, phone, notes, customer_name, is_paid, pay_amount, payment_method } = parsed.data;
 
     const notifySms = parsed.data.notify_sms ?? true;
 
@@ -205,44 +210,62 @@ export async function POST(request: Request) {
       maskedPhone = maskPhone(normalizedPhone);
     }
 
-    // Sanitize notes
+    // Sanitize notes and customer name
     const sanitizedNotes = notes ? sanitizeNotes(notes) : null;
+    const sanitizedCustomerName = customer_name ? sanitizeCustomerName(customer_name) : null;
 
-    const { data: job, error: insertError } = await supabase
-      .from('jobs')
-      .insert({
-        laundromat_id: laundromat.id,
-        machine_id: machine_id || null,
-        customer_phone_encrypted: encryptedPhone,
-        customer_phone_masked: maskedPhone,
-        notes: sanitizedNotes,
-        status: machine_id ? 'in_progress' : 'pending',
-        notify_sms: notifySms,
-        is_paid,
-        pay_amount,
-        payment_method: payment_method ?? null,
-        services: parsed.data.services,
-      })
-      .select(`
-        id,
-        laundromat_id,
-        machine_id,
-        customer_phone_masked,
-        notes,
-        status,
-        started_at,
-        completed_at,
-        sms_sent,
-        notify_sms,
-        payment_method,
-        pay_amount,
-        is_paid,
-        services,
-        created_at
-      `)
-      .single();
+    // Generate claim number and insert job.
+    // The RPC's advisory lock is transaction-scoped and released before INSERT,
+    // so a concurrent request can get the same number. We retry once on unique
+    // constraint violation (23505) to handle this race.
+    const jobPayload = {
+      laundromat_id: laundromat.id,
+      machine_id: machine_id || null,
+      customer_phone_encrypted: encryptedPhone,
+      customer_phone_masked: maskedPhone,
+      notes: sanitizedNotes,
+      status: machine_id ? ('in_progress' as const) : ('pending' as const),
+      notify_sms: notifySms,
+      is_paid,
+      pay_amount,
+      payment_method: payment_method ?? null,
+      services: parsed.data.services,
+      customer_name: sanitizedCustomerName,
+    };
 
-    if (insertError) {
+    const selectFields = `
+      id, laundromat_id, machine_id, customer_phone_masked, notes,
+      status, started_at, completed_at, sms_sent, notify_sms,
+      payment_method, pay_amount, is_paid, services,
+      claim_number, customer_name, created_at
+    `;
+
+    const insertWithClaimNumber = async (attempt: number) => {
+      const { data: claimNumber, error: claimError } = await supabase
+        .rpc('generate_claim_number', { p_laundromat_id: laundromat.id });
+
+      if (claimError) {
+        console.error('Claim number generation failed:', claimError);
+        return { job: null, error: claimError };
+      }
+
+      const { data: job, error: insertError } = await supabase
+        .from('jobs')
+        .insert({ ...jobPayload, claim_number: claimNumber })
+        .select(selectFields)
+        .single();
+
+      // Retry once on unique constraint violation (claim_number race)
+      if (insertError?.code === '23505' && attempt === 0) {
+        return insertWithClaimNumber(1);
+      }
+
+      return { job, error: insertError };
+    };
+
+    const { job, error: insertError } = await insertWithClaimNumber(0);
+
+    if (insertError || !job) {
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
     }
 

@@ -17,3 +17,7 @@ export function sanitizeNotes(notes: string): string {
 export function sanitizeMachineLabel(label: string): string {
   return sanitizeText(label).slice(0, 20);
 }
+
+export function sanitizeCustomerName(name: string): string {
+  return sanitizeText(name).slice(0, 60);
+}

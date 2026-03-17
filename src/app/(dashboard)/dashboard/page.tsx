@@ -76,6 +76,8 @@ export default async function DashboardPage() {
       is_overdue,
       overdue_reason,
       services,
+      claim_number,
+      customer_name,
       created_at,
       machines (
         id,
@@ -101,6 +103,8 @@ export default async function DashboardPage() {
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
     services: (job.services || []) as string[],
+    claim_number: job.claim_number as number | null,
+    customer_name: job.customer_name as string | null,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
   }));
 

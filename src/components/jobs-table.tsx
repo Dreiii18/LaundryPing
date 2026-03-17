@@ -71,6 +71,8 @@ interface Job {
   is_overdue: boolean;
   overdue_reason: string | null;
   services: string[];
+  claim_number: number | null;
+  customer_name: string | null;
   machine: {
     id: string;
     label: string;
@@ -312,6 +314,9 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
       <Table>
         <TableHeader>
           <TableRow className="bg-slate-50/50">
+            <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              #
+            </TableHead>
             {context === 'jobs-page' && (
               <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Date
@@ -346,6 +351,15 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
         <TableBody>
           {initialJobs.map((job) => (
             <TableRow key={job.id} className="hover:bg-slate-50/50 transition-colors">
+              <TableCell className="px-6 py-4">
+                {job.claim_number != null ? (
+                  <span className="inline-flex items-center justify-center size-8 rounded-full bg-teal-100 text-teal-700 text-xs font-bold">
+                    #{job.claim_number}
+                  </span>
+                ) : (
+                  <span className="text-slate-400 italic text-sm">--</span>
+                )}
+              </TableCell>
               {context === 'jobs-page' && (
                 <TableCell className="px-6 py-4 text-sm text-slate-500 font-medium">
                   {formatDate(job.started_at)}
@@ -364,7 +378,12 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                 )}
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600">
-                {job.customer_phone_masked || <span className="text-slate-400 italic">--</span>}
+                <div>
+                  {job.customer_phone_masked || <span className="text-slate-400 italic">--</span>}
+                  {job.customer_name && (
+                    <div className="text-xs text-slate-400 mt-0.5">{job.customer_name}</div>
+                  )}
+                </div>
               </TableCell>
               <TableCell className="px-6 py-4 text-sm text-slate-600 font-medium">
                 {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}

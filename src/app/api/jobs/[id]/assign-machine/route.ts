@@ -122,6 +122,8 @@ export async function POST(
         pay_amount,
         is_paid,
         services,
+        claim_number,
+        customer_name,
         created_at
       `)
       .single();

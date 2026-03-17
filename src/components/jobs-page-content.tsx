@@ -118,7 +118,7 @@ export function JobsPageContent({
       <div className="relative mb-4">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
         <Input
-          placeholder="Search by phone or notes..."
+          placeholder="Search by tag #, name, phone, or notes..."
           value={searchInput}
           onChange={(e) => setSearchInput(e.target.value)}
           className="pl-10 h-10"

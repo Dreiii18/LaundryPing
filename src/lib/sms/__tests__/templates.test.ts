@@ -105,6 +105,62 @@ describe('buildLaundryDoneMessage', () => {
       expect(msg).not.toContain('\n');
     });
   });
+
+  describe('claim number and customer name', () => {
+    it('appends claim number when provided', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('SpinClean', 7);
+      expect(msg).toContain(' Tag #7');
+    });
+
+    it('appends claim number and customer name when both fit', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('SpinClean', 3, 'Juan');
+      expect(msg).toContain(' Tag #3 - Juan');
+    });
+
+    it('drops customer name but keeps claim number if both would exceed 160 chars', () => {
+      Math.random = () => 0;
+      // Use a long shop name to push close to the limit
+      const shopName = 'A'.repeat(25);
+      const longCustomerName = 'B'.repeat(60);
+      const msg = buildLaundryDoneMessage(shopName, 999, longCustomerName);
+      expect(msg).toContain(' Tag #999');
+      expect(msg).not.toContain(longCustomerName);
+      expect(msg.length).toBeLessThanOrEqual(160);
+    });
+
+    it('tag fits even with a max-length shop name and claim number', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('A'.repeat(25), 999);
+      expect(msg).toContain(' Tag #999');
+      expect(msg.length).toBeLessThanOrEqual(160);
+    });
+
+    it('does not append anything when claimNumber is null', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('SpinClean', null, 'Juan');
+      expect(msg).not.toContain('Tag');
+      expect(msg).not.toContain('Juan');
+    });
+
+    it('does not append anything when claimNumber is undefined', () => {
+      Math.random = () => 0;
+      const msg = buildLaundryDoneMessage('SpinClean');
+      const msgExplicit = buildLaundryDoneMessage('SpinClean', undefined, undefined);
+      expect(msg).toBe(msgExplicit);
+    });
+
+    it('all templates fit in 1 segment with claim number and short customer name', () => {
+      const shopName = 'A'.repeat(25);
+      for (let i = 0; i < 5; i++) {
+        Math.random = () => i / 5;
+        const msg = buildLaundryDoneMessage(shopName, 99, 'Juan');
+        expect(msg.length).toBeLessThanOrEqual(160);
+        expect(getMessageSegmentCount(msg)).toBe(1);
+      }
+    });
+  });
 });
 
 describe('getMessageSegmentCount', () => {

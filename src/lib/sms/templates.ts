@@ -20,14 +20,35 @@ const TEMPLATES = [
  * Builds a randomized Tagalog SMS message for laundry completion.
  * Rotates through 5 templates to keep messages fresh.
  * Shop names > 25 chars are truncated with ellipsis.
+ * Optionally appends claim number and customer name if they fit in 160 chars.
  */
-export function buildLaundryDoneMessage(shopName: string): string {
+export function buildLaundryDoneMessage(
+  shopName: string,
+  claimNumber?: number | null,
+  customerName?: string | null,
+): string {
   const truncatedName = shopName.length > 25
     ? shopName.slice(0, 22) + '...'
     : shopName;
 
   const index = Math.floor(Math.random() * TEMPLATES.length);
-  return TEMPLATES[index](truncatedName);
+  const base = TEMPLATES[index](truncatedName);
+
+  if (claimNumber == null) return base;
+
+  const tagWithName = customerName
+    ? ` Tag #${claimNumber} - ${customerName}`
+    : null;
+  const tagOnly = ` Tag #${claimNumber}`;
+
+  // Try claim+name first, then claim only, then skip if neither fits
+  if (tagWithName && base.length + tagWithName.length <= 160) {
+    return base + tagWithName;
+  }
+  if (base.length + tagOnly.length <= 160) {
+    return base + tagOnly;
+  }
+  return base;
 }
 
 /**
