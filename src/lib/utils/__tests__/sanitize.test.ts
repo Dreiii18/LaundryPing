@@ -5,6 +5,7 @@ import {
   sanitizeAddress,
   sanitizeNotes,
   sanitizeMachineLabel,
+  sanitizeCustomerName,
 } from '../sanitize';
 
 describe('sanitizeText', () => {
@@ -176,5 +177,37 @@ describe('sanitizeMachineLabel', () => {
 
   it('handles empty input', () => {
     expect(sanitizeMachineLabel('')).toBe('');
+  });
+});
+
+describe('sanitizeCustomerName', () => {
+  it('returns clean name unchanged', () => {
+    expect(sanitizeCustomerName('Juan Dela Cruz')).toBe('Juan Dela Cruz');
+  });
+
+  it('strips HTML tags', () => {
+    expect(sanitizeCustomerName('<b>Juan</b>')).toBe('Juan');
+  });
+
+  it('truncates names longer than 60 characters', () => {
+    const longName = 'A'.repeat(70);
+    expect(sanitizeCustomerName(longName)).toHaveLength(60);
+  });
+
+  it('keeps names exactly 60 characters unchanged', () => {
+    const exactName = 'A'.repeat(60);
+    expect(sanitizeCustomerName(exactName)).toBe(exactName);
+  });
+
+  it('trims whitespace', () => {
+    expect(sanitizeCustomerName('  Maria Santos  ')).toBe('Maria Santos');
+  });
+
+  it('handles empty input', () => {
+    expect(sanitizeCustomerName('')).toBe('');
+  });
+
+  it('strips script tags', () => {
+    expect(sanitizeCustomerName('<script>alert("xss")</script>Juan')).toBe('alert("xss")Juan');
   });
 });

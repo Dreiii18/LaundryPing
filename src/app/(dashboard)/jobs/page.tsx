@@ -69,6 +69,8 @@ export default async function JobsPage({
       is_overdue,
       overdue_reason,
       services,
+      claim_number,
+      customer_name,
       created_at,
       machines (
         id,
@@ -94,10 +96,18 @@ export default async function JobsPage({
   }
   if (search) {
     // Escape PostgREST-special characters to prevent filter injection
-    const sanitized = search.replace(/[,()\\%_]/g, '\\$&');
-    query = query.or(
-      `customer_phone_masked.ilike.%${sanitized}%,notes.ilike.%${sanitized}%`
-    );
+    const trimmed = search.trim();
+    const sanitized = trimmed.replace(/[,()\\%_]/g, '\\$&');
+    const isNumeric = /^\d+$/.test(trimmed);
+    const filters = [
+      `customer_phone_masked.ilike.%${sanitized}%`,
+      `notes.ilike.%${sanitized}%`,
+      `customer_name.ilike.%${sanitized}%`,
+    ];
+    if (isNumeric) {
+      filters.push(`claim_number.eq.${search.trim()}`);
+    }
+    query = query.or(filters.join(','));
   }
 
   // Pagination
@@ -127,6 +137,8 @@ export default async function JobsPage({
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
     services: (job.services || []) as string[],
+    claim_number: job.claim_number as number | null,
+    customer_name: job.customer_name as string | null,
     machine:
       Array.isArray(job.machines)
         ? ((job.machines[0] as { id: string; label: string }) ?? null)
