@@ -1,25 +1,12 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { TopupPackageCards } from '@/components/topup-package-cards';
 import { MessageSquare } from 'lucide-react';
 
 export default async function PlanBillingPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, laundromat, supabase } = await getCachedUser();
 
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
 
@@ -27,18 +14,18 @@ export default async function PlanBillingPage() {
   const paidCredits = laundromat.sms_paid_credits;
   const totalCredits = freeCredits + paidCredits;
 
-  // Fetch top-up packages
-  const { data: packages } = await supabase
-    .from('sms_topup_packages')
-    .select('slug, label, sms_credits, price_php, description')
-    .order('sort_order', { ascending: true });
-
-  // Fetch top-up history
-  const { data: topupLogs } = await supabase
-    .from('sms_topup_logs')
-    .select('package_slug, credits_added, price_php, created_at')
-    .order('created_at', { ascending: false })
-    .limit(10);
+  // Fetch packages and top-up history in parallel
+  const [{ data: packages }, { data: topupLogs }] = await Promise.all([
+    supabase
+      .from('sms_topup_packages')
+      .select('slug, label, sms_credits, price_php, description')
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('sms_topup_logs')
+      .select('package_slug, credits_added, price_php, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10),
+  ]);
 
   // Billing period
   const now = new Date();

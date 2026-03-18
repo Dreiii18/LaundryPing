@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/supabase/admin-auth';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
 
@@ -9,23 +9,13 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, laundromat } = await getCachedUser();
 
-  if (!user) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
 
-  // Fetch laundromat data
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('id, name, address')
-    .eq('user_id', user.id)
-    .single();
-
-  const shopName = laundromat?.name || 'My Laundromat';
+  const shopName = laundromat.name || 'My Laundromat';
   const userEmail = user.email || '';
   const userInitials = userEmail
     .split('@')[0]
