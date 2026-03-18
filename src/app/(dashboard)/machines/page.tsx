@@ -1,50 +1,36 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { MachinesTable } from '@/components/machines-table';
 
 export default async function MachinesPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, laundromat, supabase } = await getCachedUser();
 
-  if (!user) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('id')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
-    redirect('/login');
-  }
-
-  const { data: machines } = await supabase
-    .from('machines')
-    .select('*')
-    .eq('laundromat_id', laundromat.id)
-    .in('status', ['active', 'maintenance'])
-    .order('created_at', { ascending: true });
 
   // Get today's date in PH timezone for filtering completed jobs
-  const now = new Date();
-  const phFormatter = new Intl.DateTimeFormat('en-CA', {
+  const todayPH = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Manila',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
-  });
-  const todayPH = phFormatter.format(now);
+  }).format(new Date());
 
-  // Fetch jobs: in_progress (any day) + completed today
-  const { data: jobs } = await supabase
-    .from('jobs')
-    .select('id, machine_id, status, started_at, completed_at')
-    .eq('laundromat_id', laundromat.id)
-    .or(`status.eq.in_progress,and(status.eq.completed,completed_at.gte.${todayPH}T00:00:00+08:00)`);
+  // Fetch machines and jobs in parallel
+  const [{ data: machines }, { data: jobs }] = await Promise.all([
+    supabase
+      .from('machines')
+      .select('*')
+      .eq('laundromat_id', laundromat.id)
+      .in('status', ['active', 'maintenance'])
+      .order('created_at', { ascending: true }),
+    supabase
+      .from('jobs')
+      .select('id, machine_id, status, started_at, completed_at')
+      .eq('laundromat_id', laundromat.id)
+      .or(`status.eq.in_progress,and(status.eq.completed,completed_at.gte.${todayPH}T00:00:00+08:00)`),
+  ]);
 
   // Aggregate per-machine stats
   const machineStats = new Map<string, {

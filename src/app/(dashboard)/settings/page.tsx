@@ -1,25 +1,12 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { SettingsForm } from '@/components/settings-form';
 import { Store } from 'lucide-react';
 
 export default async function SettingsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, laundromat } = await getCachedUser();
 
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
 

@@ -1,24 +1,11 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { SmsHistoryContent } from '@/components/sms-history-content';
 
 export default async function SmsHistoryPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, laundromat, supabase } = await getCachedUser();
 
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('id')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
 

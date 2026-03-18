@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
 import { JobsTable } from '@/components/jobs-table';
@@ -8,44 +8,23 @@ import { TrendingUp, TrendingDown, Minus, Plus } from 'lucide-react';
 import Image from 'next/image';
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Deduplicated via React.cache — no extra DB round trips even though layout calls this too
+  const { user, laundromat, supabase } = await getCachedUser();
 
-  if (!user) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('*')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
-    redirect('/login');
-  }
-
-  const { count: machineCount } = await supabase
-    .from('machines')
-    .select('id', { count: 'exact', head: true })
-    .eq('laundromat_id', laundromat.id)
-    .in('status', ['active', 'maintenance']);
-
-  const hasNoMachines = (machineCount ?? 0) === 0;
 
   const freeCredits = laundromat.sms_free_credits;
   const paidCredits = laundromat.sms_paid_credits;
   const totalCredits = freeCredits + paidCredits;
 
-  // Calculate days until billing cycle reset (1st of next month)
+  // Calculate dates in PH timezone
   const now = new Date();
   const phNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const nextMonth = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 1);
   const daysUntilFreeReset = Math.ceil((nextMonth.getTime() - phNow.getTime()) / (1000 * 60 * 60 * 24));
 
-  // Get today's date in PH timezone
   const phFormatter = new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Asia/Manila',
     year: 'numeric',
@@ -53,11 +32,43 @@ export default async function DashboardPage() {
     day: '2-digit',
   });
   const todayPH = phFormatter.format(now);
+  const yesterdayDate = new Date(now);
+  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+  const yesterdayPH = phFormatter.format(yesterdayDate);
 
-  // Mark overdue jobs before fetching
-  await supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id });
+  // Run all independent queries in parallel.
+  // mark_overdue_jobs only modifies in_progress rows, so the todayCompleted/yesterdayCompleted
+  // queries (filtered to status=completed) are unaffected by execution order.
+  // The error from mark_overdue_jobs is intentionally discarded (index 1 unused) — it only
+  // fails if auth context is mismatched, which cannot happen here since user is verified above.
+  const [{ count: machineCount }, , { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
+    await Promise.all([
+      supabase
+        .from('machines')
+        .select('id', { count: 'exact', head: true })
+        .eq('laundromat_id', laundromat.id)
+        .in('status', ['active', 'maintenance']),
+      supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id }),
+      supabase
+        .from('jobs')
+        .select('pay_amount')
+        .eq('laundromat_id', laundromat.id)
+        .eq('status', 'completed')
+        .gte('completed_at', `${todayPH}T00:00:00+08:00`),
+      supabase
+        .from('jobs')
+        .select('pay_amount')
+        .eq('laundromat_id', laundromat.id)
+        .eq('status', 'completed')
+        .gte('completed_at', `${yesterdayPH}T00:00:00+08:00`)
+        .lt('completed_at', `${todayPH}T00:00:00+08:00`),
+    ]);
 
-  // Fetch jobs for today OR overdue in_progress jobs
+  const hasNoMachines = (machineCount ?? 0) === 0;
+
+  // WARNING: this query must remain after the Promise.all above — it needs to see
+  // the is_overdue updates written by mark_overdue_jobs (PostgreSQL read-committed isolation
+  // guarantees visibility of committed writes before this statement begins).
   const { data: jobs } = await supabase
     .from('jobs')
     .select(`
@@ -108,31 +119,10 @@ export default async function DashboardPage() {
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
   }));
 
-  // Today's completed jobs (by completed_at) -- count + revenue
-  const { data: todayCompletedJobs } = await supabase
-    .from('jobs')
-    .select('pay_amount')
-    .eq('laundromat_id', laundromat.id)
-    .eq('status', 'completed')
-    .gte('completed_at', `${todayPH}T00:00:00+08:00`);
-
   const completedToday = todayCompletedJobs?.length ?? 0;
   const todayRevenue = (todayCompletedJobs || [])
     .filter((j) => j.pay_amount != null)
     .reduce((sum, j) => sum + Number(j.pay_amount), 0);
-
-  // Yesterday's completed jobs (by completed_at) -- count + revenue
-  const yesterdayDate = new Date(now);
-  yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-  const yesterdayPH = phFormatter.format(yesterdayDate);
-
-  const { data: yesterdayCompletedJobs } = await supabase
-    .from('jobs')
-    .select('pay_amount')
-    .eq('laundromat_id', laundromat.id)
-    .eq('status', 'completed')
-    .gte('completed_at', `${yesterdayPH}T00:00:00+08:00`)
-    .lt('completed_at', `${todayPH}T00:00:00+08:00`);
 
   const yesterdayCount = yesterdayCompletedJobs?.length ?? 0;
   const yesterdayRevenue = (yesterdayCompletedJobs || [])
