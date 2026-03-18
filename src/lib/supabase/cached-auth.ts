@@ -23,7 +23,7 @@ export const getCachedUser = cache(async () => {
 
   const { data: laundromat, error: laundromatError } = await supabase
     .from('laundromats')
-    .select('id, name, address, user_id, sms_free_credits, sms_paid_credits, billing_cycle_start, available_services')
+    .select('id, name, address, sms_free_credits, sms_paid_credits, available_services')
     .eq('user_id', user.id)
     .single();
 

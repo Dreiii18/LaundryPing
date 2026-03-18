@@ -11,9 +11,11 @@ export default function MachinesLoading() {
       <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
         {/* Column headers */}
         <div className="flex items-center gap-4 px-4 py-3 border-b border-slate-100 bg-slate-50">
-          {[40, 24, 20, 20, 16].map((w, i) => (
-            <div key={i} className={`h-3 w-${w} bg-slate-200 rounded`} />
-          ))}
+          <div className="h-3 w-40 bg-slate-200 rounded" />
+          <div className="h-3 w-24 bg-slate-200 rounded" />
+          <div className="h-3 w-20 bg-slate-200 rounded" />
+          <div className="h-3 w-20 bg-slate-200 rounded" />
+          <div className="h-3 w-16 bg-slate-200 rounded" />
         </div>
         {/* Rows */}
         <div className="divide-y divide-slate-100">

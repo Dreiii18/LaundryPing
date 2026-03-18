@@ -15,7 +15,7 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
-  const shopName = laundromat?.name || 'My Laundromat';
+  const shopName = laundromat.name || 'My Laundromat';
   const userEmail = user.email || '';
   const userInitials = userEmail
     .split('@')[0]
