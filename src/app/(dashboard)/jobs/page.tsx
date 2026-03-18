@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { JobsPageContent } from '@/components/jobs-page-content';
 
@@ -10,23 +10,9 @@ export default async function JobsPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await searchParams;
+  const { user, laundromat, supabase } = await getCachedUser();
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login');
-  }
-
-  const { data: laundromat } = await supabase
-    .from('laundromats')
-    .select('id')
-    .eq('user_id', user.id)
-    .single();
-
-  if (!laundromat) {
+  if (!user || !laundromat) {
     redirect('/login');
   }
 
@@ -38,16 +24,16 @@ export default async function JobsPage({
   const search = typeof params.search === 'string' ? params.search : '';
   const page = Math.max(1, parseInt(typeof params.page === 'string' ? params.page : '1', 10) || 1);
 
-  // Mark overdue jobs before fetching
-  await supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id });
-
-  // Fetch all machines for filter dropdown
-  const { data: machines } = await supabase
-    .from('machines')
-    .select('id, label')
-    .eq('laundromat_id', laundromat.id)
-    .eq('status', 'active')
-    .order('label');
+  // Run mark_overdue and machines fetch in parallel
+  const [, { data: machines }] = await Promise.all([
+    supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id }),
+    supabase
+      .from('machines')
+      .select('id, label')
+      .eq('laundromat_id', laundromat.id)
+      .eq('status', 'active')
+      .order('label'),
+  ]);
 
   // Build filtered, paginated query
   let query = supabase
@@ -114,13 +100,15 @@ export default async function JobsPage({
   const offset = (page - 1) * PAGE_SIZE;
   query = query.order('started_at', { ascending: false }).range(offset, offset + PAGE_SIZE - 1);
 
-  const { data: jobs, count: totalCount } = await query;
-
-  // Fetch total unfiltered count for the header badge
-  const { count: totalJobCount } = await supabase
-    .from('jobs')
-    .select('id', { count: 'exact', head: true })
-    .eq('laundromat_id', laundromat.id);
+  // Run paginated jobs query (filtered, for pagination) and total unfiltered count in parallel.
+  // totalCount drives pagination UI; totalJobCount drives the page header badge — they are intentionally different.
+  const [{ data: jobs, count: totalCount }, { count: totalJobCount }] = await Promise.all([
+    query,
+    supabase
+      .from('jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('laundromat_id', laundromat.id),
+  ]);
 
   const safeJobs = (jobs || []).map((job) => ({
     id: job.id,
