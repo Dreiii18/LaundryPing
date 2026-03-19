@@ -6,7 +6,7 @@ const MUTATION_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 const INACTIVITY_TIMEOUT_MS = 8 * 60 * 60 * 1000; // 8 hours
 const LAST_ACTIVITY_COOKIE = 'lp_last_activity';
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
   });
