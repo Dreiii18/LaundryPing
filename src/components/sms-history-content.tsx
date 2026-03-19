@@ -112,9 +112,6 @@ export function SmsHistoryContent({ logs }: SmsHistoryContentProps) {
               <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Status
               </TableHead>
-              <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
-                Provider
-              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -134,9 +131,6 @@ export function SmsHistoryContent({ logs }: SmsHistoryContentProps) {
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <StatusBadge status={log.status} />
-                  </TableCell>
-                  <TableCell className="px-6 py-4 text-sm text-slate-500 capitalize">
-                    {log.provider ?? '--'}
                   </TableCell>
                 </TableRow>
               );
