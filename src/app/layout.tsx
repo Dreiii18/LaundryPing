@@ -21,7 +21,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={`${inter.variable} font-sans antialiased`}>
         {children}
-        <Toaster position="top-right" richColors />
+        <Toaster position="top-right" richColors duration={2500} closeButton />
         <Analytics />
         <SpeedInsights />
       </body>
