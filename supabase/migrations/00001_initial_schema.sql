@@ -19,7 +19,7 @@ CREATE TABLE laundromats (
   address TEXT,
   sms_free_credits INTEGER NOT NULL DEFAULT 50,
   sms_paid_credits INTEGER NOT NULL DEFAULT 0,
-  billing_cycle_start DATE NOT NULL DEFAULT date_trunc('month', CURRENT_DATE)::date,
+  billing_cycle_start DATE NOT NULL DEFAULT date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   available_services TEXT[] NOT NULL DEFAULT ARRAY['Wash', 'Dry'],

@@ -37,9 +37,11 @@ export const getCachedUser = cache(async () => {
   const phNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
   const firstOfMonthPH = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, '0')}-01`;
   if (laundromat.billing_cycle_start < firstOfMonthPH) {
-    await supabase.rpc('ensure_billing_cycle', { p_laundromat_id: laundromat.id });
-    laundromat.sms_free_credits = 50;
-    laundromat.billing_cycle_start = firstOfMonthPH;
+    const { error: cycleError } = await supabase.rpc('ensure_billing_cycle', { p_laundromat_id: laundromat.id });
+    if (!cycleError) {
+      laundromat.sms_free_credits = 50;
+      laundromat.billing_cycle_start = firstOfMonthPH;
+    }
   }
 
   return { user, laundromat, supabase, error: null };
