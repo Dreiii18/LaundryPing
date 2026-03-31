@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, Suspense } from 'react';
+import { useState, Suspense, useTransition } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import { Button } from '@/components/ui/button';
@@ -33,6 +33,7 @@ function LoginBanners() {
 
 function LoginForm() {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -53,14 +54,15 @@ function LoginForm() {
 
       if (authError) {
         setError(authError.message);
-        setLoading(false);
         return;
       }
 
-      router.push('/dashboard');
-      router.refresh();
+      startTransition(() => {
+        router.push('/dashboard');
+      });
     } catch {
       setError('An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };

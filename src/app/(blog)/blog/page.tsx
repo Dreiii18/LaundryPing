@@ -8,11 +8,13 @@ export const metadata: Metadata = {
 };
 
 export default async function BlogPage() {
-  const { data: posts } = await supabaseAdmin
+  const { data: posts, error } = await supabaseAdmin
     .from('blog_posts')
     .select('slug, title, description, author, created_at')
     .eq('published', true)
     .order('created_at', { ascending: false });
+
+  if (error) console.error('Failed to fetch blog posts:', error.message);
 
   return (
     <div className="space-y-8">
