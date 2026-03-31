@@ -254,12 +254,14 @@ CREATE TRIGGER trg_protect_credit_columns
 -- =============================================================================
 
 -- Billing cycle reset + atomic credit consumption (merged to prevent TOCTOU)
+-- Uses Asia/Manila timezone since LaundryPing is a PH-only app.
 CREATE OR REPLACE FUNCTION public.check_and_consume_sms_credit(p_laundromat_id UUID)
 RETURNS TEXT AS $$
 DECLARE
   v_free        INTEGER;
   v_paid        INTEGER;
   v_cycle_start DATE;
+  v_ph_month    DATE := date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date;
 BEGIN
   -- Authorization: verify caller owns this laundromat
   IF NOT EXISTS (
@@ -279,12 +281,12 @@ BEGIN
     RAISE EXCEPTION 'Laundromat not found: %', p_laundromat_id;
   END IF;
 
-  -- Inline billing cycle reset
-  IF v_cycle_start < date_trunc('month', CURRENT_DATE)::date THEN
+  -- Inline billing cycle reset (PH timezone)
+  IF v_cycle_start < v_ph_month THEN
     v_free := 50;
     UPDATE public.laundromats
     SET sms_free_credits    = 50,
-        billing_cycle_start = date_trunc('month', CURRENT_DATE)::date,
+        billing_cycle_start = v_ph_month,
         updated_at          = now()
     WHERE id = p_laundromat_id;
   END IF;
@@ -307,8 +309,11 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Lazy billing cycle reset (standalone, kept for direct usage)
+-- Uses Asia/Manila timezone since LaundryPing is a PH-only app.
 CREATE OR REPLACE FUNCTION public.ensure_billing_cycle(p_laundromat_id UUID)
 RETURNS VOID AS $$
+DECLARE
+  v_ph_month DATE := date_trunc('month', CURRENT_TIMESTAMP AT TIME ZONE 'Asia/Manila')::date;
 BEGIN
   -- Authorization: verify caller owns this laundromat
   IF NOT EXISTS (
@@ -320,10 +325,10 @@ BEGIN
 
   UPDATE public.laundromats
   SET sms_free_credits = 50,
-      billing_cycle_start = date_trunc('month', CURRENT_DATE)::date,
+      billing_cycle_start = v_ph_month,
       updated_at = now()
   WHERE id = p_laundromat_id
-    AND billing_cycle_start < date_trunc('month', CURRENT_DATE)::date;
+    AND billing_cycle_start < v_ph_month;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
