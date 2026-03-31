@@ -13,13 +13,14 @@ export async function generateMetadata({
   params,
 }: BlogPostPageProps): Promise<Metadata> {
   const { slug } = await params;
-  const { data: post } = await supabaseAdmin
+  const { data: post, error } = await supabaseAdmin
     .from('blog_posts')
     .select('title, description')
     .eq('slug', slug)
     .eq('published', true)
     .single();
 
+  if (error) console.error('Failed to fetch blog post metadata:', error.message);
   if (!post) return { title: 'Post Not Found' };
 
   return {
@@ -30,13 +31,14 @@ export async function generateMetadata({
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
-  const { data: post } = await supabaseAdmin
+  const { data: post, error: postError } = await supabaseAdmin
     .from('blog_posts')
     .select('*')
     .eq('slug', slug)
     .eq('published', true)
     .single();
 
+  if (postError) console.error('Failed to fetch blog post:', postError.message);
   if (!post) {
     notFound();
   }

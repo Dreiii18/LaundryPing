@@ -51,12 +51,12 @@ describe('ensureBillingCycle', () => {
     });
   });
 
-  it('resolves without throwing even when the RPC returns an error', async () => {
+  it('throws when the RPC returns an error', async () => {
     const mock = createMockSupabase({ rpcError: { message: 'DB error' } });
 
     await expect(
       ensureBillingCycle(mock as unknown as SupabaseClient, LAUNDROMAT_ID)
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow('Failed to ensure billing cycle: DB error');
   });
 });
 

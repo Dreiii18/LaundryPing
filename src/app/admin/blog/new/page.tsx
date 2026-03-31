@@ -1,15 +1,12 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/supabase/admin-auth';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { BlogPostForm } from '@/components/admin/blog-post-form';
 
 export default async function NewBlogPostPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user || !isAdmin(user)) {
+  if (error || !user || !isAdmin(user)) {
     redirect('/dashboard');
   }
 

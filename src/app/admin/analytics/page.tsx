@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 import {
@@ -10,57 +10,65 @@ import {
 } from 'lucide-react';
 
 export default async function AdminAnalyticsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user || !isAdmin(user)) {
+  if (error === 'Unauthorized' || !user || !isAdmin(user)) {
     redirect('/dashboard');
   }
 
-  // Total laundromats
-  const { count: totalLaundromats } = await supabaseAdmin
-    .from('laundromats')
-    .select('*', { count: 'exact', head: true });
-
-  // SMS sent this month
   const firstOfMonth = new Date();
   firstOfMonth.setDate(1);
   firstOfMonth.setHours(0, 0, 0, 0);
-  const { count: smsSentThisMonth } = await supabaseAdmin
-    .from('sms_logs')
-    .select('*', { count: 'exact', head: true })
-    .eq('status', 'sent')
-    .gte('sent_at', firstOfMonth.toISOString());
+  const firstOfMonthISO = firstOfMonth.toISOString();
 
-  // Revenue from top-ups this month
-  const { data: topupLogs } = await supabaseAdmin
-    .from('sms_topup_logs')
-    .select('price_php')
-    .gte('created_at', firstOfMonth.toISOString());
+  // Run all independent queries in parallel
+  const [
+    { count: totalLaundromats, error: e1 },
+    { count: smsSentThisMonth, error: e2 },
+    { data: topupLogs, error: e3 },
+    { data: allLaundromats, error: e4 },
+    { data: recentLaundromats, error: e5 },
+  ] = await Promise.all([
+    supabaseAdmin
+      .from('laundromats')
+      .select('*', { count: 'exact', head: true }),
+    supabaseAdmin
+      .from('sms_logs')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'sent')
+      .gte('sent_at', firstOfMonthISO),
+    supabaseAdmin
+      .from('sms_topup_logs')
+      .select('price_php')
+      .gte('created_at', firstOfMonthISO),
+    supabaseAdmin
+      .from('laundromats')
+      .select('sms_free_credits, sms_paid_credits'),
+    supabaseAdmin
+      .from('laundromats')
+      .select('id, user_id, name, created_at')
+      .order('created_at', { ascending: false })
+      .limit(5),
+  ]);
+
+  for (const err of [e1, e2, e3, e4, e5]) {
+    if (err) console.error('Analytics query failed:', err.message);
+  }
 
   const monthlyRevenue = (topupLogs || []).reduce((sum, l) => sum + Number(l.price_php), 0);
-
-  // Total credits in system
-  const { data: allLaundromats } = await supabaseAdmin
-    .from('laundromats')
-    .select('sms_free_credits, sms_paid_credits');
-
   const totalFreeCredits = (allLaundromats || []).reduce((sum, l) => sum + l.sms_free_credits, 0);
   const totalPaidCredits = (allLaundromats || []).reduce((sum, l) => sum + l.sms_paid_credits, 0);
 
-  // Recent signups (last 5)
-  const { data: recentLaundromats } = await supabaseAdmin
-    .from('laundromats')
-    .select('id, user_id, name, created_at')
-    .order('created_at', { ascending: false })
-    .limit(5);
-
-  const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+  // Fetch only the emails we need (one per recent signup) in parallel
+  const recentUserIds = (recentLaundromats || []).map((l) => l.user_id);
+  const recentUserResults = await Promise.allSettled(
+    recentUserIds.map((id) => supabaseAdmin.auth.admin.getUserById(id))
+  );
   const emailMap = new Map<string, string>();
-  for (const u of usersData?.users || []) {
-    emailMap.set(u.id, u.email || '');
+  for (const result of recentUserResults) {
+    if (result.status === 'fulfilled' && result.value.data?.user) {
+      emailMap.set(result.value.data.user.id, result.value.data.user.email || '');
+    }
   }
 
   const recentSignups = (recentLaundromats || []).map((l) => ({

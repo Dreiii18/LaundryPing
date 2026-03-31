@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
@@ -10,23 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import type { BlogPost } from '@/types';
+import { useSlugGeneration } from './use-slug-generation';
 
 interface BlogPostFormProps {
   post?: BlogPost;
 }
 
-function slugify(text: string): string {
-  return text
-    .toLowerCase()
-    .trim()
-    .replace(/[^\w\s-]/g, '')
-    .replace(/[\s_]+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-+|-+$/g, '');
-}
-
 export function BlogPostForm({ post }: BlogPostFormProps) {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [saving, setSaving] = useState(false);
   const [title, setTitle] = useState(post?.title ?? '');
   const [slug, setSlug] = useState(post?.slug ?? '');
@@ -35,17 +27,7 @@ export function BlogPostForm({ post }: BlogPostFormProps) {
   const [author, setAuthor] = useState(post?.author ?? 'LaundryPing Team');
   const [published, setPublished] = useState(post?.published ?? false);
 
-  // Track the last auto-generated slug to know when to auto-update
-  const autoSlugRef = useRef(post ? '' : slugify(title));
-
-  useEffect(() => {
-    // Only auto-generate slug if user hasn't manually edited it
-    if (!post && (slug === '' || slug === autoSlugRef.current)) {
-      const newSlug = slugify(title);
-      setSlug(newSlug);
-      autoSlugRef.current = newSlug;
-    }
-  }, [title, post, slug]);
+  useSlugGeneration({ title, slug, setSlug, isEditing: !!post });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,8 +51,9 @@ export function BlogPostForm({ post }: BlogPostFormProps) {
       }
 
       toast.success(post ? 'Post updated' : 'Post created');
-      router.push('/admin/blog');
-      router.refresh();
+      startTransition(() => {
+        router.push('/admin/blog');
+      });
     } catch {
       toast.error('An unexpected error occurred');
     } finally {
@@ -128,14 +111,8 @@ export function BlogPostForm({ post }: BlogPostFormProps) {
         </div>
 
         <div className="flex items-center gap-3">
-          <Switch
-            id="published"
-            checked={published}
-            onCheckedChange={setPublished}
-          />
-          <Label htmlFor="published">
-            {published ? 'Published' : 'Draft'}
-          </Label>
+          <Switch id="published" checked={published} onCheckedChange={setPublished} />
+          <Label htmlFor="published">{published ? 'Published' : 'Draft'}</Label>
         </div>
 
         <div className="space-y-2">
@@ -162,7 +139,7 @@ export function BlogPostForm({ post }: BlogPostFormProps) {
         <Button
           type="button"
           variant="outline"
-          onClick={() => router.push('/admin/blog')}
+          onClick={() => startTransition(() => router.push('/admin/blog'))}
           disabled={saving}
         >
           Cancel

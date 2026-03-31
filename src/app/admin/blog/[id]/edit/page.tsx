@@ -1,7 +1,7 @@
 import { redirect, notFound } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { BlogPostForm } from '@/components/admin/blog-post-form';
 
 interface EditBlogPostPageProps {
@@ -9,23 +9,21 @@ interface EditBlogPostPageProps {
 }
 
 export default async function EditBlogPostPage({ params }: EditBlogPostPageProps) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user || !isAdmin(user)) {
+  if (error || !user || !isAdmin(user)) {
     redirect('/dashboard');
   }
 
   const { id } = await params;
 
-  const { data: post } = await supabaseAdmin
+  const { data: post, error: postError } = await supabaseAdmin
     .from('blog_posts')
     .select('*')
     .eq('id', id)
     .single();
 
+  if (postError) console.error('Failed to fetch blog post:', postError.message);
   if (!post) {
     notFound();
   }

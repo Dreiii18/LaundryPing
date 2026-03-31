@@ -1,26 +1,25 @@
 import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { AdminBlogContent } from '@/components/admin/admin-blog-content';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
+import { AdminBlogContent } from '@/components/admin/blog-content';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
 
 export default async function AdminBlogPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user || !isAdmin(user)) {
+  if (error || !user || !isAdmin(user)) {
     redirect('/dashboard');
   }
 
-  const { data: posts } = await supabaseAdmin
+  const { data: posts, error: postsError } = await supabaseAdmin
     .from('blog_posts')
     .select('*')
     .order('created_at', { ascending: false });
+
+  if (postsError) console.error('Failed to fetch blog posts:', postsError.message);
 
   return (
     <div className="space-y-6">
