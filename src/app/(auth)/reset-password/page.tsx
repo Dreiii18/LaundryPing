@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ let recoveryToken: string | null = null;
 
 export default function ResetPasswordPage() {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -94,7 +95,9 @@ export default function ResetPasswordPage() {
       recoveryToken = null;
 
       toast.success('Password updated! Please log in with your new password.');
-      router.push('/login');
+      startTransition(() => {
+        router.push('/login');
+      });
     } catch {
       setError('An unexpected error occurred');
       setLoading(false);

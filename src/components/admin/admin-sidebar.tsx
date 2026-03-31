@@ -1,5 +1,6 @@
 'use client';
 
+import { useTransition } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 import {
@@ -25,12 +26,14 @@ interface AdminSidebarContentProps {
 export function AdminSidebarContent({ onNavigate }: AdminSidebarContentProps) {
   const pathname = usePathname();
   const router = useRouter();
+  const [, startTransition] = useTransition();
 
   const handleLogout = async () => {
     const supabase = createClient();
     await supabase.auth.signOut();
-    router.push('/');
-    router.refresh();
+    startTransition(() => {
+      router.push('/');
+    });
   };
 
   return (

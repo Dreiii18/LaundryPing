@@ -1,10 +1,18 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Plus, Store, Menu } from 'lucide-react';
-import { StartJobModal } from './start-job-modal';
-import { MobileSidebar } from './mobile-sidebar';
+
+const StartJobModal = dynamic(
+  () => import('./start-job-modal').then((m) => ({ default: m.StartJobModal })),
+  { ssr: false }
+);
+const MobileSidebar = dynamic(
+  () => import('./mobile-sidebar').then((m) => ({ default: m.MobileSidebar })),
+  { ssr: false }
+);
 
 interface TopbarProps {
   shopName: string;

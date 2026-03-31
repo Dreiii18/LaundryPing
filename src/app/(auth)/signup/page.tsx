@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import Image from 'next/image';
 
 export default function SignupPage() {
   const router = useRouter();
+  const [, startTransition] = useTransition();
   const [shopName, setShopName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -64,7 +65,9 @@ export default function SignupPage() {
       }
 
       // Redirect to login with success indication
-      router.push('/login?registered=true');
+      startTransition(() => {
+        router.push('/login?registered=true');
+      });
     } catch {
       setError('An unexpected error occurred');
       setLoading(false);

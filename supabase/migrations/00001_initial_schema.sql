@@ -73,6 +73,7 @@ CREATE INDEX idx_jobs_laundromat_id ON jobs(laundromat_id);
 CREATE INDEX idx_jobs_laundromat_started ON jobs(laundromat_id, started_at DESC);
 CREATE INDEX idx_jobs_status ON jobs(status) WHERE status IN ('pending', 'in_progress');
 CREATE INDEX idx_jobs_machine_id ON jobs(machine_id);
+CREATE INDEX idx_jobs_laundromat_status_completed ON jobs(laundromat_id, status, completed_at DESC);
 CREATE INDEX idx_jobs_customer_name ON jobs(customer_name) WHERE customer_name IS NOT NULL;
 
 -- SMS_LOGS

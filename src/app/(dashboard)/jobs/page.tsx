@@ -25,7 +25,7 @@ export default async function JobsPage({
   const page = Math.max(1, parseInt(typeof params.page === 'string' ? params.page : '1', 10) || 1);
 
   // Run mark_overdue and machines fetch in parallel
-  const [, { data: machines }] = await Promise.all([
+  const [{ error: overdueError }, { data: machines }] = await Promise.all([
     supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id }),
     supabase
       .from('machines')
@@ -34,6 +34,8 @@ export default async function JobsPage({
       .eq('status', 'active')
       .order('label'),
   ]);
+
+  if (overdueError) console.error('mark_overdue_jobs failed:', overdueError.message);
 
   // Build filtered, paginated query
   let query = supabase

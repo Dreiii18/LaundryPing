@@ -1,11 +1,106 @@
+import { Suspense } from 'react';
 import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
-import Link from 'next/link';
 import { JobsTable } from '@/components/jobs-table';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
-import { TrendingUp, TrendingDown, Minus, Plus } from 'lucide-react';
-import Image from 'next/image';
+import { StatCardWithTrend } from '@/components/dashboard/stat-card-with-trend';
+import { OnboardingBanner } from '@/components/onboarding-banner';
+import { createClient } from '@/lib/supabase/server';
+
+function JobsTableSkeleton() {
+  return (
+    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-pulse">
+      <div className="px-6 py-4 border-b border-slate-100">
+        <div className="h-5 w-32 bg-slate-200 rounded" />
+      </div>
+      <div className="divide-y divide-slate-100">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="flex items-center gap-4 px-4 py-3">
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+            <div className="h-4 w-24 bg-slate-100 rounded" />
+            <div className="h-4 w-20 bg-slate-200 rounded" />
+            <div className="h-4 flex-1 bg-slate-100 rounded" />
+            <div className="h-4 w-16 bg-slate-100 rounded" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+async function DashboardJobsTable({
+  laundromatId,
+  todayPH,
+  shopInfo,
+}: {
+  laundromatId: string;
+  todayPH: string;
+  shopInfo: { name: string; address: string | null; contactNumber: string | null; servicePrices: Record<string, number> };
+}) {
+  const supabase = await createClient();
+  // WARNING: this query must run after mark_overdue_jobs has committed — it needs to see
+  // the is_overdue updates (PostgreSQL read-committed isolation guarantees visibility
+  // of committed writes before this statement begins).
+  const { data: jobs } = await supabase
+    .from('jobs')
+    .select(`
+      id,
+      laundromat_id,
+      machine_id,
+      customer_phone_masked,
+      notes,
+      status,
+      started_at,
+      completed_at,
+      sms_sent,
+      payment_method,
+      pay_amount,
+      cash_tendered,
+      is_paid,
+      is_overdue,
+      overdue_reason,
+      services,
+      claim_number,
+      customer_name,
+      created_at,
+      machines (
+        id,
+        label
+      )
+    `)
+    .eq('laundromat_id', laundromatId)
+    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
+    .order('started_at', { ascending: false });
+
+  const safeJobs = (jobs || []).map((job) => ({
+    id: job.id,
+    machine_id: job.machine_id as string | null,
+    customer_phone_masked: job.customer_phone_masked as string | null,
+    status: job.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
+    started_at: job.started_at,
+    completed_at: job.completed_at,
+    sms_sent: job.sms_sent,
+    notes: job.notes,
+    payment_method: job.payment_method as string | null,
+    pay_amount: job.pay_amount as number | null,
+    cash_tendered: job.cash_tendered as number | null,
+    is_paid: job.is_paid as boolean,
+    is_overdue: job.is_overdue as boolean,
+    overdue_reason: job.overdue_reason as string | null,
+    services: (job.services || []) as string[],
+    claim_number: job.claim_number as number | null,
+    customer_name: job.customer_name as string | null,
+    machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
+  }));
+
+  return (
+    <JobsTable
+      jobs={safeJobs}
+      shopInfo={shopInfo}
+    />
+  );
+}
 
 export default async function DashboardPage() {
   // Deduplicated via React.cache — no extra DB round trips even though layout calls this too
@@ -39,9 +134,7 @@ export default async function DashboardPage() {
   // Run all independent queries in parallel.
   // mark_overdue_jobs only modifies in_progress rows, so the todayCompleted/yesterdayCompleted
   // queries (filtered to status=completed) are unaffected by execution order.
-  // The error from mark_overdue_jobs is intentionally discarded (index 1 unused) — it only
-  // fails if auth context is mismatched, which cannot happen here since user is verified above.
-  const [{ count: machineCount }, , { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
+  const [{ count: machineCount }, { error: overdueError }, { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
     await Promise.all([
       supabase
         .from('machines')
@@ -64,62 +157,9 @@ export default async function DashboardPage() {
         .lt('completed_at', `${todayPH}T00:00:00+08:00`),
     ]);
 
+  if (overdueError) console.error('mark_overdue_jobs failed:', overdueError.message);
+
   const hasNoMachines = (machineCount ?? 0) === 0;
-
-  // WARNING: this query must remain after the Promise.all above — it needs to see
-  // the is_overdue updates written by mark_overdue_jobs (PostgreSQL read-committed isolation
-  // guarantees visibility of committed writes before this statement begins).
-  const { data: jobs } = await supabase
-    .from('jobs')
-    .select(`
-      id,
-      laundromat_id,
-      machine_id,
-      customer_phone_masked,
-      notes,
-      status,
-      started_at,
-      completed_at,
-      sms_sent,
-      payment_method,
-      pay_amount,
-      cash_tendered,
-      is_paid,
-      is_overdue,
-      overdue_reason,
-      services,
-      claim_number,
-      customer_name,
-      created_at,
-      machines (
-        id,
-        label
-      )
-    `)
-    .eq('laundromat_id', laundromat.id)
-    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
-    .order('started_at', { ascending: false });
-
-  const safeJobs = (jobs || []).map((job) => ({
-    id: job.id,
-    machine_id: job.machine_id as string | null,
-    customer_phone_masked: job.customer_phone_masked as string | null,
-    status: job.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-    started_at: job.started_at,
-    completed_at: job.completed_at,
-    sms_sent: job.sms_sent,
-    notes: job.notes,
-    payment_method: job.payment_method as string | null,
-    pay_amount: job.pay_amount as number | null,
-    cash_tendered: job.cash_tendered as number | null,
-    is_paid: job.is_paid as boolean,
-    is_overdue: job.is_overdue as boolean,
-    overdue_reason: job.overdue_reason as string | null,
-    services: (job.services || []) as string[],
-    claim_number: job.claim_number as number | null,
-    customer_name: job.customer_name as string | null,
-    machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
-  }));
 
   const completedToday = todayCompletedJobs?.length ?? 0;
   const todayRevenue = (todayCompletedJobs || [])
@@ -133,25 +173,8 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Onboarding Banner - only when no machines and no jobs */}
-      {hasNoMachines && safeJobs.length === 0 && (
-        <div className="bg-white border-2 border-[#0d968b]/30 rounded-xl p-6 flex items-start gap-4">
-          <Image src="/laundryping-icon.png" alt="LaundryPing" width={144} height={144} className="size-12 rounded-xl shrink-0" />
-          <div>
-            <h3 className="text-lg font-bold text-slate-900 mb-1">Welcome to LaundryPing!</h3>
-            <p className="text-sm text-slate-600 mb-3">
-              Get started by adding your first machine.
-            </p>
-            <Link
-              href="/machines"
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[#0d968b] text-white font-semibold text-sm hover:bg-[#0d968b]/90 transition-colors"
-            >
-              <Plus className="size-4" />
-              Add Machine
-            </Link>
-          </div>
-        </div>
-      )}
+      {/* Onboarding Banner - only when no machines */}
+      {hasNoMachines && <OnboardingBanner />}
 
       {/* SMS Credit Warning */}
       <SmsQuotaWarning totalCredits={totalCredits} />
@@ -159,88 +182,22 @@ export default async function DashboardPage() {
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Jobs Completed Today */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
-          <p className="text-slate-500 text-sm font-medium mb-1">Jobs completed today</p>
-          <div className="flex items-end gap-3">
-            <p className="text-4xl font-bold text-slate-900" aria-label={`${completedToday} jobs completed today`}>{completedToday}</p>
-            {yesterdayCount > 0 ? (
-              (() => {
-                const pctChange = Math.round(((completedToday - yesterdayCount) / yesterdayCount) * 100);
-                if (pctChange > 0) {
-                  return (
-                    <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
-                      <TrendingUp className="size-3.5" aria-hidden="true" />
-                      +{pctChange}%
-                    </span>
-                  );
-                }
-                if (pctChange < 0) {
-                  return (
-                    <span className="flex items-center gap-0.5 text-xs font-semibold text-red-500 mb-1">
-                      <TrendingDown className="size-3.5" aria-hidden="true" />
-                      {pctChange}%
-                    </span>
-                  );
-                }
-                return (
-                  <span className="flex items-center gap-0.5 text-xs font-semibold text-slate-400 mb-1">
-                    <Minus className="size-3.5" aria-hidden="true" />
-                    0%
-                  </span>
-                );
-              })()
-            ) : completedToday > 0 && yesterdayCount === 0 ? (
-              <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
-                <TrendingUp className="size-3.5" aria-hidden="true" />
-                New
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-slate-400 mt-1">vs {yesterdayCount} yesterday</p>
-        </div>
+        <StatCardWithTrend
+          label="Jobs completed today"
+          value={String(completedToday)}
+          currentNumericValue={completedToday}
+          previousValue={yesterdayCount}
+          previousLabel={`vs ${yesterdayCount} yesterday`}
+        />
 
         {/* Today's Total Revenue */}
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-[#0d968b]/10">
-          <p className="text-slate-500 text-sm font-medium mb-1">Today&apos;s total revenue</p>
-          <div className="flex items-end gap-3">
-            <p className="text-4xl font-bold text-slate-900" aria-label={`Today's total revenue: ${todayRevenue} pesos`}>
-              ₱{todayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            {yesterdayRevenue > 0 ? (
-              (() => {
-                const pctChange = Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100);
-                if (pctChange > 0) {
-                  return (
-                    <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
-                      <TrendingUp className="size-3.5" aria-hidden="true" />
-                      +{pctChange}%
-                    </span>
-                  );
-                }
-                if (pctChange < 0) {
-                  return (
-                    <span className="flex items-center gap-0.5 text-xs font-semibold text-red-500 mb-1">
-                      <TrendingDown className="size-3.5" aria-hidden="true" />
-                      {pctChange}%
-                    </span>
-                  );
-                }
-                return (
-                  <span className="flex items-center gap-0.5 text-xs font-semibold text-slate-400 mb-1">
-                    <Minus className="size-3.5" aria-hidden="true" />
-                    0%
-                  </span>
-                );
-              })()
-            ) : todayRevenue > 0 && yesterdayRevenue === 0 ? (
-              <span className="flex items-center gap-0.5 text-xs font-semibold text-emerald-600 mb-1">
-                <TrendingUp className="size-3.5" aria-hidden="true" />
-                New
-              </span>
-            ) : null}
-          </div>
-          <p className="text-xs text-slate-400 mt-1">vs ₱{yesterdayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} yesterday</p>
-        </div>
+        <StatCardWithTrend
+          label="Today's total revenue"
+          value={`₱${todayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
+          currentNumericValue={todayRevenue}
+          previousValue={yesterdayRevenue}
+          previousLabel={`vs ₱${yesterdayRevenue.toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} yesterday`}
+        />
 
         {/* SMS Credits */}
         <SmsUsageCard
@@ -251,16 +208,19 @@ export default async function DashboardPage() {
         />
       </div>
 
-      {/* Today's Jobs Table */}
-      <JobsTable
-        jobs={safeJobs}
-        shopInfo={{
-          name: laundromat.name,
-          address: laundromat.address,
-          contactNumber: laundromat.contact_number,
-          servicePrices: laundromat.service_prices || {},
-        }}
-      />
+      {/* Today's Jobs Table — streams in via Suspense after stats render */}
+      <Suspense fallback={<JobsTableSkeleton />}>
+        <DashboardJobsTable
+          laundromatId={laundromat.id}
+          todayPH={todayPH}
+          shopInfo={{
+            name: laundromat.name,
+            address: laundromat.address,
+            contactNumber: laundromat.contact_number,
+            servicePrices: laundromat.service_prices || {},
+          }}
+        />
+      </Suspense>
     </div>
   );
 }

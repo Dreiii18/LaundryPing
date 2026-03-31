@@ -1,36 +1,41 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { supabaseAdmin } from '@/lib/supabase/admin';
-import { AdminTopupContent } from '@/components/admin/admin-topup-content';
+import { AdminTopupContent } from '@/components/admin/topup';
 
 export default async function AdminPlansPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user || !isAdmin(user)) {
+  if (error === 'Unauthorized' || !user || !isAdmin(user)) {
     redirect('/dashboard');
   }
 
-  // Fetch all laundromats with credit info
-  const { data: laundromats } = await supabaseAdmin
-    .from('laundromats')
-    .select('id, user_id, name, sms_free_credits, sms_paid_credits')
-    .order('created_at', { ascending: false });
+  // Fetch laundromats and packages in parallel
+  const [{ data: laundromats, error: laundromatError }, { data: packages, error: packageError }] = await Promise.all([
+    supabaseAdmin
+      .from('laundromats')
+      .select('id, user_id, name, sms_free_credits, sms_paid_credits')
+      .order('created_at', { ascending: false }),
+    supabaseAdmin
+      .from('sms_topup_packages')
+      .select('slug, label, sms_credits, price_php')
+      .order('sort_order', { ascending: true }),
+  ]);
 
-  // Fetch top-up packages
-  const { data: packages } = await supabaseAdmin
-    .from('sms_topup_packages')
-    .select('slug, label, sms_credits, price_php')
-    .order('sort_order', { ascending: true });
+  if (laundromatError) console.error('Failed to fetch laundromats:', laundromatError.message);
+  if (packageError) console.error('Failed to fetch packages:', packageError.message);
 
-  // Fetch user emails via admin API
-  const { data: usersData } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+  // Fetch only the emails we actually need (one per laundromat) in parallel
+  const userIds = (laundromats || []).map((l) => l.user_id);
+  const userResults = await Promise.allSettled(
+    userIds.map((id) => supabaseAdmin.auth.admin.getUserById(id))
+  );
   const emailMap = new Map<string, string>();
-  for (const u of usersData?.users || []) {
-    emailMap.set(u.id, u.email || '');
+  for (const result of userResults) {
+    if (result.status === 'fulfilled' && result.value.data?.user) {
+      emailMap.set(result.value.data.user.id, result.value.data.user.email || '');
+    }
   }
 
   // Enrich laundromat rows

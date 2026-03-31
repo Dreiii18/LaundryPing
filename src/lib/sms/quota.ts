@@ -17,9 +17,13 @@ export async function ensureBillingCycle(
   supabase: SupabaseClient,
   laundromatId: string
 ): Promise<void> {
-  await supabase.rpc('ensure_billing_cycle', {
+  const { error } = await supabase.rpc('ensure_billing_cycle', {
     p_laundromat_id: laundromatId,
   });
+  if (error) {
+    console.error('ensure_billing_cycle failed:', error.message);
+    throw new Error(`Failed to ensure billing cycle: ${error.message}`);
+  }
 }
 
 /**

@@ -20,12 +20,13 @@ export default async function EditBlogPostPage({ params }: EditBlogPostPageProps
 
   const { id } = await params;
 
-  const { data: post } = await supabaseAdmin
+  const { data: post, error: postError } = await supabaseAdmin
     .from('blog_posts')
     .select('*')
     .eq('id', id)
     .single();
 
+  if (postError) console.error('Failed to fetch blog post:', postError.message);
   if (!post) {
     notFound();
   }

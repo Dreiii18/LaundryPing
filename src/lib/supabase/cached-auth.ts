@@ -38,7 +38,9 @@ export const getCachedUser = cache(async () => {
   const firstOfMonthPH = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, '0')}-01`;
   if (laundromat.billing_cycle_start < firstOfMonthPH) {
     const { error: cycleError } = await supabase.rpc('ensure_billing_cycle', { p_laundromat_id: laundromat.id });
-    if (!cycleError) {
+    if (cycleError) {
+      console.error('ensure_billing_cycle failed:', cycleError.message);
+    } else {
       laundromat.sms_free_credits = 50;
       laundromat.billing_cycle_start = firstOfMonthPH;
     }

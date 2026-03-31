@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
-import { createClient } from '@/lib/supabase/server';
+import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { isAdmin } from '@/lib/supabase/admin-auth';
 import { AdminSidebar } from '@/components/admin/admin-sidebar';
 import { AdminTopbar } from '@/components/admin/admin-topbar';
@@ -9,12 +9,9 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { user, error } = await getCachedUser();
 
-  if (!user) {
+  if (error === 'Unauthorized' || !user) {
     redirect('/login');
   }
 
