@@ -18,6 +18,7 @@ const createJobSchema = z.object({
   customer_name: z.string().max(60, 'Customer name must be 60 characters or less').optional(),
   is_paid: z.boolean(),
   pay_amount: z.number().min(0, 'Amount must be 0 or more'),
+  cash_tendered: z.number().min(0).optional(),
   payment_method: z.enum(PAYMENT_METHODS).optional(),
   services: z.array(z.string().min(1).max(50)).min(1, 'At least one service is required').max(10),
 }).refine(
@@ -62,6 +63,7 @@ export async function GET() {
         notify_sms,
         payment_method,
         pay_amount,
+        cash_tendered,
         is_paid,
         services,
         claim_number,
@@ -94,6 +96,7 @@ export async function GET() {
       notify_sms: job.notify_sms,
       payment_method: job.payment_method,
       pay_amount: job.pay_amount,
+      cash_tendered: job.cash_tendered,
       is_paid: job.is_paid,
       services: job.services,
       claim_number: job.claim_number,
@@ -129,7 +132,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const { machine_id, phone, notes, customer_name, is_paid, pay_amount, payment_method } = parsed.data;
+    const { machine_id, phone, notes, customer_name, is_paid, pay_amount, cash_tendered, payment_method } = parsed.data;
 
     const notifySms = parsed.data.notify_sms ?? true;
 
@@ -228,6 +231,7 @@ export async function POST(request: Request) {
       notify_sms: notifySms,
       is_paid,
       pay_amount,
+      cash_tendered: cash_tendered ?? null,
       payment_method: payment_method ?? null,
       services: parsed.data.services,
       customer_name: sanitizedCustomerName,
@@ -236,7 +240,7 @@ export async function POST(request: Request) {
     const selectFields = `
       id, laundromat_id, machine_id, customer_phone_masked, notes,
       status, started_at, completed_at, sms_sent, notify_sms,
-      payment_method, pay_amount, is_paid, services,
+      payment_method, pay_amount, cash_tendered, is_paid, services,
       claim_number, customer_name, created_at
     `;
 

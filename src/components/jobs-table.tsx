@@ -39,10 +39,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
-import { Loader2, CheckCircle, Clock, CircleX, CircleAlert } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer } from 'lucide-react';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { EmptyState } from '@/components/empty-state';
+import { printReceipt } from '@/lib/utils/receipt';
 
 const PAYMENT_METHODS = [
   { value: 'cash', label: 'Cash' },
@@ -67,6 +68,7 @@ interface Job {
   notes: string | null;
   payment_method: string | null;
   pay_amount: number | null;
+  cash_tendered: number | null;
   is_paid: boolean;
   is_overdue: boolean;
   overdue_reason: string | null;
@@ -79,14 +81,22 @@ interface Job {
   } | null;
 }
 
+interface ShopInfo {
+  name: string;
+  address: string | null;
+  contactNumber: string | null;
+  servicePrices: Record<string, number>;
+}
+
 interface JobsTableProps {
   jobs: Job[];
   context?: 'dashboard' | 'jobs-page';
+  shopInfo?: ShopInfo;
 }
 
 export type { Job };
 
-export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTableProps) {
+export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }: JobsTableProps) {
   const router = useRouter();
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
@@ -100,6 +110,25 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
   const [assigningMachine, setAssigningMachine] = useState(false);
   const [availableMachines, setAvailableMachines] = useState<Machine[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(false);
+
+  const handlePrint = (job: Job) => {
+    if (!shopInfo) return;
+    printReceipt({
+      shopName: shopInfo.name,
+      shopAddress: shopInfo.address,
+      shopContact: shopInfo.contactNumber,
+      claimNumber: job.claim_number,
+      date: job.started_at,
+      customerName: job.customer_name,
+      customerPhone: job.customer_phone_masked,
+      services: job.services,
+      servicePrices: shopInfo.servicePrices,
+      payAmount: job.pay_amount ?? 0,
+      cashTendered: job.cash_tendered,
+      isPaid: job.is_paid,
+      paymentMethod: job.payment_method,
+    });
+  };
 
   const completeJob = async (jobId: string, options?: { payment_method?: string; overdue_reason?: string }) => {
     setCompletingId(jobId);
@@ -477,12 +506,33 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard' }: JobsTabl
                         'Cancel'
                       )}
                     </Button>
+                    {shopInfo && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePrint(job)}
+                        aria-label="Print receipt"
+                        className="text-xs font-bold text-slate-500 border-slate-200 hover:bg-slate-50 min-h-11 min-w-11"
+                      >
+                        <Printer className="size-3.5" />
+                      </Button>
+                    )}
                   </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                    <CheckCircle className="size-4 text-slate-300" aria-hidden="true" />
-                    Done
-                  </span>
+                  <div className="inline-flex items-center gap-2 justify-end">
+                    {shopInfo && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handlePrint(job)}
+                        aria-label="Print receipt"
+                        className="text-xs font-bold text-slate-500 border-slate-200 hover:bg-slate-50 min-h-11 min-w-11"
+                      >
+                        <Printer className="size-3.5" />
+                        Print
+                      </Button>
+                    )}
+                  </div>
                 )}
               </TableCell>
             </TableRow>

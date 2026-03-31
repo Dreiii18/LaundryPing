@@ -1,3 +1,5 @@
+import { escapeHtml } from '@/lib/utils/sanitize';
+
 export interface TopupConfirmationData {
   laundromatName: string;
   packageLabel: string;
@@ -151,10 +153,3 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
   return { subject, html };
 }
 
-export function escapeHtml(str: string): string {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
