@@ -7,7 +7,9 @@ const updateSettingsSchema = z.object({
   name: z.string().min(1, 'Shop name is required').max(50, 'Shop name must be 50 characters or less').optional(),
   address: z.string().max(200, 'Address must be 200 characters or less').optional().nullable(),
   available_services: z.array(z.string().min(1).max(50)).min(1).max(20).optional(),
-  service_prices: z.record(z.string(), z.number().min(0)).optional(),
+  service_prices: z.record(z.string().min(1).max(50), z.number().min(0).max(99999))
+    .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service prices')
+    .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
 });
 
@@ -89,13 +91,20 @@ export async function PUT(request: Request) {
     }
 
     if (parsed.data.service_prices !== undefined) {
-      updateData.service_prices = parsed.data.service_prices;
+      // Filter to only keys that match current available_services
+      const validServices = new Set(
+        (parsed.data.available_services ?? (updateData.available_services as string[] | undefined) ?? laundromat.available_services)
+      );
+      updateData.service_prices = Object.fromEntries(
+        Object.entries(parsed.data.service_prices).filter(([k]) => validServices.has(k))
+      );
     }
 
     if (parsed.data.contact_number !== undefined) {
-      updateData.contact_number = parsed.data.contact_number
+      const sanitized = parsed.data.contact_number
         ? sanitizeContactNumber(parsed.data.contact_number)
         : null;
+      updateData.contact_number = sanitized || null;
     }
 
     if (Object.keys(updateData).length === 0) {

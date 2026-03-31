@@ -68,6 +68,7 @@ interface Job {
   notes: string | null;
   payment_method: string | null;
   pay_amount: number | null;
+  cash_tendered: number | null;
   is_paid: boolean;
   is_overdue: boolean;
   overdue_reason: string | null;
@@ -123,6 +124,7 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
       services: job.services,
       servicePrices: shopInfo.servicePrices,
       payAmount: job.pay_amount ?? 0,
+      cashTendered: job.cash_tendered,
       isPaid: job.is_paid,
       paymentMethod: job.payment_method,
     });

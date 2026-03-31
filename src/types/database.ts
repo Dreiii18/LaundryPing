@@ -94,6 +94,7 @@ export interface Database {
           notify_sms: boolean;
           payment_method: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount: number | null;
+          cash_tendered: number | null;
           is_paid: boolean;
           is_overdue: boolean;
           overdue_reason: string | null;
@@ -117,6 +118,7 @@ export interface Database {
           notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
+          cash_tendered?: number | null;
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;
@@ -139,6 +141,7 @@ export interface Database {
           notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
+          cash_tendered?: number | null;
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;

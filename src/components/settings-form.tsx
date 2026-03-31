@@ -199,7 +199,7 @@ export function SettingsForm({ initialName, initialAddress, initialServices, ini
                     min="0"
                     step="0.01"
                     placeholder="0.00"
-                    value={servicePrices[service] || ''}
+                    value={servicePrices[service] ?? ''}
                     onChange={(e) => updateServicePrice(service, e.target.value)}
                     className="h-8 pl-6 text-sm"
                     aria-label={`Price for ${service}`}

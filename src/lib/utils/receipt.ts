@@ -15,6 +15,7 @@ interface ReceiptData {
   services: string[];
   servicePrices: Record<string, number>;
   payAmount: number;
+  cashTendered: number | null;
   isPaid: boolean;
   paymentMethod: string | null;
 }
@@ -28,6 +29,7 @@ const PAYMENT_METHOD_LABELS: Record<string, string> = {
 
 function formatDate(isoDate: string): { date: string; time: string } {
   const d = new Date(isoDate);
+  if (isNaN(d.getTime())) return { date: '--', time: '--' };
   const date = d.toLocaleDateString('en-US', {
     month: '2-digit',
     day: '2-digit',
@@ -87,16 +89,19 @@ export function generateReceiptHtml(data: ReceiptData): string {
     const methodLabel = data.paymentMethod
       ? PAYMENT_METHOD_LABELS[data.paymentMethod] || data.paymentMethod
       : '';
+    const received = data.cashTendered != null ? data.cashTendered : total;
+    const change = data.cashTendered != null ? Math.max(0, data.cashTendered - total) : 0;
     paymentSection = `
       <tr>
         <td colspan="2">PAYMENT RECEIVED:</td>
-        <td style="text-align:right;">${formatCurrency(total)}</td>
+        <td style="text-align:right;">${formatCurrency(received)}</td>
       </tr>
       <tr><td colspan="3">${escapeHtml(methodLabel)}</td></tr>
+      ${data.cashTendered != null ? `
       <tr>
         <td colspan="2">CHANGE AMOUNT:</td>
-        <td style="text-align:right;">0.00</td>
-      </tr>
+        <td style="text-align:right;">${formatCurrency(change)}</td>
+      </tr>` : ''}
       <tr>
         <td colspan="3" style="text-align:center;padding-top:8px;">
           <span style="border:2px solid #c00;color:#c00;padding:2px 12px;font-weight:bold;font-size:14px;letter-spacing:2px;">PAID</span>
@@ -123,7 +128,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
 <html>
 <head>
 <meta charset="utf-8">
-<title>Receipt #${invoiceNum}</title>
+<title>Receipt #${escapeHtml(invoiceNum)}</title>
 <style>
   @page {
     size: 58mm auto;
@@ -192,9 +197,9 @@ export function generateReceiptHtml(data: ReceiptData): string {
 
   <!-- Invoice Info -->
   <table>
-    <tr><td colspan="3">INV#: ${invoiceNum}</td></tr>
-    <tr><td colspan="3">DATE: ${date}</td></tr>
-    <tr><td colspan="3">TIME: ${time}</td></tr>
+    <tr><td colspan="3">INV#: ${escapeHtml(invoiceNum)}</td></tr>
+    <tr><td colspan="3">DATE: ${escapeHtml(date)}</td></tr>
+    <tr><td colspan="3">TIME: ${escapeHtml(time)}</td></tr>
   </table>
 
   <div class="divider"></div>
@@ -264,6 +269,7 @@ export function printReceipt(data: ReceiptData): void {
   const html = generateReceiptHtml(data);
   const iframe = document.createElement('iframe');
   iframe.style.display = 'none';
+  iframe.setAttribute('sandbox', 'allow-modals allow-same-origin');
   document.body.appendChild(iframe);
   const doc = iframe.contentDocument || iframe.contentWindow?.document;
   if (!doc) {
@@ -271,16 +277,16 @@ export function printReceipt(data: ReceiptData): void {
     return;
   }
   const cleanup = () => setTimeout(() => iframe.remove(), 500);
-  if (iframe.contentWindow) {
-    iframe.contentWindow.onafterprint = cleanup;
-  }
   doc.open();
   doc.write(html);
   doc.close();
   // Print after brief delay to ensure content is rendered
   setTimeout(() => {
+    if (iframe.contentWindow) {
+      iframe.contentWindow.onafterprint = cleanup;
+    }
     iframe.contentWindow?.print();
-    // Fallback cleanup if onafterprint doesn't fire (e.g. print cancelled)
+    // Fallback cleanup if onafterprint doesn't fire
     setTimeout(() => { if (iframe.parentNode) iframe.remove(); }, 5000);
   }, 100);
 }

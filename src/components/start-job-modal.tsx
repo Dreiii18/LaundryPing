@@ -58,6 +58,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
   const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
+  const [cashTendered, setCashTendered] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -76,6 +77,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setSelectedServices([]);
       setServicePrices({});
       setPriceManuallyChanged(false);
+      setCashTendered('');
       setError('');
       setLoading(false);
       setTotalCredits(null);
@@ -158,19 +160,14 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   };
 
   const toggleService = (service: string) => {
-    setSelectedServices((prev) => {
-      const next = prev.includes(service)
-        ? prev.filter((s) => s !== service)
-        : [...prev, service];
-
-      // Auto-update price if it hasn't been manually changed
-      if (!priceManuallyChanged) {
-        const total = calculateTotal(next);
-        setPayAmount(total > 0 ? total.toString() : '');
-      }
-
-      return next;
-    });
+    const next = selectedServices.includes(service)
+      ? selectedServices.filter((s) => s !== service)
+      : [...selectedServices, service];
+    setSelectedServices(next);
+    if (!priceManuallyChanged) {
+      const total = next.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+      setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -230,6 +227,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
           customer_name: customerName.trim() || undefined,
           is_paid: isPaid,
           pay_amount: Number(payAmount),
+          cash_tendered: isPaid && paymentMethod === 'cash' && cashTendered ? Number(cashTendered) : undefined,
           payment_method: isPaid ? paymentMethod : undefined,
           services: selectedServices,
         }),
@@ -250,6 +248,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setLoading(false);
     }
   };
+
+  const autoTotal = calculateTotal(selectedServices);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -417,23 +417,24 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                   value={payAmount}
                   onChange={(e) => {
                     setPayAmount(e.target.value);
-                    const autoTotal = calculateTotal(selectedServices);
-                    const entered = parseFloat(e.target.value) || 0;
-                    setPriceManuallyChanged(autoTotal > 0 && Math.abs(entered - autoTotal) >= 0.01);
+                    const auto = calculateTotal(selectedServices);
+                    const entered = e.target.value.trim() === '' ? null : parseFloat(e.target.value);
+                    setPriceManuallyChanged(
+                      entered !== null && !isNaN(entered) && auto > 0 && Math.abs(entered - auto) >= 0.01
+                    );
                   }}
                   disabled={loading}
                   className="pl-7 h-12"
                 />
               </div>
-              {selectedServices.length > 0 && calculateTotal(selectedServices) > 0 && (
+              {selectedServices.length > 0 && autoTotal > 0 && (
                 <p className="text-xs text-slate-400">
-                  Auto-calculated: ₱{calculateTotal(selectedServices).toFixed(2)}
+                  Auto-calculated: ₱{autoTotal.toFixed(2)}
                   {priceManuallyChanged && (
                     <button
                       type="button"
                       onClick={() => {
-                        const total = calculateTotal(selectedServices);
-                        setPayAmount(total.toString());
+                        setPayAmount((Math.round(autoTotal * 100) / 100).toString());
                         setPriceManuallyChanged(false);
                       }}
                       className="ml-2 text-[#0d968b] hover:underline"
@@ -451,7 +452,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => { setIsPaid(true); setPaymentMethod(''); }}
+                  onClick={() => { setIsPaid(true); setPaymentMethod(''); setCashTendered(''); }}
                   className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
                     isPaid
                       ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
@@ -462,7 +463,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => { setIsPaid(false); setPaymentMethod(''); }}
+                  onClick={() => { setIsPaid(false); setPaymentMethod(''); setCashTendered(''); }}
                   className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
                     !isPaid
                       ? 'bg-amber-50 border-amber-400 text-amber-700'
@@ -490,6 +491,37 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+            )}
+
+            {/* Cash Tendered — only when Paid + Cash */}
+            {isPaid && paymentMethod === 'cash' && (
+              <div className="flex flex-col gap-2">
+                <Label htmlFor="cash-tendered" className="text-sm font-semibold text-[#111817]">Cash Tendered</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm font-medium">₱</span>
+                  <Input
+                    id="cash-tendered"
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="0.00"
+                    value={cashTendered}
+                    onChange={(e) => setCashTendered(e.target.value)}
+                    disabled={loading}
+                    className="pl-7 h-12"
+                  />
+                </div>
+                {cashTendered && Number(cashTendered) >= Number(payAmount) && Number(payAmount) > 0 && (
+                  <p className="text-xs text-[#0d968b] font-medium">
+                    Change: ₱{(Number(cashTendered) - Number(payAmount)).toFixed(2)}
+                  </p>
+                )}
+                {cashTendered && Number(cashTendered) > 0 && Number(cashTendered) < Number(payAmount) && (
+                  <p className="text-xs text-red-500 font-medium">
+                    Insufficient — ₱{(Number(payAmount) - Number(cashTendered)).toFixed(2)} short
+                  </p>
+                )}
               </div>
             )}
 

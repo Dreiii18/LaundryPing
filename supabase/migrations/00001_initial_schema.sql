@@ -58,6 +58,7 @@ CREATE TABLE jobs (
   sms_sent BOOLEAN NOT NULL DEFAULT false,
   payment_method TEXT CHECK (payment_method IN ('cash', 'ewallet', 'card', 'bank_transfer')),
   pay_amount NUMERIC(10,2),
+  cash_tendered NUMERIC(10,2),
   is_paid BOOLEAN NOT NULL DEFAULT false,
   is_overdue BOOLEAN NOT NULL DEFAULT false,
   overdue_reason TEXT,
