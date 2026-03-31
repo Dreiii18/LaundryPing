@@ -26,10 +26,10 @@ export function AdminTopupContent({ laundromats, packages }: AdminTopupContentPr
     handleConfirm,
   } = useAdminTopup();
 
-  const filteredCount = laundromats.filter((row) => {
+  const filtered = laundromats.filter((row) => {
     const q = search.toLowerCase();
     return row.name.toLowerCase().includes(q) || row.email.toLowerCase().includes(q);
-  }).length;
+  });
 
   return (
     <div className="space-y-6">
@@ -44,13 +44,12 @@ export function AdminTopupContent({ laundromats, packages }: AdminTopupContentPr
           />
         </div>
         <p className="text-sm text-slate-500">
-          {filteredCount} laundromat{filteredCount !== 1 ? 's' : ''}
+          {filtered.length} laundromat{filtered.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       <LaundromatTable
-        laundromats={laundromats}
-        search={search}
+        laundromats={filtered}
         onTopUp={handleTopup}
       />
 

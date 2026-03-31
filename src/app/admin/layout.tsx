@@ -11,7 +11,7 @@ export default async function AdminLayout({
 }) {
   const { user, error } = await getCachedUser();
 
-  if (error === 'Unauthorized' || !user) {
+  if (error || !user) {
     redirect('/login');
   }
 

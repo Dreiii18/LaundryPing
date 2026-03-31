@@ -16,15 +16,10 @@ import type { BlogPost } from '@/types';
 
 interface BlogTableProps {
   posts: BlogPost[];
-  search: string;
   onDelete: (id: string) => void;
 }
 
-export function BlogTable({ posts, search, onDelete }: BlogTableProps) {
-  const filtered = posts.filter((post) =>
-    post.title.toLowerCase().includes(search.toLowerCase())
-  );
-
+export function BlogTable({ posts, onDelete }: BlogTableProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden">
       <Table>
@@ -38,14 +33,14 @@ export function BlogTable({ posts, search, onDelete }: BlogTableProps) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 ? (
+          {posts.length === 0 ? (
             <TableRow>
               <TableCell colSpan={5} className="text-center text-slate-500 py-8">
                 No posts found
               </TableCell>
             </TableRow>
           ) : (
-            filtered.map((post) => (
+            posts.map((post) => (
               <TableRow key={post.id}>
                 <TableCell className="font-medium">{post.title}</TableCell>
                 <TableCell>

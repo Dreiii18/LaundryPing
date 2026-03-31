@@ -54,7 +54,6 @@ function LoginForm() {
 
       if (authError) {
         setError(authError.message);
-        setLoading(false);
         return;
       }
 
@@ -63,6 +62,7 @@ function LoginForm() {
       });
     } catch {
       setError('An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };

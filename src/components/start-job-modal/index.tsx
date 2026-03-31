@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -29,37 +28,6 @@ import type { StartJobModalProps } from './types';
 
 export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const form = useStartJobForm(open, onOpenChange);
-
-  const handleToggleService = useCallback(
-    (service: string) => form.toggleService(service),
-    [form]
-  );
-
-  const handlePayAmountChange = useCallback(
-    (value: string, currentServices: string[]) =>
-      form.handlePayAmountChange(value, currentServices),
-    [form]
-  );
-
-  const handleResetToAutoPrice = useCallback(
-    (autoTotal: number) => form.resetToAutoPrice(autoTotal),
-    [form]
-  );
-
-  const handleSetIsPaid = useCallback(
-    (paid: boolean) => form.setIsPaid(paid),
-    [form]
-  );
-
-  const handleSetPaymentMethod = useCallback(
-    (method: string) => form.setPaymentMethod(method),
-    [form]
-  );
-
-  const handleSetCashTendered = useCallback(
-    (value: string) => form.setCashTendered(value),
-    [form]
-  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,7 +78,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
             <ServiceSelector
               availableServices={form.availableServices}
               selectedServices={form.selectedServices}
-              onToggle={handleToggleService}
+              onToggle={form.toggleService}
             />
 
             {/* Customer Name */}
@@ -205,11 +173,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               paymentMethod={form.paymentMethod}
               cashTendered={form.cashTendered}
               loading={form.loading}
-              onPayAmountChange={handlePayAmountChange}
-              onResetToAutoPrice={handleResetToAutoPrice}
-              onSetIsPaid={handleSetIsPaid}
-              onSetPaymentMethod={handleSetPaymentMethod}
-              onSetCashTendered={handleSetCashTendered}
+              onPayAmountChange={form.handlePayAmountChange}
+              onResetToAutoPrice={form.resetToAutoPrice}
+              onSetIsPaid={form.setIsPaid}
+              onSetPaymentMethod={form.setPaymentMethod}
+              onSetCashTendered={form.setCashTendered}
             />
 
             {/* Notes */}

@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -14,21 +13,10 @@ import type { LaundryRow } from './use-admin-topup';
 
 interface LaundromatTableProps {
   laundromats: LaundryRow[];
-  search: string;
   onTopUp: (row: LaundryRow) => void;
 }
 
-export function LaundromatTable({ laundromats, search, onTopUp }: LaundromatTableProps) {
-  const filtered = laundromats.filter((row) => {
-    const q = search.toLowerCase();
-    return row.name.toLowerCase().includes(q) || row.email.toLowerCase().includes(q);
-  });
-
-  const handleTopUp = useCallback(
-    (row: LaundryRow) => () => onTopUp(row),
-    [onTopUp]
-  );
-
+export function LaundromatTable({ laundromats, onTopUp }: LaundromatTableProps) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden">
       <Table>
@@ -43,14 +31,14 @@ export function LaundromatTable({ laundromats, search, onTopUp }: LaundromatTabl
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filtered.length === 0 ? (
+          {laundromats.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-center text-slate-500 py-8">
                 No laundromats found
               </TableCell>
             </TableRow>
           ) : (
-            filtered.map((row) => {
+            laundromats.map((row) => {
               const total = row.sms_free_credits + row.sms_paid_credits;
               return (
                 <TableRow key={row.id}>
@@ -75,7 +63,7 @@ export function LaundromatTable({ laundromats, search, onTopUp }: LaundromatTabl
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={handleTopUp(row)}
+                      onClick={() => onTopUp(row)}
                       className="text-[#0d968b] border-[#0d968b]/30 hover:bg-[#0d968b]/5"
                     >
                       Top Up

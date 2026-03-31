@@ -22,9 +22,9 @@ export function AdminBlogContent({ posts }: AdminBlogContentProps) {
     handleDelete,
   } = useBlogActions();
 
-  const filteredCount = posts.filter((post) =>
+  const filtered = posts.filter((post) =>
     post.title.toLowerCase().includes(search.toLowerCase())
-  ).length;
+  );
 
   return (
     <div className="space-y-6">
@@ -39,13 +39,12 @@ export function AdminBlogContent({ posts }: AdminBlogContentProps) {
           />
         </div>
         <p className="text-sm text-slate-500">
-          {filteredCount} post{filteredCount !== 1 ? 's' : ''}
+          {filtered.length} post{filtered.length !== 1 ? 's' : ''}
         </p>
       </div>
 
       <BlogTable
-        posts={posts}
-        search={search}
+        posts={filtered}
         onDelete={handleRequestDelete}
       />
 
