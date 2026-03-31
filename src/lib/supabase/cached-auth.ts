@@ -23,12 +23,25 @@ export const getCachedUser = cache(async () => {
 
   const { data: laundromat, error: laundromatError } = await supabase
     .from('laundromats')
-    .select('id, name, address, sms_free_credits, sms_paid_credits, available_services, service_prices, contact_number')
+    .select('id, name, address, sms_free_credits, sms_paid_credits, billing_cycle_start, available_services, service_prices, contact_number')
     .eq('user_id', user.id)
     .single();
 
   if (laundromatError || !laundromat) {
     return { user, laundromat: null, supabase, error: 'Laundromat not found' as const };
+  }
+
+  // Lazy billing cycle reset: if the stored cycle is from a previous month (PH time),
+  // call the DB function to reset free credits and reflect the change in-memory.
+  // PH timezone (UTC+8) must match the DB functions which use Asia/Manila.
+  const phNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const firstOfMonthPH = `${phNow.getFullYear()}-${String(phNow.getMonth() + 1).padStart(2, '0')}-01`;
+  if (laundromat.billing_cycle_start < firstOfMonthPH) {
+    const { error: cycleError } = await supabase.rpc('ensure_billing_cycle', { p_laundromat_id: laundromat.id });
+    if (!cycleError) {
+      laundromat.sms_free_credits = 50;
+      laundromat.billing_cycle_start = firstOfMonthPH;
+    }
   }
 
   return { user, laundromat, supabase, error: null };
