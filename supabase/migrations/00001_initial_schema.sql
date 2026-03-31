@@ -119,6 +119,8 @@ CREATE TABLE sms_topup_logs (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX idx_sms_topup_logs_laundromat_id ON sms_topup_logs(laundromat_id);
+CREATE INDEX idx_sms_topup_logs_activated_by ON sms_topup_logs(activated_by);
+CREATE INDEX idx_sms_topup_logs_package_slug ON sms_topup_logs(package_slug);
 
 -- BLOG_POSTS
 CREATE TABLE blog_posts (
@@ -244,7 +246,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql;
+$$ LANGUAGE plpgsql SET search_path = '';
 
 CREATE TRIGGER trg_protect_credit_columns
   BEFORE UPDATE ON public.laundromats
