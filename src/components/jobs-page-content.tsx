@@ -21,6 +21,13 @@ interface Machine {
   label: string;
 }
 
+interface ShopInfo {
+  name: string;
+  address: string | null;
+  contactNumber: string | null;
+  servicePrices: Record<string, number>;
+}
+
 interface JobsPageContentProps {
   jobs: Job[];
   machines: Machine[];
@@ -35,6 +42,7 @@ interface JobsPageContentProps {
     dateTo: string;
     search: string;
   };
+  shopInfo?: ShopInfo;
 }
 
 export function JobsPageContent({
@@ -45,6 +53,7 @@ export function JobsPageContent({
   currentPage,
   pageSize,
   currentFilters,
+  shopInfo,
 }: JobsPageContentProps) {
   const router = useRouter();
   const pathname = usePathname();
@@ -207,7 +216,7 @@ export function JobsPageContent({
       )}
 
       {/* Jobs table */}
-      <JobsTable jobs={jobs} context="jobs-page" />
+      <JobsTable jobs={jobs} context="jobs-page" shopInfo={shopInfo} />
 
       {/* Pagination */}
       {totalCount > pageSize && (

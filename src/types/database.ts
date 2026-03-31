@@ -19,6 +19,8 @@ export interface Database {
           sms_paid_credits: number;
           billing_cycle_start: string;
           available_services: string[];
+          service_prices: Record<string, number>;
+          contact_number: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -31,6 +33,8 @@ export interface Database {
           sms_paid_credits?: number;
           billing_cycle_start?: string;
           available_services?: string[];
+          service_prices?: Record<string, number>;
+          contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -43,6 +47,8 @@ export interface Database {
           sms_paid_credits?: number;
           billing_cycle_start?: string;
           available_services?: string[];
+          service_prices?: Record<string, number>;
+          contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -88,6 +94,7 @@ export interface Database {
           notify_sms: boolean;
           payment_method: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount: number | null;
+          cash_tendered: number | null;
           is_paid: boolean;
           is_overdue: boolean;
           overdue_reason: string | null;
@@ -111,6 +118,7 @@ export interface Database {
           notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
+          cash_tendered?: number | null;
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;
@@ -133,6 +141,7 @@ export interface Database {
           notify_sms?: boolean;
           payment_method?: 'cash' | 'ewallet' | 'card' | 'bank_transfer' | null;
           pay_amount?: number | null;
+          cash_tendered?: number | null;
           is_paid?: boolean;
           is_overdue?: boolean;
           overdue_reason?: string | null;

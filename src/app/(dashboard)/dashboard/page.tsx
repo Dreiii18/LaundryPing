@@ -83,6 +83,7 @@ export default async function DashboardPage() {
       sms_sent,
       payment_method,
       pay_amount,
+      cash_tendered,
       is_paid,
       is_overdue,
       overdue_reason,
@@ -110,6 +111,7 @@ export default async function DashboardPage() {
     notes: job.notes,
     payment_method: job.payment_method as string | null,
     pay_amount: job.pay_amount as number | null,
+    cash_tendered: job.cash_tendered as number | null,
     is_paid: job.is_paid as boolean,
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
@@ -250,7 +252,15 @@ export default async function DashboardPage() {
       </div>
 
       {/* Today's Jobs Table */}
-      <JobsTable jobs={safeJobs} />
+      <JobsTable
+        jobs={safeJobs}
+        shopInfo={{
+          name: laundromat.name,
+          address: laundromat.address,
+          contactNumber: laundromat.contact_number,
+          servicePrices: laundromat.service_prices || {},
+        }}
+      />
     </div>
   );
 }
