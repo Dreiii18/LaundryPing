@@ -21,3 +21,15 @@ export function sanitizeMachineLabel(label: string): string {
 export function sanitizeCustomerName(name: string): string {
   return sanitizeText(name).slice(0, 60);
 }
+
+export function sanitizeContactNumber(phone: string): string {
+  return phone.replace(/[^0-9+\-() ]/g, '').trim().slice(0, 20);
+}
+
+export function escapeHtml(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}

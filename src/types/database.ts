@@ -19,6 +19,8 @@ export interface Database {
           sms_paid_credits: number;
           billing_cycle_start: string;
           available_services: string[];
+          service_prices: Record<string, number>;
+          contact_number: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -31,6 +33,8 @@ export interface Database {
           sms_paid_credits?: number;
           billing_cycle_start?: string;
           available_services?: string[];
+          service_prices?: Record<string, number>;
+          contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -43,6 +47,8 @@ export interface Database {
           sms_paid_credits?: number;
           billing_cycle_start?: string;
           available_services?: string[];
+          service_prices?: Record<string, number>;
+          contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
         };

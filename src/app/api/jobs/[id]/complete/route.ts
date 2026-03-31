@@ -215,7 +215,7 @@ export async function POST(
     }
 
     // Build message and send SMS
-    const message = buildLaundryDoneMessage(laundromat.name, job.claim_number, job.customer_name);
+    const message = buildLaundryDoneMessage(laundromat.name, job.customer_name);
     const smsResult = await sendSms(phoneNumber, message);
 
     if (smsResult.success) {

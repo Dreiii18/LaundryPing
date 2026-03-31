@@ -250,7 +250,15 @@ export default async function DashboardPage() {
       </div>
 
       {/* Today's Jobs Table */}
-      <JobsTable jobs={safeJobs} />
+      <JobsTable
+        jobs={safeJobs}
+        shopInfo={{
+          name: laundromat.name,
+          address: laundromat.address,
+          contactNumber: laundromat.contact_number,
+          servicePrices: laundromat.service_prices || {},
+        }}
+      />
     </div>
   );
 }

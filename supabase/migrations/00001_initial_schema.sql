@@ -23,6 +23,8 @@ CREATE TABLE laundromats (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   available_services TEXT[] NOT NULL DEFAULT ARRAY['Wash', 'Dry'],
+  service_prices JSONB NOT NULL DEFAULT '{}'::jsonb,
+  contact_number TEXT DEFAULT NULL,
   CONSTRAINT laundromats_user_id_unique UNIQUE (user_id),
   CONSTRAINT chk_sms_free_credits CHECK (sms_free_credits >= 0 AND sms_free_credits <= 50),
   CONSTRAINT chk_sms_paid_credits CHECK (sms_paid_credits >= 0)
@@ -60,12 +62,17 @@ CREATE TABLE jobs (
   is_overdue BOOLEAN NOT NULL DEFAULT false,
   overdue_reason TEXT,
   services TEXT[] NOT NULL DEFAULT '{}',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+  claim_number SMALLINT,
+  customer_name TEXT CHECK (char_length(customer_name) <= 60),
+  claim_date DATE GENERATED ALWAYS AS ((created_at AT TIME ZONE 'Asia/Manila')::date) STORED,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT jobs_laundromat_claim_unique UNIQUE (laundromat_id, claim_date, claim_number)
 );
 CREATE INDEX idx_jobs_laundromat_id ON jobs(laundromat_id);
 CREATE INDEX idx_jobs_laundromat_started ON jobs(laundromat_id, started_at DESC);
 CREATE INDEX idx_jobs_status ON jobs(status) WHERE status IN ('pending', 'in_progress');
 CREATE INDEX idx_jobs_machine_id ON jobs(machine_id);
+CREATE INDEX idx_jobs_customer_name ON jobs(customer_name) WHERE customer_name IS NOT NULL;
 
 -- SMS_LOGS
 CREATE TABLE sms_logs (
@@ -399,6 +406,33 @@ REVOKE EXECUTE ON FUNCTION public.add_sms_topup FROM PUBLIC, authenticated, anon
 -- =============================================================================
 -- Stored Procedures — Jobs
 -- =============================================================================
+
+-- Generate next claim number atomically (per laundromat per day in PH timezone)
+CREATE OR REPLACE FUNCTION public.generate_claim_number(p_laundromat_id UUID)
+RETURNS SMALLINT AS $$
+DECLARE
+  v_today DATE;
+  v_next SMALLINT;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.laundromats
+    WHERE id = p_laundromat_id AND user_id = auth.uid()
+  ) THEN
+    RAISE EXCEPTION 'Access denied';
+  END IF;
+
+  v_today := (now() AT TIME ZONE 'Asia/Manila')::date;
+
+  -- Advisory lock serializes per laundromat+date (prevents first-of-day race)
+  PERFORM pg_advisory_xact_lock(hashtext(p_laundromat_id::text || v_today::text));
+
+  SELECT COALESCE(MAX(claim_number), 0) + 1 INTO v_next
+  FROM public.jobs
+  WHERE laundromat_id = p_laundromat_id AND claim_date = v_today;
+
+  RETURN v_next;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;
 
 -- Mark overdue jobs (in_progress since before today in PH timezone)
 CREATE OR REPLACE FUNCTION mark_overdue_jobs(p_laundromat_id UUID)

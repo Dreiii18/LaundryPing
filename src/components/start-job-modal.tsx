@@ -56,6 +56,8 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const [notifySms, setNotifySms] = useState(true);
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
+  const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
+  const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -72,7 +74,10 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       setPaymentMethod('');
       setNotifySms(true);
       setSelectedServices([]);
+      setServicePrices({});
+      setPriceManuallyChanged(false);
       setError('');
+      setLoading(false);
       setTotalCredits(null);
       fetchMachines();
       fetchSmsCredits();
@@ -137,20 +142,35 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       if (res.ok) {
         const data = await res.json();
         setAvailableServices(data.settings?.available_services || ['Wash', 'Dry']);
+        setServicePrices(data.settings?.service_prices || {});
       } else {
         setAvailableServices(['Wash', 'Dry']);
+        setServicePrices({});
       }
     } catch {
       setAvailableServices(['Wash', 'Dry']);
+      setServicePrices({});
     }
   };
 
+  const calculateTotal = (services: string[]) => {
+    return services.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+  };
+
   const toggleService = (service: string) => {
-    setSelectedServices((prev) =>
-      prev.includes(service)
+    setSelectedServices((prev) => {
+      const next = prev.includes(service)
         ? prev.filter((s) => s !== service)
-        : [...prev, service]
-    );
+        : [...prev, service];
+
+      // Auto-update price if it hasn't been manually changed
+      if (!priceManuallyChanged) {
+        const total = calculateTotal(next);
+        setPayAmount(total > 0 ? total.toString() : '');
+      }
+
+      return next;
+    });
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -187,6 +207,11 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
     if (isPaid && !paymentMethod) {
       setError('Please select a payment method');
+      return;
+    }
+
+    if (priceManuallyChanged && !notes.trim()) {
+      setError('Notes are required when the price differs from the calculated amount');
       return;
     }
 
@@ -390,11 +415,34 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                   step="0.01"
                   placeholder="0.00"
                   value={payAmount}
-                  onChange={(e) => setPayAmount(e.target.value)}
+                  onChange={(e) => {
+                    setPayAmount(e.target.value);
+                    const autoTotal = calculateTotal(selectedServices);
+                    const entered = parseFloat(e.target.value) || 0;
+                    setPriceManuallyChanged(autoTotal > 0 && Math.abs(entered - autoTotal) >= 0.01);
+                  }}
                   disabled={loading}
                   className="pl-7 h-12"
                 />
               </div>
+              {selectedServices.length > 0 && calculateTotal(selectedServices) > 0 && (
+                <p className="text-xs text-slate-400">
+                  Auto-calculated: ₱{calculateTotal(selectedServices).toFixed(2)}
+                  {priceManuallyChanged && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const total = calculateTotal(selectedServices);
+                        setPayAmount(total.toString());
+                        setPriceManuallyChanged(false);
+                      }}
+                      className="ml-2 text-[#0d968b] hover:underline"
+                    >
+                      Reset
+                    </button>
+                  )}
+                </p>
+              )}
             </div>
 
             {/* Payment Status */}
@@ -447,13 +495,18 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
 
             {/* Notes */}
             <div className="flex flex-col gap-2">
-              <Label className="text-sm font-semibold text-[#111817]">Notes (Optional)</Label>
+              <Label className="text-sm font-semibold text-[#111817]">
+                Notes {priceManuallyChanged ? '(Required — price differs from calculated)' : '(Optional)'}
+              </Label>
               <Textarea
-                placeholder="e.g., Extra spin, delicate cycle, low heat"
+                placeholder={priceManuallyChanged
+                  ? 'Explain why the price differs from the calculated amount'
+                  : 'e.g., Extra spin, delicate cycle, low heat'
+                }
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 maxLength={500}
-                className="min-h-16 sm:min-h-25 resize-none"
+                className={`min-h-16 sm:min-h-25 resize-none ${priceManuallyChanged && !notes.trim() ? 'border-amber-400 focus-visible:ring-amber-400/30' : ''}`}
               />
             </div>
           </div>

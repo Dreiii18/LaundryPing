@@ -147,6 +147,12 @@ export default async function JobsPage({
       currentPage={page}
       pageSize={PAGE_SIZE}
       currentFilters={{ status, machineId, dateFrom, dateTo, search }}
+      shopInfo={{
+        name: laundromat.name,
+        address: laundromat.address,
+        contactNumber: laundromat.contact_number,
+        servicePrices: laundromat.service_prices || {},
+      }}
     />
   );
 }

@@ -1,12 +1,14 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
-import { sanitizeLaundromatName, sanitizeAddress } from '@/lib/utils/sanitize';
+import { sanitizeLaundromatName, sanitizeAddress, sanitizeContactNumber } from '@/lib/utils/sanitize';
 
 const updateSettingsSchema = z.object({
   name: z.string().min(1, 'Shop name is required').max(50, 'Shop name must be 50 characters or less').optional(),
   address: z.string().max(200, 'Address must be 200 characters or less').optional().nullable(),
   available_services: z.array(z.string().min(1).max(50)).min(1).max(20).optional(),
+  service_prices: z.record(z.string(), z.number().min(0)).optional(),
+  contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
 });
 
 export async function GET() {
@@ -26,6 +28,8 @@ export async function GET() {
         name: laundromat.name,
         address: laundromat.address,
         available_services: laundromat.available_services,
+        service_prices: laundromat.service_prices,
+        contact_number: laundromat.contact_number,
       },
     });
   } catch {
@@ -54,7 +58,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const updateData: Record<string, string | string[] | null> = {};
+    const updateData: Record<string, string | string[] | Record<string, number> | null> = {};
 
     if (parsed.data.name !== undefined) {
       const sanitizedName = sanitizeLaundromatName(parsed.data.name);
@@ -84,6 +88,16 @@ export async function PUT(request: Request) {
       updateData.available_services = deduplicated;
     }
 
+    if (parsed.data.service_prices !== undefined) {
+      updateData.service_prices = parsed.data.service_prices;
+    }
+
+    if (parsed.data.contact_number !== undefined) {
+      updateData.contact_number = parsed.data.contact_number
+        ? sanitizeContactNumber(parsed.data.contact_number)
+        : null;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -95,7 +109,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services')
+      .select('id, name, address, available_services, service_prices, contact_number')
       .single();
 
     if (updateError) {
