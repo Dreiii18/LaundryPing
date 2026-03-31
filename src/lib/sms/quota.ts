@@ -45,10 +45,10 @@ export async function getCreditStatus(
   const paidCredits = laundromat.sms_paid_credits;
   const totalCredits = freeCredits + paidCredits;
 
-  const now = new Date();
-  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const phNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+  const nextMonth = new Date(phNow.getFullYear(), phNow.getMonth() + 1, 1);
   const daysUntilFreeReset = Math.ceil(
-    (nextMonth.getTime() - now.getTime()) / (1000 * 60 * 60 * 24)
+    (nextMonth.getTime() - phNow.getTime()) / (1000 * 60 * 60 * 24)
   );
 
   return {
