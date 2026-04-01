@@ -12,6 +12,7 @@ const updateSettingsSchema = z.object({
     .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
   rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
+  receipt_paper_size: z.enum(['58mm', '80mm']).optional(),
 });
 
 export async function GET() {
@@ -34,6 +35,7 @@ export async function GET() {
         service_prices: laundromat.service_prices,
         rush_fee: laundromat.rush_fee,
         contact_number: laundromat.contact_number,
+        receipt_paper_size: laundromat.receipt_paper_size,
       },
     });
   } catch {
@@ -113,6 +115,10 @@ export async function PUT(request: Request) {
       updateData.rush_fee = parsed.data.rush_fee;
     }
 
+    if (parsed.data.receipt_paper_size !== undefined) {
+      updateData.receipt_paper_size = parsed.data.receipt_paper_size;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -124,7 +130,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services, service_prices, rush_fee, contact_number')
+      .select('id, name, address, available_services, service_prices, rush_fee, contact_number, receipt_paper_size')
       .single();
 
     if (updateError) {

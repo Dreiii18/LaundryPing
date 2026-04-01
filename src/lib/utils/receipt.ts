@@ -1,5 +1,5 @@
 /**
- * Generates receipt HTML for thermal printing (48mm print width / 58mm paper).
+ * Generates receipt HTML for thermal printing (58mm or 80mm paper).
  * Uses a hidden iframe and triggers window.print().
  */
 import { escapeHtml } from '@/lib/utils/sanitize';
@@ -18,7 +18,13 @@ interface ReceiptData {
   cashTendered: number | null;
   isPaid: boolean;
   paymentMethod: string | null;
+  paperSize?: '58mm' | '80mm';
 }
+
+const PAPER_CONFIG = {
+  '58mm': { pageWidth: '58mm', printWidth: '48mm', fontSize: '11px', shopNameSize: '13px', totalSize: '12px', sectionTitleSize: '10px', footerSize: '10px', paidStampSize: '14px', signatureLabelSize: '9px', signatureLineWidth: '70%' },
+  '80mm': { pageWidth: '80mm', printWidth: '72mm', fontSize: '13px', shopNameSize: '16px', totalSize: '14px', sectionTitleSize: '12px', footerSize: '12px', paidStampSize: '16px', signatureLabelSize: '11px', signatureLineWidth: '60%' },
+} as const;
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
   cash: 'Cash',
@@ -55,6 +61,7 @@ function padInvoice(num: number | null): string {
 }
 
 export function generateReceiptHtml(data: ReceiptData): string {
+  const cfg = PAPER_CONFIG[data.paperSize ?? '58mm'];
   const { date, time } = formatDate(data.date);
   const invoiceNum = padInvoice(data.claimNumber);
   const customerName = data.customerName || 'Walk-in';
@@ -104,7 +111,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
       </tr>` : ''}
       <tr>
         <td colspan="3" style="text-align:center;padding-top:8px;">
-          <span style="border:2px solid #c00;color:#c00;padding:2px 12px;font-weight:bold;font-size:14px;letter-spacing:2px;">PAID</span>
+          <span style="border:2px solid #c00;color:#c00;padding:2px 12px;font-weight:bold;font-size:${cfg.paidStampSize};letter-spacing:2px;">PAID</span>
         </td>
       </tr>`;
   } else {
@@ -131,14 +138,14 @@ export function generateReceiptHtml(data: ReceiptData): string {
 <title>Receipt #${escapeHtml(invoiceNum)}</title>
 <style>
   @page {
-    size: 58mm auto;
+    size: ${cfg.pageWidth} auto;
     margin: 0;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
     font-family: 'Courier New', Courier, monospace;
-    font-size: 11px;
-    width: 48mm;
+    font-size: ${cfg.fontSize};
+    width: ${cfg.printWidth};
     padding: 4mm 2mm;
     color: #000;
   }
@@ -150,24 +157,24 @@ export function generateReceiptHtml(data: ReceiptData): string {
     margin: 6px 0;
   }
   .shop-name {
-    font-size: 13px;
+    font-size: ${cfg.shopNameSize};
     font-weight: bold;
     text-decoration: underline;
   }
   .section-title {
     text-align: center;
-    font-size: 10px;
+    font-size: ${cfg.sectionTitleSize};
     padding: 4px 0 2px;
   }
   .total-row td {
     font-weight: bold;
-    font-size: 12px;
+    font-size: ${cfg.totalSize};
     padding-top: 4px;
   }
   .footer {
     text-align: center;
     padding-top: 8px;
-    font-size: 10px;
+    font-size: ${cfg.footerSize};
     font-style: italic;
   }
   .signature {
@@ -176,12 +183,12 @@ export function generateReceiptHtml(data: ReceiptData): string {
   }
   .signature-line {
     display: inline-block;
-    width: 70%;
+    width: ${cfg.signatureLineWidth};
     border-bottom: 1px solid #000;
     margin-bottom: 2px;
   }
   @media print {
-    body { width: 48mm; }
+    body { width: ${cfg.printWidth}; }
   }
 </style>
 </head>
@@ -251,7 +258,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <div style="padding-top:16px;">
       <span class="signature-line"></span>
     </div>
-    <div style="font-size:9px;">(Staff Signature)</div>
+    <div style="font-size:${cfg.signatureLabelSize};">(Staff Signature)</div>
   </div>
 
   <div class="divider"></div>
