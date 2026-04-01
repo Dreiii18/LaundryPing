@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
 import type { Machine } from './types';
@@ -18,12 +19,14 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const [isPaid, setIsPaid] = useState(true);
   const [payAmount, setPayAmount] = useState('');
   const [paymentMethod, setPaymentMethod] = useState('');
-  const [notifySms, setNotifySms] = useState(true);
+  const [smsOption, setSmsOption] = useState<'none' | 'completion' | 'queue_and_completion'>('completion');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
   const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
   const [cashTendered, setCashTendered] = useState('');
+  const [priority, setPriority] = useState<'normal' | 'rush'>('normal');
+  const [rushFeeAmount, setRushFeeAmount] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
@@ -82,13 +85,16 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         const data = await res.json();
         setAvailableServices(data.settings?.available_services || ['Wash', 'Dry']);
         setServicePrices(data.settings?.service_prices || {});
+        setRushFeeAmount(Number(data.settings?.rush_fee) || 0);
       } else {
         setAvailableServices(['Wash', 'Dry']);
         setServicePrices({});
+        setRushFeeAmount(0);
       }
     } catch {
       setAvailableServices(['Wash', 'Dry']);
       setServicePrices({});
+      setRushFeeAmount(0);
     }
   }, []);
 
@@ -101,11 +107,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setIsPaid(true);
       setPayAmount('');
       setPaymentMethod('');
-      setNotifySms(true);
+      setSmsOption('completion');
       setSelectedServices([]);
       setServicePrices({});
       setPriceManuallyChanged(false);
       setCashTendered('');
+      setPriority('normal');
       setError('');
       setLoading(false);
       setTotalCredits(null);
@@ -115,9 +122,11 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     }
   }, [open, fetchMachines, fetchSmsCredits, fetchAvailableServices]);
 
-  const calculateTotal = useCallback((services: string[]) => {
-    return services.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
-  }, [servicePrices]);
+  const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId) => {
+    const serviceTotal = services.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+    const rushSurcharge = (!currentMachineId && currentPriority === 'rush') ? rushFeeAmount : 0;
+    return serviceTotal + rushSurcharge;
+  }, [servicePrices, rushFeeAmount, priority, machineId]);
 
   const toggleService = useCallback((service: string) => {
     const next = selectedServices.includes(service)
@@ -125,24 +134,47 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       : [...selectedServices, service];
     setSelectedServices(next);
     if (!priceManuallyChanged) {
-      const total = next.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+      const total = calculateTotal(next);
       setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
     }
-  }, [selectedServices, priceManuallyChanged, servicePrices]);
+  }, [selectedServices, priceManuallyChanged, calculateTotal]);
 
   const handlePayAmountChange = useCallback((value: string, currentServices: string[]) => {
     setPayAmount(value);
-    const auto = currentServices.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+    const auto = calculateTotal(currentServices);
     const entered = value.trim() === '' ? null : parseFloat(value);
     setPriceManuallyChanged(
       entered !== null && !isNaN(entered) && auto > 0 && Math.abs(entered - auto) >= 0.01
     );
-  }, [servicePrices]);
+  }, [calculateTotal]);
 
   const resetToAutoPrice = useCallback((autoTotal: number) => {
     setPayAmount((Math.round(autoTotal * 100) / 100).toString());
     setPriceManuallyChanged(false);
   }, []);
+
+  const handleMachineChange = useCallback((newMachineId: string) => {
+    setMachineId(newMachineId);
+    // Downgrade queue+completion to completion when a machine is selected (no longer queued)
+    if (newMachineId && smsOption === 'queue_and_completion') {
+      setSmsOption('completion');
+    }
+  }, [smsOption]);
+
+  const handleSmsOptionChange = useCallback((option: 'none' | 'completion' | 'queue_and_completion') => {
+    setSmsOption(option);
+    if (option === 'none') {
+      setPhone('');
+    }
+  }, []);
+
+  const handlePriorityChange = useCallback((newPriority: 'normal' | 'rush') => {
+    setPriority(newPriority);
+    if (!priceManuallyChanged && selectedServices.length > 0) {
+      const total = calculateTotal(selectedServices, newPriority);
+      setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
+    }
+  }, [priceManuallyChanged, selectedServices, calculateTotal]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -157,6 +189,9 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setError('Please select a machine');
       return;
     }
+
+    const notifySms = smsOption !== 'none';
+    const notifyQueueSms = smsOption === 'queue_and_completion';
 
     if (notifySms) {
       if (!phone.trim()) {
@@ -197,6 +232,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
           ...(machineId ? { machine_id: machineId } : {}),
           ...(notifySms && phoneClean ? { phone: phoneClean } : {}),
           notify_sms: notifySms,
+          notify_queue_sms: notifyQueueSms,
           notes: notes.trim() || undefined,
           customer_name: customerName.trim() || undefined,
           is_paid: isPaid,
@@ -204,6 +240,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
           cash_tendered: isPaid && paymentMethod === 'cash' && cashTendered ? Number(cashTendered) : undefined,
           payment_method: isPaid ? paymentMethod : undefined,
           services: selectedServices,
+          ...(!machineId ? { priority } : {}),
         }),
       });
 
@@ -213,6 +250,15 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         setError(data.error || 'Failed to start job');
         setLoading(false);
         return;
+      }
+
+      // Show queue SMS feedback
+      if (data.queueSmsSent === true) {
+        toast.success('Queue notification SMS sent.');
+      } else if (data.queueSmsSkipReason === 'no_credits') {
+        toast.warning('Queue SMS skipped: no credits remaining.');
+      } else if (data.queueSmsSkipReason) {
+        toast.warning('Queue SMS could not be sent.');
       }
 
       onOpenChange(false);
@@ -227,7 +273,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     selectedServices,
     machines.length,
     machineId,
-    notifySms,
+    smsOption,
     phone,
     payAmount,
     isPaid,
@@ -236,6 +282,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     notes,
     customerName,
     cashTendered,
+    priority,
     onOpenChange,
     router,
     startTransition,
@@ -245,7 +292,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     // State
     machines,
     machineId,
-    setMachineId,
+    setMachineId: handleMachineChange,
     phone,
     setPhone,
     notes,
@@ -257,8 +304,8 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     payAmount,
     paymentMethod,
     setPaymentMethod,
-    notifySms,
-    setNotifySms,
+    smsOption,
+    setSmsOption: handleSmsOptionChange,
     selectedServices,
     availableServices,
     servicePrices,
@@ -269,6 +316,9 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     loading,
     loadingMachines,
     totalCredits,
+    priority,
+    setPriority: handlePriorityChange,
+    rushFeeAmount,
     // Computed
     autoTotal: calculateTotal(selectedServices),
     // Handlers

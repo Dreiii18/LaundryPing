@@ -18,6 +18,7 @@ export function useSettingsForm({
   initialAddress,
   initialServices,
   initialServicePrices,
+  initialRushFee,
   initialContactNumber,
 }: SettingsFormProps) {
   const router = useRouter();
@@ -28,6 +29,7 @@ export function useSettingsForm({
   const [contactNumber, setContactNumber] = useState(initialContactNumber);
   const [services, setServices] = useState<string[]>(initialServices);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>(initialServicePrices);
+  const [rushFee, setRushFee] = useState(initialRushFee.toString());
   const [newService, setNewService] = useState('');
   const [newServicePrice, setNewServicePrice] = useState('');
   const [saving, setSaving] = useState(false);
@@ -37,7 +39,8 @@ export function useSettingsForm({
     address !== initialAddress ||
     contactNumber !== initialContactNumber ||
     JSON.stringify(services) !== JSON.stringify(initialServices) ||
-    !pricesEqual(servicePrices, initialServicePrices);
+    !pricesEqual(servicePrices, initialServicePrices) ||
+    (parseFloat(rushFee) || 0) !== initialRushFee;
 
   const addService = useCallback(() => {
     const trimmed = newService.trim();
@@ -98,6 +101,7 @@ export function useSettingsForm({
           contact_number: contactNumber.trim() || null,
           available_services: services,
           service_prices: servicePrices,
+          rush_fee: parseFloat(rushFee) || 0,
         }),
       });
 
@@ -118,7 +122,7 @@ export function useSettingsForm({
     } finally {
       setSaving(false);
     }
-  }, [name, address, contactNumber, services, servicePrices, router, startTransition]);
+  }, [name, address, contactNumber, services, servicePrices, rushFee, router, startTransition]);
 
   return {
     name,
@@ -129,6 +133,8 @@ export function useSettingsForm({
     setContactNumber,
     services,
     servicePrices,
+    rushFee,
+    setRushFee,
     newService,
     setNewService,
     newServicePrice,

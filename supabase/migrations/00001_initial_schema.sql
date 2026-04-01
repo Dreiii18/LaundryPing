@@ -24,6 +24,7 @@ CREATE TABLE laundromats (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   available_services TEXT[] NOT NULL DEFAULT ARRAY['Wash', 'Dry'],
   service_prices JSONB NOT NULL DEFAULT '{}'::jsonb,
+  rush_fee NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (rush_fee >= 0),
   contact_number TEXT DEFAULT NULL,
   CONSTRAINT laundromats_user_id_unique UNIQUE (user_id),
   CONSTRAINT chk_sms_free_credits CHECK (sms_free_credits >= 0 AND sms_free_credits <= 50),
@@ -66,6 +67,9 @@ CREATE TABLE jobs (
   claim_number SMALLINT,
   customer_name TEXT CHECK (char_length(customer_name) <= 60),
   claim_date DATE GENERATED ALWAYS AS ((created_at AT TIME ZONE 'Asia/Manila')::date) STORED,
+  notify_queue_sms BOOLEAN NOT NULL DEFAULT false,
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('normal', 'rush')),
+  estimated_minutes INTEGER CHECK (estimated_minutes IS NULL OR (estimated_minutes > 0 AND estimated_minutes <= 1440)),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   CONSTRAINT jobs_laundromat_claim_unique UNIQUE (laundromat_id, claim_date, claim_number)
 );
@@ -75,6 +79,7 @@ CREATE INDEX idx_jobs_status ON jobs(status) WHERE status IN ('pending', 'in_pro
 CREATE INDEX idx_jobs_machine_id ON jobs(machine_id);
 CREATE INDEX idx_jobs_laundromat_status_completed ON jobs(laundromat_id, status, completed_at DESC);
 CREATE INDEX idx_jobs_customer_name ON jobs(customer_name) WHERE customer_name IS NOT NULL;
+CREATE INDEX idx_jobs_priority_pending ON jobs(laundromat_id, priority, created_at) WHERE status = 'pending';
 
 -- SMS_LOGS
 CREATE TABLE sms_logs (
@@ -84,10 +89,11 @@ CREATE TABLE sms_logs (
   provider TEXT NOT NULL,
   sent_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   status TEXT NOT NULL CHECK (status IN ('sent', 'failed', 'delivered')),
+  notification_type TEXT NOT NULL DEFAULT 'completion' CHECK (notification_type IN ('queue', 'completion')),
   provider_message_id TEXT,
   provider_response JSONB,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  CONSTRAINT sms_logs_job_id_unique UNIQUE (job_id)
+  CONSTRAINT sms_logs_job_notification_unique UNIQUE (job_id, notification_type)
 );
 CREATE INDEX idx_sms_logs_laundromat_id ON sms_logs(laundromat_id);
 

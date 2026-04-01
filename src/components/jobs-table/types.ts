@@ -18,6 +18,8 @@ export interface Job {
   started_at: string;
   completed_at: string | null;
   sms_sent: boolean;
+  notify_sms: boolean;
+  notify_queue_sms: boolean;
   notes: string | null;
   payment_method: string | null;
   pay_amount: number | null;
@@ -28,6 +30,8 @@ export interface Job {
   services: string[];
   claim_number: number | null;
   customer_name: string | null;
+  priority: 'normal' | 'rush';
+  created_at: string;
   machine: {
     id: string;
     label: string;

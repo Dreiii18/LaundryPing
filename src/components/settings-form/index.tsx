@@ -19,6 +19,8 @@ export function SettingsForm(props: SettingsFormProps) {
     setContactNumber,
     services,
     servicePrices,
+    rushFee,
+    setRushFee,
     newService,
     setNewService,
     newServicePrice,
@@ -95,6 +97,28 @@ export function SettingsForm(props: SettingsFormProps) {
             onRemoveService={removeService}
             onUpdateServicePrice={updateServicePrice}
           />
+        </div>
+
+        <div>
+          <Label htmlFor="rush-fee" className="text-sm font-semibold text-slate-700 mb-2">
+            Rush Priority Fee
+          </Label>
+          <div className="relative w-48">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm font-medium">
+              ₱
+            </span>
+            <Input
+              id="rush-fee"
+              type="number"
+              min="0"
+              step="0.01"
+              placeholder="0.00"
+              value={rushFee}
+              onChange={(e) => setRushFee(e.target.value)}
+              className="h-12 pl-7 min-h-11"
+            />
+          </div>
+          <p className="text-xs text-slate-400 mt-1">Extra charge added to rush priority jobs. Set to 0 for no surcharge.</p>
         </div>
       </div>
 
