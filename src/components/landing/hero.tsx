@@ -24,7 +24,7 @@ export function Hero() {
               Start Free
             </Link>
             <a
-              href="https://calendly.com/official-laundryping/30min"
+              href="https://cal.com/laundryping-ph/30min"
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 bg-transparent text-[#618986] font-semibold text-[0.9375rem] px-7 py-3 rounded-xl border border-[#0d968b] hover:bg-[#0d968b]/10 hover:text-[#0d968b] transition-colors"
