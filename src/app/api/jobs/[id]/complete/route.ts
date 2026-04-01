@@ -9,6 +9,7 @@ import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 
 const completeJobSchema = z.object({
   payment_method: z.enum(['cash', 'ewallet', 'card', 'bank_transfer']).optional(),
+  cash_tendered: z.number().min(0).optional(),
   overdue_reason: z.string().optional(),
 });
 
@@ -49,12 +50,14 @@ export async function POST(
 
     // Parse optional payment_method and overdue_reason from request body
     let paymentMethod: string | undefined;
+    let cashTendered: number | undefined;
     let overdueReason: string | undefined;
     try {
       const body = await request.json();
       const parsed = completeJobSchema.safeParse(body);
       if (parsed.success) {
         paymentMethod = parsed.data.payment_method;
+        cashTendered = parsed.data.cash_tendered;
         overdueReason = parsed.data.overdue_reason;
       }
     } catch {
@@ -73,7 +76,11 @@ export async function POST(
     if (!job.is_paid && paymentMethod) {
       const { error: paymentError } = await supabase
         .from('jobs')
-        .update({ payment_method: paymentMethod, is_paid: true })
+        .update({
+          payment_method: paymentMethod,
+          is_paid: true,
+          ...(paymentMethod === 'cash' && cashTendered != null ? { cash_tendered: cashTendered } : {}),
+        })
         .eq('id', id);
 
       if (paymentError) {
@@ -112,6 +119,7 @@ export async function POST(
       .from('sms_logs')
       .select('id, status')
       .eq('job_id', id)
+      .eq('notification_type', 'completion')
       .single();
 
     if (existingSmsLog) {
@@ -228,6 +236,7 @@ export async function POST(
           laundromat_id: laundromat.id,
           provider: smsResult.provider,
           status: 'sent',
+          notification_type: 'completion',
           provider_message_id: smsResult.messageId || null,
           provider_response: smsResult.rawResponse as unknown as Record<string, unknown> || null,
         });
@@ -274,6 +283,7 @@ export async function POST(
           laundromat_id: laundromat.id,
           provider: smsResult.provider,
           status: 'failed',
+          notification_type: 'completion',
           provider_response: { error: smsResult.error } as unknown as Record<string, unknown>,
         });
 

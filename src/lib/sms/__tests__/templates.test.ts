@@ -1,5 +1,5 @@
 import { describe, it, expect, afterAll } from 'vitest';
-import { buildLaundryDoneMessage, getMessageSegmentCount } from '../templates';
+import { buildLaundryDoneMessage, buildQueueNotificationMessage, getMessageSegmentCount } from '../templates';
 
 describe('buildLaundryDoneMessage', () => {
   const originalRandom = Math.random;
@@ -147,6 +147,72 @@ describe('buildLaundryDoneMessage', () => {
         expect(getMessageSegmentCount(msg)).toBe(1);
       }
     });
+  });
+});
+
+describe('buildQueueNotificationMessage', () => {
+  const originalRandom = Math.random;
+
+  afterAll(() => {
+    Math.random = originalRandom;
+  });
+
+  it('rotates through 3 templates', () => {
+    const templates = new Set<string>();
+    for (let i = 0; i < 3; i++) {
+      Math.random = () => i / 3;
+      templates.add(buildQueueNotificationMessage('SpinClean'));
+    }
+    expect(templates.size).toBe(3);
+  });
+
+  it('includes the shop name', () => {
+    Math.random = () => 0;
+    const msg = buildQueueNotificationMessage('SpinClean');
+    expect(msg).toContain('SpinClean');
+  });
+
+  it('truncates shop names longer than 25 chars', () => {
+    Math.random = () => 0;
+    const shopName = 'A'.repeat(26);
+    const msg = buildQueueNotificationMessage(shopName);
+    expect(msg).toContain('A'.repeat(22) + '...');
+    expect(msg).not.toContain(shopName);
+  });
+
+  it('appends customer name when it fits in 160 chars', () => {
+    Math.random = () => 0;
+    const msg = buildQueueNotificationMessage('SpinClean', 'Juan');
+    expect(msg).toContain(' - Juan');
+    expect(msg.length).toBeLessThanOrEqual(160);
+  });
+
+  it('drops customer name if it would exceed 160 chars', () => {
+    Math.random = () => 0;
+    const longName = 'B'.repeat(80);
+    const msg = buildQueueNotificationMessage('A'.repeat(25), longName);
+    expect(msg).not.toContain(longName);
+    expect(msg.length).toBeLessThanOrEqual(160);
+  });
+
+  it('all templates fit in 1 SMS segment with 25-char name', () => {
+    const shopName = 'A'.repeat(25);
+    for (let i = 0; i < 3; i++) {
+      Math.random = () => i / 3;
+      const msg = buildQueueNotificationMessage(shopName);
+      expect(msg.length).toBeLessThanOrEqual(160);
+      expect(getMessageSegmentCount(msg)).toBe(1);
+    }
+  });
+
+  it('all templates fit in 1 segment with short customer name', () => {
+    const shopName = 'A'.repeat(25);
+    for (let i = 0; i < 3; i++) {
+      Math.random = () => i / 3;
+      const msg = buildQueueNotificationMessage(shopName, 'Juan');
+      expect(msg.length).toBeLessThanOrEqual(160);
+      expect(getMessageSegmentCount(msg)).toBe(1);
+    }
   });
 });
 

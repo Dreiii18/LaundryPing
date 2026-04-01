@@ -11,6 +11,7 @@ const updateSettingsSchema = z.object({
     .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service prices')
     .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
+  rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
 });
 
 export async function GET() {
@@ -31,6 +32,7 @@ export async function GET() {
         address: laundromat.address,
         available_services: laundromat.available_services,
         service_prices: laundromat.service_prices,
+        rush_fee: laundromat.rush_fee,
         contact_number: laundromat.contact_number,
       },
     });
@@ -60,7 +62,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const updateData: Record<string, string | string[] | Record<string, number> | null> = {};
+    const updateData: Record<string, string | string[] | Record<string, number> | number | null> = {};
 
     if (parsed.data.name !== undefined) {
       const sanitizedName = sanitizeLaundromatName(parsed.data.name);
@@ -107,6 +109,10 @@ export async function PUT(request: Request) {
       updateData.contact_number = sanitized || null;
     }
 
+    if (parsed.data.rush_fee !== undefined) {
+      updateData.rush_fee = parsed.data.rush_fee;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -118,7 +124,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services, service_prices, contact_number')
+      .select('id, name, address, available_services, service_prices, rush_fee, contact_number')
       .single();
 
     if (updateError) {

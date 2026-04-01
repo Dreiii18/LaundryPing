@@ -147,7 +147,10 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
       <PaymentDialog
         payLaterJobId={actions.payLaterJobId}
         payLaterMethod={actions.payLaterMethod}
+        payLaterCashTendered={actions.payLaterCashTendered}
+        payAmount={initialJobs.find((j) => j.id === actions.payLaterJobId)?.pay_amount ?? null}
         onMethodChange={actions.setPayLaterMethod}
+        onCashTenderedChange={actions.setPayLaterCashTendered}
         onConfirm={actions.handlePayLaterConfirm}
         onClose={() => { actions.setPayLaterJobId(null); actions.setOverdueReason(''); }}
       />

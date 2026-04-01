@@ -19,6 +19,7 @@ export function useJobActions(jobs: Job[]) {
   const [cancelConfirmJobId, setCancelConfirmJobId] = useState<string | null>(null);
   const [payLaterJobId, setPayLaterJobId] = useState<string | null>(null);
   const [payLaterMethod, setPayLaterMethod] = useState('');
+  const [payLaterCashTendered, setPayLaterCashTendered] = useState('');
   const [overdueJobId, setOverdueJobId] = useState<string | null>(null);
   const [overdueReason, setOverdueReason] = useState('');
   const [assignJobId, setAssignJobId] = useState<string | null>(null);
@@ -27,12 +28,13 @@ export function useJobActions(jobs: Job[]) {
   const [availableMachines, setAvailableMachines] = useState<Machine[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(false);
 
-  const completeJob = useCallback(async (jobId: string, options?: { payment_method?: string; overdue_reason?: string }) => {
+  const completeJob = useCallback(async (jobId: string, options?: { payment_method?: string; cash_tendered?: number; overdue_reason?: string }) => {
     setCompletingId(jobId);
 
     try {
-      const body: Record<string, string> = {};
+      const body: Record<string, string | number> = {};
       if (options?.payment_method) body.payment_method = options.payment_method;
+      if (options?.cash_tendered != null) body.cash_tendered = options.cash_tendered;
       if (options?.overdue_reason) body.overdue_reason = options.overdue_reason;
 
       const res = await fetchWithAuth(`/api/jobs/${jobId}/complete`, {
@@ -71,6 +73,7 @@ export function useJobActions(jobs: Job[]) {
     if (!job.is_paid) {
       setPayLaterJobId(job.id);
       setPayLaterMethod('');
+      setPayLaterCashTendered('');
       if (overdueReasonText) setOverdueReason(overdueReasonText);
     } else {
       completeJob(job.id, overdueReasonText ? { overdue_reason: overdueReasonText } : undefined);
@@ -125,10 +128,16 @@ export function useJobActions(jobs: Job[]) {
   const handlePayLaterConfirm = useCallback(() => {
     if (!payLaterJobId || !payLaterMethod) return;
     const reason = overdueReason.trim() || undefined;
+    const cashTenderedNum = payLaterCashTendered ? parseFloat(payLaterCashTendered) : undefined;
     setPayLaterJobId(null);
-    completeJob(payLaterJobId, { payment_method: payLaterMethod, ...(reason && { overdue_reason: reason }) });
+    completeJob(payLaterJobId, {
+      payment_method: payLaterMethod,
+      ...(payLaterMethod === 'cash' && cashTenderedNum != null && !isNaN(cashTenderedNum) ? { cash_tendered: cashTenderedNum } : {}),
+      ...(reason && { overdue_reason: reason }),
+    });
     setOverdueReason('');
-  }, [payLaterJobId, payLaterMethod, overdueReason, completeJob]);
+    setPayLaterCashTendered('');
+  }, [payLaterJobId, payLaterMethod, payLaterCashTendered, overdueReason, completeJob]);
 
   const openAssignDialog = useCallback(async (jobId: string) => {
     setAssignJobId(jobId);
@@ -198,6 +207,8 @@ export function useJobActions(jobs: Job[]) {
     setPayLaterJobId,
     payLaterMethod,
     setPayLaterMethod,
+    payLaterCashTendered,
+    setPayLaterCashTendered,
     overdueJobId,
     setOverdueJobId,
     overdueReason,

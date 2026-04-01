@@ -51,6 +51,8 @@ export default async function JobsPage({
       started_at,
       completed_at,
       sms_sent,
+      notify_sms,
+      notify_queue_sms,
       payment_method,
       pay_amount,
       cash_tendered,
@@ -61,6 +63,7 @@ export default async function JobsPage({
       claim_number,
       customer_name,
       created_at,
+      priority,
       machines (
         id,
         label
@@ -121,6 +124,8 @@ export default async function JobsPage({
     started_at: job.started_at,
     completed_at: job.completed_at,
     sms_sent: job.sms_sent,
+    notify_sms: job.notify_sms as boolean,
+    notify_queue_sms: job.notify_queue_sms as boolean,
     notes: job.notes,
     payment_method: job.payment_method as string | null,
     pay_amount: job.pay_amount as number | null,
@@ -131,6 +136,8 @@ export default async function JobsPage({
     services: (job.services || []) as string[],
     claim_number: job.claim_number as number | null,
     customer_name: job.customer_name as string | null,
+    priority: (job.priority as 'normal' | 'rush') ?? 'normal',
+    created_at: job.created_at as string,
     machine:
       Array.isArray(job.machines)
         ? ((job.machines[0] as { id: string; label: string }) ?? null)
