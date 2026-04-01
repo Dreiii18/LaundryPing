@@ -34,6 +34,7 @@ export default async function SettingsPage() {
             initialAddress={laundromat.address || ''}
             initialServices={laundromat.available_services || ['Wash', 'Dry']}
             initialServicePrices={laundromat.service_prices || {}}
+            initialRushFee={laundromat.rush_fee ?? 0}
             initialContactNumber={laundromat.contact_number || ''}
           />
         </section>

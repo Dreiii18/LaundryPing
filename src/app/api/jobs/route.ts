@@ -2,8 +2,11 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { isValidPhNumber, normalizeToLocal, maskPhone } from '@/lib/utils/phone';
-import { encryptPhone } from '@/lib/utils/encryption';
+import { encryptPhone, decryptPhone } from '@/lib/utils/encryption';
 import { sanitizeNotes, sanitizeCustomerName } from '@/lib/utils/sanitize';
+import { sendSms } from '@/lib/sms/provider';
+import { buildQueueNotificationMessage } from '@/lib/sms/templates';
+import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
 
@@ -21,6 +24,8 @@ const createJobSchema = z.object({
   cash_tendered: z.number().min(0).optional(),
   payment_method: z.enum(PAYMENT_METHODS).optional(),
   services: z.array(z.string().min(1).max(50)).min(1, 'At least one service is required').max(10),
+  notify_queue_sms: z.boolean().optional(),
+  priority: z.enum(['normal', 'rush']).optional(),
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
@@ -61,6 +66,7 @@ export async function GET() {
         completed_at,
         sms_sent,
         notify_sms,
+        notify_queue_sms,
         payment_method,
         pay_amount,
         cash_tendered,
@@ -69,6 +75,7 @@ export async function GET() {
         claim_number,
         customer_name,
         created_at,
+        priority,
         machines (
           id,
           label
@@ -94,6 +101,7 @@ export async function GET() {
       completed_at: job.completed_at,
       sms_sent: job.sms_sent,
       notify_sms: job.notify_sms,
+      notify_queue_sms: job.notify_queue_sms,
       payment_method: job.payment_method,
       pay_amount: job.pay_amount,
       cash_tendered: job.cash_tendered,
@@ -102,6 +110,7 @@ export async function GET() {
       claim_number: job.claim_number,
       customer_name: job.customer_name,
       created_at: job.created_at,
+      priority: job.priority,
       machine: job.machines,
     }));
 
@@ -135,6 +144,8 @@ export async function POST(request: Request) {
     const { machine_id, phone, notes, customer_name, is_paid, pay_amount, cash_tendered, payment_method } = parsed.data;
 
     const notifySms = parsed.data.notify_sms ?? true;
+    const notifyQueueSms = parsed.data.notify_queue_sms ?? false;
+    const priority = parsed.data.priority ?? 'normal';
 
     // If notify_sms is true, phone is required
     if (notifySms && !phone) {
@@ -235,13 +246,15 @@ export async function POST(request: Request) {
       payment_method: payment_method ?? null,
       services: parsed.data.services,
       customer_name: sanitizedCustomerName,
+      notify_queue_sms: notifyQueueSms,
+      priority,
     };
 
     const selectFields = `
       id, laundromat_id, machine_id, customer_phone_masked, notes,
       status, started_at, completed_at, sms_sent, notify_sms,
       payment_method, pay_amount, cash_tendered, is_paid, services,
-      claim_number, customer_name, created_at
+      claim_number, customer_name, created_at, priority
     `;
 
     const insertWithClaimNumber = async (attempt: number) => {
@@ -273,6 +286,94 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
     }
 
+    // Queue SMS: send notification if job is queued, queue SMS enabled, and phone exists
+    let queueSmsSent = false;
+    let queueSmsSkipReason: string | null = null;
+
+    if (job.status === 'pending' && notifyQueueSms && encryptedPhone) {
+      try {
+        // Idempotency check: see if queue SMS was already sent for this job
+        const { data: existingQueueLog } = await supabase
+          .from('sms_logs')
+          .select('id')
+          .eq('job_id', job.id)
+          .eq('notification_type', 'queue')
+          .single();
+
+        if (existingQueueLog) {
+          queueSmsSent = true;
+        } else {
+        // Consume one SMS credit
+        let consumedCreditType: 'free' | 'paid' | null;
+        try {
+          consumedCreditType = await checkAndConsumeCredit(supabase, laundromat.id);
+        } catch {
+          consumedCreditType = null;
+        }
+
+        if (!consumedCreditType) {
+          queueSmsSkipReason = 'no_credits';
+        } else {
+          // Decrypt phone and send
+          try {
+            const decryptedPhone = decryptPhone(encryptedPhone);
+            const phoneNumber = normalizeToLocal(decryptedPhone);
+            const message = buildQueueNotificationMessage(
+              laundromat.name,
+              sanitizedCustomerName,
+            );
+            const smsResult = await sendSms(phoneNumber, message);
+
+            if (smsResult.success) {
+              queueSmsSent = true;
+              // Insert log; ignore 23505 (unique constraint) as idempotency marker
+              const { error: logError } = await supabase.from('sms_logs').insert({
+                job_id: job.id,
+                laundromat_id: laundromat.id,
+                provider: smsResult.provider,
+                status: 'sent',
+                notification_type: 'queue',
+                provider_message_id: smsResult.messageId || null,
+                provider_response: smsResult.rawResponse as unknown as Record<string, unknown> || null,
+              });
+              if (logError && !logError.code?.includes('23505')) {
+                console.error('Queue SMS log insert failed:', logError);
+              }
+            } else {
+              // SMS failed — refund credit
+              try {
+                await refundCredit(supabase, laundromat.id, consumedCreditType);
+              } catch (refundError) {
+                console.error('[CREDIT LEAK] Queue SMS refund failed for job:', job.id, refundError);
+              }
+              await supabase.from('sms_logs').insert({
+                job_id: job.id,
+                laundromat_id: laundromat.id,
+                provider: smsResult.provider,
+                status: 'failed',
+                notification_type: 'queue',
+                provider_response: { error: smsResult.error } as unknown as Record<string, unknown>,
+              });
+              queueSmsSkipReason = 'send_failed';
+            }
+          } catch (decryptError) {
+            // Phone decryption failed — refund credit
+            try {
+              await refundCredit(supabase, laundromat.id, consumedCreditType);
+            } catch (refundError) {
+              console.error('[CREDIT LEAK] Queue SMS refund failed for job:', job.id, refundError);
+            }
+            console.error('[Queue SMS] Phone decryption failed for job:', job.id, decryptError);
+            queueSmsSkipReason = 'decrypt_failed';
+          }
+        }
+        } // end else (no existing queue log)
+      } catch (queueSmsError) {
+        console.error('[Queue SMS] Unexpected error for job:', job.id, queueSmsError);
+        queueSmsSkipReason = 'unexpected_error';
+      }
+    }
+
     return NextResponse.json({
       job: {
         ...job,
@@ -281,6 +382,8 @@ export async function POST(request: Request) {
           label: machine.label,
         } : null,
       },
+      queueSmsSent,
+      ...(queueSmsSkipReason && { queueSmsSkipReason }),
     }, { status: 201 });
   } catch {
     return NextResponse.json({ error: 'An unexpected error occurred' }, { status: 500 });

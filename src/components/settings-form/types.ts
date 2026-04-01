@@ -3,6 +3,7 @@ export interface SettingsFormProps {
   initialAddress: string;
   initialServices: string[];
   initialServicePrices: Record<string, number>;
+  initialRushFee: number;
   initialContactNumber: string;
 }
 

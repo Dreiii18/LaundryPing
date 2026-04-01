@@ -42,6 +42,45 @@ export function buildLaundryDoneMessage(
 }
 
 /**
+ * SMS templates for queue notification.
+ * Each must fit within a single 160-character GSM-7 SMS segment
+ * even with a 25-character shop name.
+ */
+const QUEUE_TEMPLATES = [
+  (name: string) =>
+    `Salamat! Nakapila na po ang labada mo sa ${name}. I-text po namin pag tapos na!`,
+  (name: string) =>
+    `Hi! Nareceive na po ang labada mo sa ${name}. Naka-queue na po. Abiso po namin pag ready!`,
+  (name: string) =>
+    `Update mula sa ${name}: Nakapila na po ang labada mo. Aabisuhan po namin kayo pag tapos!`,
+];
+
+/**
+ * Builds a randomized Tagalog SMS message for queue notification.
+ * Rotates through templates to keep messages fresh.
+ * Shop names > 25 chars are truncated with ellipsis.
+ * Optionally appends customer name if it fits in 160 chars.
+ */
+export function buildQueueNotificationMessage(
+  shopName: string,
+  customerName?: string | null,
+): string {
+  const truncatedName = shopName.length > 25
+    ? shopName.slice(0, 22) + '...'
+    : shopName;
+
+  const index = Math.floor(Math.random() * QUEUE_TEMPLATES.length);
+  const base = QUEUE_TEMPLATES[index](truncatedName);
+
+  if (customerName) {
+    const withName = `${base} - ${customerName}`;
+    if (withName.length <= 160) return withName;
+  }
+
+  return base;
+}
+
+/**
  * Checks if a message fits within a single SMS segment.
  * GSM-7: 160 chars per segment
  * Unicode (UCS-2): 70 chars per segment

@@ -19,7 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import { Loader2, Play, Clock, AlertTriangle, XCircle } from 'lucide-react';
+import { Loader2, Play, Clock, AlertTriangle, XCircle, Flame } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { useStartJobForm } from './use-start-job-form';
 import { ServiceSelector } from './service-selector';
@@ -124,36 +124,69 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
               )}
             </div>
 
-            {/* SMS Notification Toggle */}
+            {/* SMS Notification */}
             <div className="flex flex-col gap-2">
               <Label className="text-sm font-semibold text-[#111817]">SMS Notification</Label>
               <div className="flex gap-2">
                 <button
                   type="button"
-                  onClick={() => form.setNotifySms(true)}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
-                    form.notifySms
-                      ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
-                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
-                  }`}
-                >
-                  Notify via SMS
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { form.setNotifySms(false); form.setPhone(''); }}
-                  className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
-                    !form.notifySms
+                  onClick={() => form.setSmsOption('none')}
+                  className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                    form.smsOption === 'none'
                       ? 'bg-amber-50 border-amber-400 text-amber-700'
                       : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                   }`}
                 >
                   No SMS
                 </button>
+                {!form.machineId && !form.loadingMachines ? (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => form.setSmsOption('completion')}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                        form.smsOption === 'completion'
+                          ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      Completion
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => form.setSmsOption('queue_and_completion')}
+                      className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                        form.smsOption === 'queue_and_completion'
+                          ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                          : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      }`}
+                    >
+                      Queue + Done
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => form.setSmsOption('completion')}
+                    className={`flex-1 py-2.5 px-3 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                      form.smsOption !== 'none'
+                        ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    Notify via SMS
+                  </button>
+                )}
               </div>
+              {form.smsOption === 'queue_and_completion' && (
+                <p className="text-xs text-slate-400">Uses 2 SMS credits (1 on queue + 1 on completion).</p>
+              )}
+              {form.smsOption === 'completion' && (
+                <p className="text-xs text-slate-400">Uses 1 SMS credit on completion.</p>
+              )}
             </div>
 
-            {form.notifySms && (
+            {form.smsOption !== 'none' && (
               <div className="flex flex-col gap-2">
                 <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
                 <PhoneInput
@@ -161,6 +194,43 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                   onChange={form.setPhone}
                   disabled={form.loading}
                 />
+              </div>
+            )}
+
+            {/* Queue-specific: Priority */}
+            {!form.machineId && !form.loadingMachines && (
+              <div className="flex flex-col gap-2">
+                <Label className="text-sm font-semibold text-[#111817]">Priority</Label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => form.setPriority('normal')}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+                      form.priority === 'normal'
+                        ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    Normal
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => form.setPriority('rush')}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-orange-400/30 ${
+                      form.priority === 'rush'
+                        ? 'bg-orange-50 border-orange-400 text-orange-700'
+                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                    }`}
+                  >
+                    <Flame className="size-3.5 inline mr-1" />
+                    Rush
+                  </button>
+                </div>
+                {form.priority === 'rush' && form.rushFeeAmount > 0 && (
+                  <p className="text-xs text-orange-600">
+                    +₱{form.rushFeeAmount.toFixed(2)} rush fee applied
+                  </p>
+                )}
               </div>
             )}
 

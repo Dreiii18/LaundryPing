@@ -87,7 +87,8 @@ function createMockSupabase({
   const mockJobSelect = vi.fn().mockReturnValue({ eq: mockJobEqId });
 
   const mockSmsLogSingle = vi.fn().mockResolvedValue(smsLogResult);
-  const mockSmsLogEq = vi.fn().mockReturnValue({ single: mockSmsLogSingle });
+  const mockSmsLogEqNotificationType = vi.fn().mockReturnValue({ single: mockSmsLogSingle });
+  const mockSmsLogEq = vi.fn().mockReturnValue({ eq: mockSmsLogEqNotificationType });
   const mockSmsLogSelect = vi.fn().mockReturnValue({ eq: mockSmsLogEq });
 
   const mockFrom = vi.fn().mockImplementation((table: string) => {

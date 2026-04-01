@@ -20,6 +20,7 @@ export interface Database {
           billing_cycle_start: string;
           available_services: string[];
           service_prices: Record<string, number>;
+          rush_fee: number;
           contact_number: string | null;
           created_at: string;
           updated_at: string;
@@ -34,6 +35,7 @@ export interface Database {
           billing_cycle_start?: string;
           available_services?: string[];
           service_prices?: Record<string, number>;
+          rush_fee?: number;
           contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -48,6 +50,7 @@ export interface Database {
           billing_cycle_start?: string;
           available_services?: string[];
           service_prices?: Record<string, number>;
+          rush_fee?: number;
           contact_number?: string | null;
           created_at?: string;
           updated_at?: string;
@@ -102,6 +105,9 @@ export interface Database {
           claim_number: number | null;
           customer_name: string | null;
           claim_date: string;
+          notify_queue_sms: boolean;
+          priority: 'normal' | 'rush';
+
           created_at: string;
         };
         Insert: {
@@ -125,6 +131,9 @@ export interface Database {
           services?: string[];
           claim_number?: number | null;
           customer_name?: string | null;
+          notify_queue_sms?: boolean;
+          priority?: 'normal' | 'rush';
+
           created_at?: string;
         };
         Update: {
@@ -148,6 +157,9 @@ export interface Database {
           services?: string[];
           claim_number?: number | null;
           customer_name?: string | null;
+          notify_queue_sms?: boolean;
+          priority?: 'normal' | 'rush';
+
           created_at?: string;
         };
       };
@@ -159,6 +171,7 @@ export interface Database {
           provider: string;
           sent_at: string;
           status: 'sent' | 'failed' | 'delivered';
+          notification_type: 'queue' | 'completion';
           provider_message_id: string | null;
           provider_response: Json | null;
           created_at: string;
@@ -170,6 +183,7 @@ export interface Database {
           provider: string;
           sent_at?: string;
           status: 'sent' | 'failed' | 'delivered';
+          notification_type?: 'queue' | 'completion';
           provider_message_id?: string | null;
           provider_response?: Json | null;
           created_at?: string;
@@ -181,6 +195,7 @@ export interface Database {
           provider?: string;
           sent_at?: string;
           status?: 'sent' | 'failed' | 'delivered';
+          notification_type?: 'queue' | 'completion';
           provider_message_id?: string | null;
           provider_response?: Json | null;
           created_at?: string;

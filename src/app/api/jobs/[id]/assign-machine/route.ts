@@ -124,7 +124,10 @@ export async function POST(
         services,
         claim_number,
         customer_name,
-        created_at
+        created_at,
+        priority,
+        notify_sms,
+        notify_queue_sms
       `)
       .single();
 

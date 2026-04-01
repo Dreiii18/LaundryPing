@@ -16,6 +16,7 @@ export default async function SmsHistoryPage() {
       sent_at,
       status,
       provider,
+      notification_type,
       jobs!inner (
         customer_phone_masked,
         machines (
@@ -39,6 +40,7 @@ export default async function SmsHistoryPage() {
       sent_at: log.sent_at as string,
       status: log.status as string,
       provider: log.provider as string,
+      notification_type: (log.notification_type as 'queue' | 'completion') ?? 'completion',
       customer_phone_masked: (jobAny?.customer_phone_masked as string | null) ?? null,
       machine_label: (machine?.label as string | null) ?? null,
     };

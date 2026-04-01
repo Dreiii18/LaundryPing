@@ -4,7 +4,7 @@ import React from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer, Flame } from 'lucide-react';
 import type { Job, ShopInfo } from './types';
 
 interface JobRowProps {
@@ -92,10 +92,18 @@ export const JobRow = React.memo(function JobRow({
       </TableCell>
       <TableCell className="px-6 py-4">
         {job.status === 'pending' ? (
-          <Badge className="bg-blue-100 text-blue-700 border-transparent gap-1">
-            <Clock className="size-3" aria-hidden="true" />
-            Queued
-          </Badge>
+          <div className="flex items-center gap-1">
+            <Badge className="bg-blue-100 text-blue-700 border-transparent gap-1">
+              <Clock className="size-3" aria-hidden="true" />
+              Queued
+            </Badge>
+            {job.priority === 'rush' && (
+              <Badge className="bg-orange-100 text-orange-700 border-transparent gap-1">
+                <Flame className="size-3" aria-hidden="true" />
+                Rush
+              </Badge>
+            )}
+          </div>
         ) : job.status === 'in_progress' && job.is_overdue ? (
           <Badge className="bg-red-100 text-red-700 border-transparent gap-1">
             <CircleAlert className="size-3" aria-hidden="true" />

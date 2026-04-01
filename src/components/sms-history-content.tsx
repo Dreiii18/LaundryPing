@@ -16,6 +16,7 @@ interface SmsLog {
   sent_at: string;
   status: string;
   provider: string;
+  notification_type: 'queue' | 'completion';
   customer_phone_masked: string | null;
   machine_label: string | null;
 }
@@ -110,6 +111,9 @@ export function SmsHistoryContent({ logs }: SmsHistoryContentProps) {
                 Phone
               </TableHead>
               <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                Type
+              </TableHead>
+              <TableHead className="px-6 py-4 text-xs font-semibold uppercase tracking-wider text-slate-500">
                 Status
               </TableHead>
             </TableRow>
@@ -128,6 +132,17 @@ export function SmsHistoryContent({ logs }: SmsHistoryContentProps) {
                   </TableCell>
                   <TableCell className="px-6 py-4 text-sm text-slate-600">
                     {log.customer_phone_masked ?? <span className="text-slate-400 italic">--</span>}
+                  </TableCell>
+                  <TableCell className="px-6 py-4 text-sm text-slate-600">
+                    {log.notification_type === 'queue' ? (
+                      <Badge className="bg-blue-100 text-blue-700 border-transparent font-semibold">
+                        Queue
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-slate-100 text-slate-600 border-transparent font-semibold">
+                        Completion
+                      </Badge>
+                    )}
                   </TableCell>
                   <TableCell className="px-6 py-4">
                     <StatusBadge status={log.status} />

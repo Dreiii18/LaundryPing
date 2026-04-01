@@ -1,30 +1,33 @@
 import { Suspense } from 'react';
 import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
-import { JobsTable } from '@/components/jobs-table';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
 import { StatCardWithTrend } from '@/components/dashboard/stat-card-with-trend';
+import { TodaysJobsSection } from '@/components/dashboard/todays-jobs-section';
+import { QueueSection } from '@/components/dashboard/queue-section';
 import { OnboardingBanner } from '@/components/onboarding-banner';
 import { createClient } from '@/lib/supabase/server';
 
-function JobsTableSkeleton() {
+function DashboardSkeleton() {
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-pulse">
-      <div className="px-6 py-4 border-b border-slate-100">
-        <div className="h-5 w-32 bg-slate-200 rounded" />
-      </div>
-      <div className="divide-y divide-slate-100">
-        {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="flex items-center gap-4 px-4 py-3">
-            <div className="h-4 w-16 bg-slate-100 rounded" />
-            <div className="h-4 w-24 bg-slate-100 rounded" />
-            <div className="h-4 w-20 bg-slate-200 rounded" />
-            <div className="h-4 flex-1 bg-slate-100 rounded" />
-            <div className="h-4 w-16 bg-slate-100 rounded" />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {[0, 1].map((i) => (
+        <div key={i} className="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden animate-pulse">
+          <div className="px-6 py-4 border-b border-slate-100">
+            <div className="h-5 w-28 bg-slate-200 rounded" />
           </div>
-        ))}
-      </div>
+          <div className="p-3 space-y-2">
+            {[0, 1, 2].map((j) => (
+              <div key={j} className="rounded-lg border border-slate-100 p-3 space-y-2">
+                <div className="h-4 w-20 bg-slate-100 rounded" />
+                <div className="h-4 w-40 bg-slate-100 rounded" />
+                <div className="h-4 w-32 bg-slate-200 rounded" />
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -54,6 +57,8 @@ async function DashboardJobsTable({
       started_at,
       completed_at,
       sms_sent,
+      notify_sms,
+      notify_queue_sms,
       payment_method,
       pay_amount,
       cash_tendered,
@@ -64,6 +69,7 @@ async function DashboardJobsTable({
       claim_number,
       customer_name,
       created_at,
+      priority,
       machines (
         id,
         label
@@ -81,6 +87,8 @@ async function DashboardJobsTable({
     started_at: job.started_at,
     completed_at: job.completed_at,
     sms_sent: job.sms_sent,
+    notify_sms: job.notify_sms as boolean,
+    notify_queue_sms: job.notify_queue_sms as boolean,
     notes: job.notes,
     payment_method: job.payment_method as string | null,
     pay_amount: job.pay_amount as number | null,
@@ -91,14 +99,30 @@ async function DashboardJobsTable({
     services: (job.services || []) as string[],
     claim_number: job.claim_number as number | null,
     customer_name: job.customer_name as string | null,
+    priority: (job.priority as 'normal' | 'rush') ?? 'normal',
+    created_at: job.created_at as string,
     machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
   }));
 
+  // Queue: pending jobs — rush first, then oldest first (FIFO)
+  const queuedJobs = safeJobs
+    .filter((j) => j.status === 'pending')
+    .sort((a, b) => {
+      if (a.priority === 'rush' && b.priority !== 'rush') return -1;
+      if (a.priority !== 'rush' && b.priority === 'rush') return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+
+  // Today's Jobs: non-pending — newest first
+  const todayJobs = safeJobs
+    .filter((j) => j.status !== 'pending')
+    .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
+
   return (
-    <JobsTable
-      jobs={safeJobs}
-      shopInfo={shopInfo}
-    />
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <TodaysJobsSection jobs={todayJobs} shopInfo={shopInfo} />
+      <QueueSection jobs={queuedJobs} shopInfo={shopInfo} />
+    </div>
   );
 }
 
@@ -209,7 +233,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Today's Jobs Table — streams in via Suspense after stats render */}
-      <Suspense fallback={<JobsTableSkeleton />}>
+      <Suspense fallback={<DashboardSkeleton />}>
         <DashboardJobsTable
           laundromatId={laundromat.id}
           todayPH={todayPH}
