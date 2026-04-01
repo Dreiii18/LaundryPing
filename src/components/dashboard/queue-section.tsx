@@ -33,6 +33,7 @@ export function QueueSection({ jobs, shopInfo }: QueueSectionProps) {
       cashTendered: job.cash_tendered,
       isPaid: job.is_paid,
       paymentMethod: job.payment_method,
+      paperSize: shopInfo.receiptPaperSize,
     });
   }, [shopInfo]);
 

@@ -5,6 +5,7 @@ export interface SettingsFormProps {
   initialServicePrices: Record<string, number>;
   initialRushFee: number;
   initialContactNumber: string;
+  initialReceiptPaperSize: '58mm' | '80mm';
 }
 
 export interface ServicesManagerProps {

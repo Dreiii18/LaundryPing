@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Save, CheckCircle } from 'lucide-react';
 import { useSettingsForm } from './use-settings-form';
 import { ServicesManager } from './services-manager';
@@ -21,6 +22,8 @@ export function SettingsForm(props: SettingsFormProps) {
     servicePrices,
     rushFee,
     setRushFee,
+    receiptPaperSize,
+    setReceiptPaperSize,
     newService,
     setNewService,
     newServicePrice,
@@ -82,6 +85,22 @@ export function SettingsForm(props: SettingsFormProps) {
             className="h-12 min-h-11"
           />
           <p className="text-xs text-slate-400 mt-1">Shown on printed receipts</p>
+        </div>
+
+        <div>
+          <Label htmlFor="receipt-paper-size" className="text-sm font-semibold text-slate-700 mb-2">
+            Receipt Paper Size
+          </Label>
+          <Select value={receiptPaperSize} onValueChange={(val: '58mm' | '80mm') => setReceiptPaperSize(val)}>
+            <SelectTrigger id="receipt-paper-size" className="w-48 h-12 mt-2">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="58mm">58mm (small)</SelectItem>
+              <SelectItem value="80mm">80mm (standard)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-slate-400 mt-1">Paper width of your thermal receipt printer</p>
         </div>
 
         <div>

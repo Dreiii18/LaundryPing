@@ -39,7 +39,7 @@ async function DashboardJobsTable({
 }: {
   laundromatId: string;
   todayPH: string;
-  shopInfo: { name: string; address: string | null; contactNumber: string | null; servicePrices: Record<string, number> };
+  shopInfo: { name: string; address: string | null; contactNumber: string | null; servicePrices: Record<string, number>; receiptPaperSize: '58mm' | '80mm' };
 }) {
   const supabase = await createClient();
   // WARNING: this query must run after mark_overdue_jobs has committed — it needs to see
@@ -242,6 +242,7 @@ export default async function DashboardPage() {
             address: laundromat.address,
             contactNumber: laundromat.contact_number,
             servicePrices: laundromat.service_prices || {},
+            receiptPaperSize: laundromat.receipt_paper_size ?? '58mm',
           }}
         />
       </Suspense>

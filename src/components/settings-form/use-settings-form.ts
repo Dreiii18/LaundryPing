@@ -20,6 +20,7 @@ export function useSettingsForm({
   initialServicePrices,
   initialRushFee,
   initialContactNumber,
+  initialReceiptPaperSize,
 }: SettingsFormProps) {
   const router = useRouter();
   const [, startTransition] = useTransition();
@@ -31,6 +32,7 @@ export function useSettingsForm({
   const [servicePrices, setServicePrices] = useState<Record<string, number>>(initialServicePrices);
   const [rushFee, setRushFee] = useState(initialRushFee.toString());
   const [newService, setNewService] = useState('');
+  const [receiptPaperSize, setReceiptPaperSize] = useState<'58mm' | '80mm'>(initialReceiptPaperSize);
   const [newServicePrice, setNewServicePrice] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -40,7 +42,8 @@ export function useSettingsForm({
     contactNumber !== initialContactNumber ||
     JSON.stringify(services) !== JSON.stringify(initialServices) ||
     !pricesEqual(servicePrices, initialServicePrices) ||
-    (parseFloat(rushFee) || 0) !== initialRushFee;
+    (parseFloat(rushFee) || 0) !== initialRushFee ||
+    receiptPaperSize !== initialReceiptPaperSize;
 
   const addService = useCallback(() => {
     const trimmed = newService.trim();
@@ -102,6 +105,7 @@ export function useSettingsForm({
           available_services: services,
           service_prices: servicePrices,
           rush_fee: parseFloat(rushFee) || 0,
+          receipt_paper_size: receiptPaperSize,
         }),
       });
 
@@ -122,7 +126,7 @@ export function useSettingsForm({
     } finally {
       setSaving(false);
     }
-  }, [name, address, contactNumber, services, servicePrices, rushFee, router, startTransition]);
+  }, [name, address, contactNumber, services, servicePrices, rushFee, receiptPaperSize, router, startTransition]);
 
   return {
     name,
@@ -135,6 +139,8 @@ export function useSettingsForm({
     servicePrices,
     rushFee,
     setRushFee,
+    receiptPaperSize,
+    setReceiptPaperSize,
     newService,
     setNewService,
     newServicePrice,

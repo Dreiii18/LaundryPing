@@ -43,6 +43,7 @@ export interface ShopInfo {
   address: string | null;
   contactNumber: string | null;
   servicePrices: Record<string, number>;
+  receiptPaperSize: '58mm' | '80mm';
 }
 
 export interface JobsTableProps {
