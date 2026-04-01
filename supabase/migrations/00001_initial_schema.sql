@@ -26,6 +26,7 @@ CREATE TABLE laundromats (
   service_prices JSONB NOT NULL DEFAULT '{}'::jsonb,
   rush_fee NUMERIC(10,2) NOT NULL DEFAULT 0 CHECK (rush_fee >= 0),
   contact_number TEXT DEFAULT NULL,
+  receipt_paper_size TEXT NOT NULL DEFAULT '58mm' CHECK (receipt_paper_size IN ('58mm', '80mm')),
   CONSTRAINT laundromats_user_id_unique UNIQUE (user_id),
   CONSTRAINT chk_sms_free_credits CHECK (sms_free_credits >= 0 AND sms_free_credits <= 50),
   CONSTRAINT chk_sms_paid_credits CHECK (sms_paid_credits >= 0)

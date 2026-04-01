@@ -40,6 +40,7 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
       cashTendered: job.cash_tendered,
       isPaid: job.is_paid,
       paymentMethod: job.payment_method,
+      paperSize: shopInfo.receiptPaperSize,
     });
   }, [shopInfo]);
 

@@ -22,6 +22,7 @@ export interface Database {
           service_prices: Record<string, number>;
           rush_fee: number;
           contact_number: string | null;
+          receipt_paper_size: '58mm' | '80mm';
           created_at: string;
           updated_at: string;
         };
@@ -37,6 +38,7 @@ export interface Database {
           service_prices?: Record<string, number>;
           rush_fee?: number;
           contact_number?: string | null;
+          receipt_paper_size?: '58mm' | '80mm';
           created_at?: string;
           updated_at?: string;
         };
@@ -52,6 +54,7 @@ export interface Database {
           service_prices?: Record<string, number>;
           rush_fee?: number;
           contact_number?: string | null;
+          receipt_paper_size?: '58mm' | '80mm';
           created_at?: string;
           updated_at?: string;
         };

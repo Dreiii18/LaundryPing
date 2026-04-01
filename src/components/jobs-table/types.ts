@@ -38,12 +38,8 @@ export interface Job {
   } | null;
 }
 
-export interface ShopInfo {
-  name: string;
-  address: string | null;
-  contactNumber: string | null;
-  servicePrices: Record<string, number>;
-}
+import type { ShopInfo } from '@/types/shop';
+export type { ShopInfo };
 
 export interface JobsTableProps {
   jobs: Job[];

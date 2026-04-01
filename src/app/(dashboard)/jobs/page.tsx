@@ -163,6 +163,7 @@ export default async function JobsPage({
         address: laundromat.address,
         contactNumber: laundromat.contact_number,
         servicePrices: laundromat.service_prices || {},
+        receiptPaperSize: laundromat.receipt_paper_size ?? '58mm',
       }}
     />
   );

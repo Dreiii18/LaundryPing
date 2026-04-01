@@ -34,6 +34,7 @@ export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
       cashTendered: job.cash_tendered,
       isPaid: job.is_paid,
       paymentMethod: job.payment_method,
+      paperSize: shopInfo.receiptPaperSize,
     });
   }, [shopInfo]);
 
