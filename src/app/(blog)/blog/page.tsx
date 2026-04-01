@@ -3,8 +3,17 @@ import Link from 'next/link';
 import { supabaseAdmin } from '@/lib/supabase/admin';
 
 export const metadata: Metadata = {
-  title: 'Blog | LaundryPing',
-  description: 'Tips, updates, and guides for Philippine laundromats',
+  title: 'Blog',
+  description:
+    'Tips, updates, and guides for Philippine laundromats using LaundryPing SMS notifications.',
+  openGraph: {
+    title: 'LaundryPing Blog',
+    description:
+      'Tips, updates, and guides for Philippine laundromats using LaundryPing SMS notifications.',
+    url: '/blog',
+    type: 'website',
+  },
+  alternates: { canonical: '/blog' },
 };
 
 export default async function BlogPage() {

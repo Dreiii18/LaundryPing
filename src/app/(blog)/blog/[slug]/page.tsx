@@ -15,7 +15,7 @@ export async function generateMetadata({
   const { slug } = await params;
   const { data: post, error } = await supabaseAdmin
     .from('blog_posts')
-    .select('title, description')
+    .select('title, description, author, created_at, updated_at')
     .eq('slug', slug)
     .eq('published', true)
     .single();
@@ -24,10 +24,22 @@ export async function generateMetadata({
   if (!post) return { title: 'Post Not Found' };
 
   return {
-    title: `${post.title} | LaundryPing Blog`,
+    title: post.title,
     description: post.description,
+    openGraph: {
+      title: post.title,
+      description: post.description,
+      type: 'article',
+      publishedTime: post.created_at,
+      modifiedTime: post.updated_at,
+      authors: post.author ? [post.author] : undefined,
+      url: `/blog/${slug}`,
+    },
+    alternates: { canonical: `/blog/${slug}` },
   };
 }
+
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://laundryping.com';
 
 export default async function BlogPostPage({ params }: BlogPostPageProps) {
   const { slug } = await params;
@@ -43,8 +55,37 @@ export default async function BlogPostPage({ params }: BlogPostPageProps) {
     notFound();
   }
 
+  const articleJsonLd = {
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    description: post.description,
+    author: {
+      '@type': 'Person',
+      name: post.author || 'LaundryPing',
+    },
+    datePublished: post.created_at,
+    dateModified: post.updated_at,
+    publisher: {
+      '@type': 'Organization',
+      name: 'LaundryPing',
+      logo: {
+        '@type': 'ImageObject',
+        url: `${siteUrl}/laundryping-logo.png`,
+      },
+    },
+    mainEntityOfPage: {
+      '@type': 'WebPage',
+      '@id': `${siteUrl}/blog/${slug}`,
+    },
+  };
+
   return (
     <article className="space-y-8">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(articleJsonLd) }}
+      />
       <Link
         href="/blog"
         className="inline-flex items-center gap-1 text-sm text-[#0d968b] hover:underline"
