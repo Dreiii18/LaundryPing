@@ -38,13 +38,8 @@ export interface Job {
   } | null;
 }
 
-export interface ShopInfo {
-  name: string;
-  address: string | null;
-  contactNumber: string | null;
-  servicePrices: Record<string, number>;
-  receiptPaperSize: '58mm' | '80mm';
-}
+import type { ShopInfo } from '@/types/shop';
+export type { ShopInfo };
 
 export interface JobsTableProps {
   jobs: Job[];

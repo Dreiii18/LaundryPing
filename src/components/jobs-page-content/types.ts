@@ -3,13 +3,8 @@ export interface Machine {
   label: string;
 }
 
-export interface ShopInfo {
-  name: string;
-  address: string | null;
-  contactNumber: string | null;
-  servicePrices: Record<string, number>;
-  receiptPaperSize: '58mm' | '80mm';
-}
+import type { ShopInfo } from '@/types/shop';
+export type { ShopInfo };
 
 export interface CurrentFilters {
   status: string;

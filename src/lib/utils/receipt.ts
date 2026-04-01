@@ -1,5 +1,5 @@
 /**
- * Generates receipt HTML for thermal printing (48mm print width / 58mm paper).
+ * Generates receipt HTML for thermal printing (58mm or 80mm paper).
  * Uses a hidden iframe and triggers window.print().
  */
 import { escapeHtml } from '@/lib/utils/sanitize';
@@ -22,8 +22,8 @@ interface ReceiptData {
 }
 
 const PAPER_CONFIG = {
-  '58mm': { pageWidth: '58mm', printWidth: '48mm', fontSize: '11px', shopNameSize: '13px', totalSize: '12px', sectionTitleSize: '10px', footerSize: '10px', paidStampSize: '14px' },
-  '80mm': { pageWidth: '80mm', printWidth: '72mm', fontSize: '13px', shopNameSize: '16px', totalSize: '14px', sectionTitleSize: '12px', footerSize: '12px', paidStampSize: '16px' },
+  '58mm': { pageWidth: '58mm', printWidth: '48mm', fontSize: '11px', shopNameSize: '13px', totalSize: '12px', sectionTitleSize: '10px', footerSize: '10px', paidStampSize: '14px', signatureLabelSize: '9px', signatureLineWidth: '70%' },
+  '80mm': { pageWidth: '80mm', printWidth: '72mm', fontSize: '13px', shopNameSize: '16px', totalSize: '14px', sectionTitleSize: '12px', footerSize: '12px', paidStampSize: '16px', signatureLabelSize: '11px', signatureLineWidth: '60%' },
 } as const;
 
 const PAYMENT_METHOD_LABELS: Record<string, string> = {
@@ -183,7 +183,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
   }
   .signature-line {
     display: inline-block;
-    width: 70%;
+    width: ${cfg.signatureLineWidth};
     border-bottom: 1px solid #000;
     margin-bottom: 2px;
   }
@@ -258,7 +258,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <div style="padding-top:16px;">
       <span class="signature-line"></span>
     </div>
-    <div style="font-size:9px;">(Staff Signature)</div>
+    <div style="font-size:${cfg.signatureLabelSize};">(Staff Signature)</div>
   </div>
 
   <div class="divider"></div>

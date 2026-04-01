@@ -8,6 +8,7 @@ import { TodaysJobsSection } from '@/components/dashboard/todays-jobs-section';
 import { QueueSection } from '@/components/dashboard/queue-section';
 import { OnboardingBanner } from '@/components/onboarding-banner';
 import { createClient } from '@/lib/supabase/server';
+import type { ShopInfo } from '@/types/shop';
 
 function DashboardSkeleton() {
   return (
@@ -39,7 +40,7 @@ async function DashboardJobsTable({
 }: {
   laundromatId: string;
   todayPH: string;
-  shopInfo: { name: string; address: string | null; contactNumber: string | null; servicePrices: Record<string, number>; receiptPaperSize: '58mm' | '80mm' };
+  shopInfo: ShopInfo;
 }) {
   const supabase = await createClient();
   // WARNING: this query must run after mark_overdue_jobs has committed — it needs to see
