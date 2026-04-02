@@ -39,8 +39,8 @@ export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
   }, [shopInfo]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden">
-      <div className="px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
+    <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden md:flex md:flex-col md:min-h-0">
+      <div className="shrink-0 px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
         <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
         <div className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
@@ -55,7 +55,7 @@ export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
           description="Click &quot;Start new job&quot; in the top bar to get started with your first laundry job."
         />
       ) : (
-        <div className="p-3 space-y-2">
+        <div className="p-3 space-y-2 max-h-[70vh] overflow-y-auto md:max-h-none md:flex-1 md:min-h-0 md:overflow-y-auto">
           {jobs.map((job) => (
             <TodaysJobsCard
               key={job.id}
