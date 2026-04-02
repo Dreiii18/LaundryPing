@@ -120,7 +120,7 @@ async function DashboardJobsTable({
     .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
       <TodaysJobsSection jobs={todayJobs} shopInfo={shopInfo} />
       <QueueSection jobs={queuedJobs} shopInfo={shopInfo} />
     </div>
@@ -197,7 +197,7 @@ export default async function DashboardPage() {
     .reduce((sum, j) => sum + Number(j.pay_amount), 0);
 
   return (
-    <div className="space-y-6">
+    <div className="flex flex-col gap-6 md:h-full">
       {/* Onboarding Banner - only when no machines */}
       {hasNoMachines && <OnboardingBanner />}
 
@@ -205,7 +205,7 @@ export default async function DashboardPage() {
       <SmsQuotaWarning totalCredits={totalCredits} />
 
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="shrink-0 grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* Jobs Completed Today */}
         <StatCardWithTrend
           label="Jobs completed today"
