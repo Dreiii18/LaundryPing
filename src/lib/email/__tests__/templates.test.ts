@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildTopupConfirmationEmail, buildPasswordResetEmail } from '../templates';
+import { buildTopupConfirmationEmail, buildPasswordResetEmail, buildNewSignupEmail, buildDailyPulseEmail } from '../templates';
 
 const sampleData = {
   laundromatName: 'Sparkle Clean Laundry',
@@ -64,6 +64,65 @@ describe('buildTopupConfirmationEmail', () => {
   });
 });
 
+describe('buildNewSignupEmail', () => {
+  const sampleSignupData = {
+    shopName: 'Sparkle Clean',
+    email: 'owner@sparkle.com',
+    signupTimestamp: 'April 1, 2026 at 10:00 AM',
+  };
+
+  it('returns an object with subject and html', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result).toHaveProperty('subject');
+    expect(result).toHaveProperty('html');
+    expect(typeof result.subject).toBe('string');
+    expect(typeof result.html).toBe('string');
+  });
+
+  it('subject contains the shop name', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result.subject).toBe('New Signup: Sparkle Clean');
+  });
+
+  it('html contains the shop name', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result.html).toContain('Sparkle Clean');
+  });
+
+  it('html contains the email', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result.html).toContain('owner@sparkle.com');
+  });
+
+  it('html contains the signup timestamp', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result.html).toContain('April 1, 2026 at 10:00 AM');
+  });
+
+  it('html contains branding color #0d968b', () => {
+    const result = buildNewSignupEmail(sampleSignupData);
+    expect(result.html).toContain('#0d968b');
+  });
+
+  it('escapes HTML in shop name', () => {
+    const result = buildNewSignupEmail({
+      ...sampleSignupData,
+      shopName: '<script>alert("xss")</script>',
+    });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in email', () => {
+    const result = buildNewSignupEmail({
+      ...sampleSignupData,
+      email: '<img src=x onerror=alert(1)>@evil.com',
+    });
+    expect(result.html).not.toContain('<img');
+    expect(result.html).toContain('&lt;img');
+  });
+});
+
 describe('buildPasswordResetEmail', () => {
   const resetLink = 'https://laundryping.com/api/auth/callback?next=/reset-password&token=abc123';
 
@@ -112,5 +171,113 @@ describe('buildPasswordResetEmail', () => {
     });
     expect(result.html).not.toContain('<script>');
     expect(result.html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('buildDailyPulseEmail', () => {
+  const samplePulseData = {
+    date: 'March 31, 2026',
+    activeShopsYesterday: 3,
+    totalShops: 10,
+    jobsYesterday: 42,
+    smsSent: 38,
+    smsFailed: 2,
+    inactiveShops: [
+      { name: 'Suds & Bubbles', daysSinceActive: 5 },
+      { name: 'Fresh Press Laundry', daysSinceActive: null },
+    ],
+    zeroCreditsShops: [{ name: 'Coin Wash Express' }],
+  };
+
+  it('returns an object with subject and html', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result).toHaveProperty('subject');
+    expect(result).toHaveProperty('html');
+    expect(typeof result.subject).toBe('string');
+    expect(typeof result.html).toBe('string');
+  });
+
+  it('subject contains the date', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.subject).toContain('March 31, 2026');
+    expect(result.subject).toBe('LaundryPing Daily Pulse — March 31, 2026');
+  });
+
+  it('html contains active shops count', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('3 / 10');
+  });
+
+  it('html contains jobs count', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('42');
+  });
+
+  it('html contains SMS sent count', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('38');
+  });
+
+  it('html contains SMS failed count', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('2');
+  });
+
+  it('html uses red color for non-zero SMS failed', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('#ef4444');
+  });
+
+  it('html does NOT use red color for SMS failed when count is zero', () => {
+    // When smsFailed is 0 and no zero-credits shops, #ef4444 should not appear at all
+    const resultNoAlerts = buildDailyPulseEmail({
+      ...samplePulseData,
+      smsFailed: 0,
+      zeroCreditsShops: [],
+    });
+    expect(resultNoAlerts.html).not.toContain('#ef4444');
+  });
+
+  it('html contains inactive shop names when provided', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('Suds &amp; Bubbles');
+    expect(result.html).toContain('Fresh Press Laundry');
+  });
+
+  it('html shows "Never active" for inactive shop with null daysSinceActive', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('Never active');
+  });
+
+  it('html contains zero-credits shop names when provided', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('Coin Wash Express');
+  });
+
+  it('html does NOT contain inactive section when list is empty', () => {
+    const result = buildDailyPulseEmail({ ...samplePulseData, inactiveShops: [] });
+    expect(result.html).not.toContain('Inactive Shops (3+ days)');
+  });
+
+  it('html does NOT contain zero-credits section when list is empty', () => {
+    const result = buildDailyPulseEmail({ ...samplePulseData, zeroCreditsShops: [] });
+    expect(result.html).not.toContain('Shops with 0 Credits');
+  });
+
+  it('html contains branding color #0d968b', () => {
+    const result = buildDailyPulseEmail(samplePulseData);
+    expect(result.html).toContain('#0d968b');
+  });
+
+  it('escapes HTML in shop names', () => {
+    const result = buildDailyPulseEmail({
+      ...samplePulseData,
+      inactiveShops: [{ name: '<script>alert("xss")</script>', daysSinceActive: 4 }],
+      zeroCreditsShops: [{ name: '<img src=x onerror=alert(1)>' }],
+    });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+    expect(result.html).not.toContain('<img src=x');
+    expect(result.html).toContain('&lt;img');
   });
 });

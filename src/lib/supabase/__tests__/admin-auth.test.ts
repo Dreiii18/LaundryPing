@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import type { User } from '@supabase/supabase-js';
-import { isAdmin } from '../admin-auth';
+import { isAdmin, getAdminEmailList } from '../admin-auth';
 
 // ---------------------------------------------------------------------------
 // Helper
@@ -86,5 +86,55 @@ describe('isAdmin', () => {
     process.env.ADMIN_EMAILS = 'admin@example.com';
 
     expect(isAdmin(makeUser(undefined))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// getAdminEmailList
+// ---------------------------------------------------------------------------
+
+describe('getAdminEmailList', () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    delete process.env.ADMIN_EMAILS;
+    delete process.env.ADMIN_EMAIL;
+  });
+
+  it('returns emails from ADMIN_EMAILS', () => {
+    process.env.ADMIN_EMAILS = 'admin@example.com,other@example.com';
+
+    expect(getAdminEmailList()).toEqual(['admin@example.com', 'other@example.com']);
+  });
+
+  it('returns lowercase emails', () => {
+    process.env.ADMIN_EMAILS = 'Admin@Example.COM,Super@Example.COM';
+
+    expect(getAdminEmailList()).toEqual(['admin@example.com', 'super@example.com']);
+  });
+
+  it('handles whitespace in a comma-separated list', () => {
+    process.env.ADMIN_EMAILS = ' admin@example.com , super@example.com ';
+
+    expect(getAdminEmailList()).toEqual(['admin@example.com', 'super@example.com']);
+  });
+
+  it('falls back to ADMIN_EMAIL when ADMIN_EMAILS is not set', () => {
+    delete process.env.ADMIN_EMAILS;
+    process.env.ADMIN_EMAIL = 'fallback@example.com';
+
+    expect(getAdminEmailList()).toEqual(['fallback@example.com']);
+  });
+
+  it('returns empty array when no env var is set', () => {
+    delete process.env.ADMIN_EMAILS;
+    delete process.env.ADMIN_EMAIL;
+
+    expect(getAdminEmailList()).toEqual([]);
+  });
+
+  it('filters out empty strings from the result', () => {
+    process.env.ADMIN_EMAILS = 'admin@example.com,,other@example.com,';
+
+    expect(getAdminEmailList()).toEqual(['admin@example.com', 'other@example.com']);
   });
 });
