@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { sanitizeLaundromatName } from '@/lib/utils/sanitize';
+import { sendEmail } from '@/lib/email/provider';
+import { buildNewSignupEmail } from '@/lib/email/templates';
+import { getAdminEmailList } from '@/lib/supabase/admin-auth';
 
 const signupSchema = z.object({
   email: z.string().email('Please enter a valid email address'),
@@ -55,6 +58,36 @@ export async function POST(request: Request) {
         { error: 'An account with this email already exists' },
         { status: 400 }
       );
+    }
+
+    // Fire-and-forget: notify admins of new signup
+    try {
+      const adminEmails = getAdminEmailList();
+      if (adminEmails.length > 0) {
+        const phTimestamp = new Date().toLocaleString('en-US', {
+          timeZone: 'Asia/Manila',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        });
+        const { subject, html } = buildNewSignupEmail({
+          shopName: sanitizedShopName,
+          email,
+          signupTimestamp: phTimestamp,
+        });
+        Promise.all(
+          adminEmails.map((adminEmail) =>
+            sendEmail({ to: adminEmail, subject, html }).catch((err) =>
+              console.error('Signup notification email error:', err)
+            )
+          )
+        ).catch((err) => console.error('Signup notification emails failed:', err));
+      }
+    } catch (emailErr) {
+      console.error('Signup notification error:', emailErr);
     }
 
     return NextResponse.json(
