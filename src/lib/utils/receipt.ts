@@ -142,6 +142,7 @@ export function generateReceiptHtml(data: ReceiptData): string {
     margin: 0;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
+  html { width: ${cfg.printWidth}; height: auto; }
   body {
     font-family: 'Courier New', Courier, monospace;
     font-size: ${cfg.fontSize};
@@ -188,7 +189,17 @@ export function generateReceiptHtml(data: ReceiptData): string {
     margin-bottom: 2px;
   }
   @media print {
-    body { width: ${cfg.printWidth}; }
+    html, body {
+      width: ${cfg.printWidth};
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+    }
+    body {
+      padding: 4mm 2mm;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
   }
 </style>
 </head>
@@ -275,25 +286,21 @@ export function generateReceiptHtml(data: ReceiptData): string {
 export function printReceipt(data: ReceiptData): void {
   const html = generateReceiptHtml(data);
   const iframe = document.createElement('iframe');
-  iframe.style.display = 'none';
-  iframe.setAttribute('sandbox', 'allow-modals allow-same-origin');
+  iframe.style.position = 'fixed';
+  iframe.style.width = '0';
+  iframe.style.height = '0';
+  iframe.style.border = '0';
+  iframe.style.top = '0';
+  iframe.style.left = '0';
+  iframe.onload = () => {
+    // Guard: skip the initial about:blank load — only print once srcdoc has rendered
+    if (!iframe.contentWindow || !iframe.contentDocument?.title) return;
+    iframe.contentWindow.onafterprint = () => iframe.remove();
+    iframe.contentWindow.focus();
+    iframe.contentWindow.print();
+  };
+  iframe.srcdoc = html;
   document.body.appendChild(iframe);
-  const doc = iframe.contentDocument || iframe.contentWindow?.document;
-  if (!doc) {
-    iframe.remove();
-    return;
-  }
-  const cleanup = () => setTimeout(() => iframe.remove(), 500);
-  doc.open();
-  doc.write(html);
-  doc.close();
-  // Print after brief delay to ensure content is rendered
-  setTimeout(() => {
-    if (iframe.contentWindow) {
-      iframe.contentWindow.onafterprint = cleanup;
-    }
-    iframe.contentWindow?.print();
-    // Fallback cleanup if onafterprint doesn't fire
-    setTimeout(() => { if (iframe.parentNode) iframe.remove(); }, 5000);
-  }, 100);
+  // Fallback cleanup if onafterprint doesn't fire or onload never triggers
+  setTimeout(() => { if (iframe.parentNode) iframe.remove(); }, 10000);
 }
