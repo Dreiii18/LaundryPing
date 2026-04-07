@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2, Printer, MessageSquare } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
@@ -59,40 +60,7 @@ export function TodaysJobsCard({
 
   // Compact row for completed/cancelled jobs
   if (!isActive) {
-    const isCancelled = job.status === 'cancelled';
-    return (
-      <div className={`flex items-center gap-3 rounded-lg border border-slate-100 border-l-4 ${borderColor} px-3 py-2 ${isCancelled ? 'opacity-50' : ''}`}>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-sm truncate ${isCancelled ? 'text-slate-400' : 'font-semibold text-slate-700'}`}>
-              {job.services.length > 0 ? job.services.join(', ') : '--'}
-            </span>
-            {amount && (
-              <span className={`text-xs shrink-0 ${isCancelled ? 'line-through text-slate-400' : job.is_paid ? 'text-[#0d968b]' : 'text-amber-600'}`}>
-                {amount}
-              </span>
-            )}
-            {isCancelled && (
-              <span className="text-xs text-slate-400 shrink-0">cancelled</span>
-            )}
-          </div>
-          <div className="text-xs text-slate-400 truncate">
-            {secondaryParts.join(' · ')} · {formatTime(job.started_at)}
-            {job.sms_sent && ' · SMS sent'}
-          </div>
-        </div>
-        {shopInfo && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onPrint(job)}
-            className="text-slate-300 hover:text-slate-500 h-7 w-7 p-0 shrink-0"
-          >
-            <Printer className="size-3.5" />
-          </Button>
-        )}
-      </div>
-    );
+    return <CompactJobRow job={job} shopInfo={shopInfo} amount={amount} borderColor={borderColor} secondaryParts={secondaryParts} onPrint={onPrint} formatTime={formatTime} />;
   }
 
   // Full card for active (in_progress) jobs
@@ -157,6 +125,67 @@ export function TodaysJobsCard({
             size="sm"
             onClick={() => onPrint(job)}
             className="text-slate-400 hover:text-slate-600 h-7 w-7 p-0 ml-auto"
+          >
+            <Printer className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function CompactJobRow({
+  job,
+  shopInfo,
+  amount,
+  borderColor,
+  secondaryParts,
+  onPrint,
+  formatTime: fmtTime,
+}: {
+  job: Job;
+  shopInfo?: ShopInfo;
+  amount: string | null;
+  borderColor: string;
+  secondaryParts: string[];
+  onPrint: (job: Job) => void;
+  formatTime: (dateStr: string) => string;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const isCancelled = job.status === 'cancelled';
+  const services = job.services.length > 0 ? job.services.join(', ') : '--';
+
+  return (
+    <div
+      onClick={() => setExpanded(!expanded)}
+      className={`rounded-lg border border-slate-100 border-l-4 ${borderColor} px-3 py-2 cursor-pointer ${isCancelled ? 'opacity-50' : ''}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm ${expanded ? '' : 'truncate'} ${isCancelled ? 'text-slate-400' : 'font-semibold text-slate-700'}`}>
+              {services}
+            </span>
+            {amount && (
+              <span className={`text-xs shrink-0 ${isCancelled ? 'line-through text-slate-400' : job.is_paid ? 'text-[#0d968b]' : 'text-amber-600'}`}>
+                {amount}
+              </span>
+            )}
+            {isCancelled && (
+              <span className="text-xs text-slate-400 shrink-0">cancelled</span>
+            )}
+          </div>
+          <div className={`text-xs text-slate-400 ${expanded ? '' : 'truncate'}`}>
+            {secondaryParts.join(' · ')} · {fmtTime(job.started_at)}
+            {job.sms_sent && ' · SMS sent'}
+          </div>
+        </div>
+        {shopInfo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={(e) => { e.stopPropagation(); onPrint(job); }}
+            className="text-slate-300 hover:text-slate-500 h-7 w-7 p-0 shrink-0"
           >
             <Printer className="size-3.5" />
           </Button>
