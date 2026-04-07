@@ -7,7 +7,7 @@ const createMachineSchema = z.object({
   label: z.string().min(1, 'Label is required').max(20, 'Label must be 20 characters or less'),
 });
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
     const { laundromat, supabase, error } = await getAuthenticatedUser();
 
@@ -18,12 +18,48 @@ export async function GET() {
       return NextResponse.json({ error: 'Laundromat not found' }, { status: 404 });
     }
 
-    const { data: machines, error: queryError } = await supabase
+    const { searchParams } = new URL(request.url);
+    const availableOnly = searchParams.get('available') === 'true';
+    const excludeJobId = searchParams.get('exclude_job');
+
+    if (excludeJobId && !z.string().uuid().safeParse(excludeJobId).success) {
+      return NextResponse.json({ error: 'Invalid exclude_job parameter' }, { status: 400 });
+    }
+
+    let query = supabase
       .from('machines')
       .select('*')
-      .eq('laundromat_id', laundromat.id)
-      .in('status', ['active', 'maintenance'])
-      .order('created_at', { ascending: true });
+      .eq('laundromat_id', laundromat.id);
+
+    if (availableOnly) {
+      query = query.eq('status', 'active');
+
+      let jobsQuery = supabase
+        .from('jobs')
+        .select('machine_id')
+        .eq('laundromat_id', laundromat.id)
+        .in('status', ['pending', 'in_progress'])
+        .not('machine_id', 'is', null);
+
+      if (excludeJobId) {
+        jobsQuery = jobsQuery.neq('id', excludeJobId);
+      }
+
+      const { data: busyJobs } = await jobsQuery;
+      const busyMachineIds = (busyJobs || [])
+        .map((j: { machine_id: string | null }) => j.machine_id)
+        .filter(Boolean) as string[];
+
+      if (busyMachineIds.length > 0) {
+        query = query.not('id', 'in', `(${busyMachineIds.join(',')})`);
+      }
+    } else {
+      query = query.in('status', ['active', 'maintenance']);
+    }
+
+    query = query.order('created_at', { ascending: true });
+
+    const { data: machines, error: queryError } = await query;
 
     if (queryError) {
       return NextResponse.json({ error: 'Failed to fetch machines' }, { status: 500 });
