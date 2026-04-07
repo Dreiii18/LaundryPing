@@ -2,7 +2,7 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Flame, Loader2, Printer, MessageSquare } from 'lucide-react';
+import { Flame, Loader2, Printer } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
 
 interface QueueCardProps {
@@ -26,85 +26,62 @@ export function QueueCard({
 }: QueueCardProps) {
   const isActionDisabled = completingId !== null || cancellingId !== null;
 
+  // Secondary info fragments
+  const secondaryParts: string[] = [];
+  if (job.claim_number != null) secondaryParts.push(`#${job.claim_number}`);
+  if (job.customer_name) secondaryParts.push(job.customer_name);
+  if (job.pay_amount != null) {
+    secondaryParts.push(`₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+  }
+
   return (
-    <div className="rounded-lg border border-slate-200 p-3 space-y-2">
-      {/* Row 1: Claim number + priority */}
-      <div className="flex items-center gap-2">
-        {job.claim_number != null ? (
-          <span className="inline-flex items-center justify-center size-7 rounded-full bg-teal-100 text-teal-700 text-xs font-bold">
-            #{job.claim_number}
-          </span>
-        ) : (
-          <span className="text-slate-400 italic text-xs">--</span>
-        )}
-        {job.priority === 'rush' ? (
-          <Badge className="bg-orange-100 text-orange-700 border-transparent gap-1 text-xs">
+    <div className={`rounded-lg border border-slate-200 border-l-4 ${job.priority === 'rush' ? 'border-l-orange-400' : 'border-l-blue-400'} p-3 space-y-2`}>
+      {/* Row 1: Service type (primary) + rush badge */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-sm font-bold text-slate-800">
+          {job.services.length > 0 ? job.services.join(', ') : '--'}
+        </span>
+        {job.priority === 'rush' && (
+          <Badge className="bg-orange-100 text-orange-700 border-transparent gap-1 text-xs shrink-0">
             <Flame className="size-3" aria-hidden="true" />
             Rush
           </Badge>
-        ) : (
-          <Badge className="bg-slate-100 text-slate-500 border-transparent text-xs">
-            Normal
-          </Badge>
         )}
       </div>
 
-      {/* Row 2: Customer + services */}
-      <div className="text-sm text-slate-600">
-        {job.customer_name && (
-          <span className="font-medium text-slate-700">{job.customer_name} · </span>
-        )}
-        {job.services.length > 0 ? job.services.join(', ') : '--'}
-      </div>
-
-      {/* SMS indicator */}
-      {(job.notify_sms || job.notify_queue_sms) && (
-        <div className="flex items-center gap-1 text-xs text-slate-400">
-          <MessageSquare className="size-3" />
-          {job.notify_queue_sms && job.notify_sms
-            ? 'Queue + Completion'
-            : 'Completion only'}
-        </div>
-      )}
-
-      {/* Row 3: Amount + actions */}
-      <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-slate-700">
-          {job.pay_amount != null
-            ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            : '--'}
+      {/* Row 2: Metadata + actions */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-slate-400 truncate">
+          {secondaryParts.join(' · ')}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <Button
-            variant="outline"
             size="sm"
             onClick={() => onAssign(job.id)}
             disabled={isActionDisabled}
-            className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 h-8 px-2.5"
+            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-7 px-3"
           >
             Assign
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
             onClick={() => onCancel(job.id)}
             disabled={isActionDisabled}
-            className="text-xs font-bold text-red-600 border-red-200 hover:bg-red-50 h-8 px-2.5"
+            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 px-1"
           >
             {cancellingId === job.id ? (
               <Loader2 className="size-3 animate-spin" />
             ) : (
               'Cancel'
             )}
-          </Button>
+          </button>
           {shopInfo && (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => onPrint(job)}
-              className="text-xs text-slate-500 border-slate-200 hover:bg-slate-50 h-8 px-2"
+              className="text-slate-400 hover:text-slate-600 h-7 w-7 p-0"
             >
-              <Printer className="size-3" />
+              <Printer className="size-3.5" />
             </Button>
           )}
         </div>
