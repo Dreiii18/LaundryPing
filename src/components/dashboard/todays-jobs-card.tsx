@@ -1,8 +1,7 @@
 'use client';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, Clock, CircleX, CircleAlert, Loader2, Printer, MessageSquare } from 'lucide-react';
+import { Loader2, Printer, MessageSquare } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
 
 interface TodaysJobsCardProps {
@@ -25,6 +24,18 @@ const formatTime = (dateStr: string) => {
   });
 };
 
+const formatAmount = (amount: number | null) => {
+  if (amount == null) return null;
+  return `₱${Number(amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+};
+
+const getBorderColor = (job: Job) => {
+  if (job.status === 'in_progress' && job.is_overdue) return 'border-l-red-500';
+  if (job.status === 'in_progress') return 'border-l-amber-400';
+  if (job.status === 'completed') return 'border-l-[#0d968b]';
+  return 'border-l-slate-200'; // cancelled — greyed out
+};
+
 export function TodaysJobsCard({
   job,
   shopInfo,
@@ -35,122 +46,121 @@ export function TodaysJobsCard({
   onPrint,
 }: TodaysJobsCardProps) {
   const isActionDisabled = completingId !== null || cancellingId !== null;
-  const isActive = ['in_progress'].includes(job.status);
+  const isActive = job.status === 'in_progress';
+  const borderColor = getBorderColor(job);
+  const amount = formatAmount(job.pay_amount);
 
-  return (
-    <div className="rounded-lg border border-slate-200 p-3 space-y-2">
-      {/* Row 1: Claim number + machine */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {job.claim_number != null ? (
-            <span className="inline-flex items-center justify-center size-7 rounded-full bg-teal-100 text-teal-700 text-xs font-bold">
-              #{job.claim_number}
+  // Secondary info fragments
+  const secondaryParts: string[] = [];
+  if (job.claim_number != null) secondaryParts.push(`#${job.claim_number}`);
+  if (job.machine) secondaryParts.push(job.machine.label);
+  else secondaryParts.push('No machine');
+  if (job.customer_name) secondaryParts.push(job.customer_name);
+
+  // Compact row for completed/cancelled jobs
+  if (!isActive) {
+    const isCancelled = job.status === 'cancelled';
+    return (
+      <div className={`flex items-center gap-3 rounded-lg border border-slate-100 border-l-4 ${borderColor} px-3 py-2 ${isCancelled ? 'opacity-50' : ''}`}>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm truncate ${isCancelled ? 'text-slate-400' : 'font-semibold text-slate-700'}`}>
+              {job.services.length > 0 ? job.services.join(', ') : '--'}
             </span>
-          ) : (
-            <span className="text-slate-400 italic text-xs">--</span>
-          )}
-          <span className="text-sm font-bold text-slate-700">
-            {job.machine ? job.machine.label : <span className="text-slate-400 italic font-normal">No machine</span>}
-          </span>
+            {amount && (
+              <span className={`text-xs shrink-0 ${isCancelled ? 'line-through text-slate-400' : job.is_paid ? 'text-[#0d968b]' : 'text-amber-600'}`}>
+                {amount}
+              </span>
+            )}
+            {isCancelled && (
+              <span className="text-xs text-slate-400 shrink-0">cancelled</span>
+            )}
+          </div>
+          <div className="text-xs text-slate-400 truncate">
+            {secondaryParts.join(' · ')} · {formatTime(job.started_at)}
+            {job.sms_sent && ' · SMS sent'}
+          </div>
         </div>
-        {job.customer_name && (
-          <span className="text-xs text-slate-400">{job.customer_name}</span>
+        {shopInfo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPrint(job)}
+            className="text-slate-300 hover:text-slate-500 h-7 w-7 p-0 shrink-0"
+          >
+            <Printer className="size-3.5" />
+          </Button>
+        )}
+      </div>
+    );
+  }
+
+  // Full card for active (in_progress) jobs
+  return (
+    <div className={`rounded-lg border border-slate-200 border-l-4 ${borderColor} p-3 space-y-2`}>
+      {/* Row 1: Service type (primary) + amount */}
+      <div className="flex items-center justify-between gap-2">
+        <span className="text-base font-bold text-slate-800">
+          {job.services.length > 0 ? job.services.join(', ') : '--'}
+        </span>
+        {amount && (
+          <span className={`text-xs shrink-0 ${job.is_paid ? 'text-[#0d968b]' : 'text-amber-600'}`}>
+            {amount} — {job.is_paid ? 'paid' : 'unpaid'}
+          </span>
         )}
       </div>
 
-      {/* Row 2: Services + amount */}
-      <div className="flex items-center justify-between text-sm">
-        <span className="text-slate-600">
-          {job.services.length > 0 ? job.services.join(', ') : '--'}
-        </span>
-        <span className="font-medium text-slate-700">
-          {job.pay_amount != null
-            ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-            : '--'}
-        </span>
+      {/* Row 2: Secondary info + time + SMS */}
+      <div className="flex items-center gap-1.5 text-xs text-slate-400 flex-wrap">
+        <span>{secondaryParts.join(' · ')}</span>
+        <span>·</span>
+        <span>{formatTime(job.started_at)}</span>
+        {job.sms_sent && (
+          <span className="flex items-center gap-0.5 text-[#0d968b]">
+            <MessageSquare className="size-3" />
+            Sent
+          </span>
+        )}
+        {job.is_overdue && (
+          <span className="text-red-600 font-medium">· Overdue</span>
+        )}
       </div>
 
-      {/* Row 3: Status + time + actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          {job.status === 'in_progress' && job.is_overdue ? (
-            <Badge className="bg-red-100 text-red-700 border-transparent gap-1 text-xs">
-              <CircleAlert className="size-3" aria-hidden="true" />
-              Overdue
-            </Badge>
-          ) : job.status === 'in_progress' ? (
-            <Badge className="bg-amber-100 text-amber-700 border-transparent gap-1 text-xs">
-              <Clock className="size-3" aria-hidden="true" />
-              In progress
-            </Badge>
-          ) : job.status === 'completed' ? (
-            <Badge className="bg-[#0d968b]/10 text-[#0d968b] border-transparent gap-1 text-xs">
-              <CheckCircle className="size-3" aria-hidden="true" />
-              Completed
-            </Badge>
+      {/* Row 3: Actions */}
+      <div className="flex items-center gap-2">
+        <Button
+          size="sm"
+          onClick={() => onMarkDone(job)}
+          disabled={isActionDisabled}
+          className="text-xs font-bold bg-[#0d968b] hover:bg-[#0b7f75] text-white h-8 px-4"
+        >
+          {completingId === job.id ? (
+            <Loader2 className="size-3 animate-spin" />
           ) : (
-            <Badge className="bg-slate-100 text-slate-500 border-transparent gap-1 text-xs">
-              <CircleX className="size-3" aria-hidden="true" />
-              Cancelled
-            </Badge>
+            'Done'
           )}
-          <span className="text-xs text-slate-400">
-            {formatTime(job.started_at)}
-          </span>
-          {job.sms_sent ? (
-            <span className="flex items-center gap-0.5 text-xs text-[#0d968b]">
-              <MessageSquare className="size-3" />
-              Sent
-            </span>
-          ) : job.notify_sms && job.status === 'in_progress' ? (
-            <span className="flex items-center gap-0.5 text-xs text-slate-400">
-              <MessageSquare className="size-3" />
-              On completion
-            </span>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-1.5">
-          {isActive && (
-            <>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onMarkDone(job)}
-                disabled={isActionDisabled}
-                className="text-xs font-bold text-[#0d968b] border-[#0d968b]/20 hover:bg-[#0d968b]/10 h-8 px-2.5"
-              >
-                {completingId === job.id ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  'Done'
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onCancel(job.id)}
-                disabled={isActionDisabled}
-                className="text-xs font-bold text-red-600 border-red-200 hover:bg-red-50 h-8 px-2.5"
-              >
-                {cancellingId === job.id ? (
-                  <Loader2 className="size-3 animate-spin" />
-                ) : (
-                  'Cancel'
-                )}
-              </Button>
-            </>
+        </Button>
+        <button
+          onClick={() => onCancel(job.id)}
+          disabled={isActionDisabled}
+          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 px-1"
+        >
+          {cancellingId === job.id ? (
+            <Loader2 className="size-3 animate-spin" />
+          ) : (
+            'Cancel'
           )}
-          {shopInfo && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onPrint(job)}
-              className="text-xs text-slate-500 border-slate-200 hover:bg-slate-50 h-8 px-2"
-            >
-              <Printer className="size-3" />
-            </Button>
-          )}
-        </div>
+        </button>
+        {shopInfo && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => onPrint(job)}
+            className="text-slate-400 hover:text-slate-600 h-7 w-7 p-0 ml-auto"
+          >
+            <Printer className="size-3.5" />
+          </Button>
+        )}
       </div>
     </div>
   );
