@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import {
   Table,
   TableBody,
@@ -10,6 +9,7 @@ import {
 } from '@/components/ui/table';
 import { EmptyState } from '@/components/empty-state';
 import { useJobActions } from './use-job-actions';
+import { useHandlePrint } from '@/hooks/use-handle-print';
 import { JobRow } from './job-row';
 import { OverdueDialog } from './overdue-dialog';
 import { CancelDialog } from './cancel-dialog';
@@ -22,27 +22,7 @@ export { type ShopInfo } from './types';
 
 export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }: JobsTableProps) {
   const actions = useJobActions(initialJobs);
-
-  const handlePrint = useCallback(async (job: Job) => {
-    if (!shopInfo) return;
-    const { printReceipt } = await import('@/lib/utils/receipt');
-    printReceipt({
-      shopName: shopInfo.name,
-      shopAddress: shopInfo.address,
-      shopContact: shopInfo.contactNumber,
-      claimNumber: job.claim_number,
-      date: job.started_at,
-      customerName: job.customer_name,
-      customerPhone: job.customer_phone_masked,
-      services: job.services,
-      servicePrices: shopInfo.servicePrices,
-      payAmount: job.pay_amount ?? 0,
-      cashTendered: job.cash_tendered,
-      isPaid: job.is_paid,
-      paymentMethod: job.payment_method,
-      paperSize: shopInfo.receiptPaperSize,
-    });
-  }, [shopInfo]);
+  const handlePrint = useHandlePrint(shopInfo);
 
   if (initialJobs.length === 0) {
     return (
