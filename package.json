@@ -1,6 +1,6 @@
 {
   "name": "laundryping",
-  "version": "1.9.8",
+  "version": "1.9.9",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -40,6 +40,7 @@
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/web-bluetooth": "^0.0.21",
     "@vitejs/plugin-react": "^5.1.4",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",

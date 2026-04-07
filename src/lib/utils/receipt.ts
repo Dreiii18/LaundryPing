@@ -4,7 +4,7 @@
  */
 import { escapeHtml } from '@/lib/utils/sanitize';
 
-interface ReceiptData {
+export interface ReceiptData {
   shopName: string;
   shopAddress: string | null;
   shopContact: string | null;
@@ -283,8 +283,30 @@ export function generateReceiptHtml(data: ReceiptData): string {
 </html>`;
 }
 
+function isMobile(): boolean {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export function printReceipt(data: ReceiptData): void {
   const html = generateReceiptHtml(data);
+
+  // Mobile browsers don't reliably support window.print() from iframes.
+  // Open the receipt in a new window instead so the print dialog/share sheet appears.
+  if (isMobile()) {
+    const win = window.open('', '_blank');
+    if (!win) return;
+    win.document.write(html);
+    win.document.close();
+    // Wait for content to render before printing
+    setTimeout(() => {
+      win.focus();
+      win.print();
+      // On mobile, the user closes the tab themselves after printing
+    }, 300);
+    return;
+  }
+
+  // Desktop: use hidden iframe approach (avoids navigating away from the app)
   const iframe = document.createElement('iframe');
   iframe.style.position = 'fixed';
   iframe.style.width = '0';

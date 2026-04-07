@@ -4,6 +4,7 @@ import { useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@/components/ui/button';
 import { Plus, Store, Menu } from 'lucide-react';
+import { PrinterStatus } from './printer-status';
 
 const StartJobModal = dynamic(
   () => import('./start-job-modal').then((m) => ({ default: m.StartJobModal })),
@@ -50,6 +51,7 @@ export function Topbar({ shopName, userInitials, isAdmin: isAdminUser }: TopbarP
             <Plus className="size-4" aria-hidden="true" />
             <span className="hidden sm:inline">Start new job</span>
           </Button>
+          <PrinterStatus />
           <div className="h-8 w-px bg-slate-200 hidden sm:block" />
           <div className="size-10 bg-[#0d968b]/20 text-[#0d968b] rounded-full flex items-center justify-center font-bold text-sm hidden sm:flex">
             {userInitials}
