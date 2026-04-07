@@ -145,20 +145,11 @@ export function useJobActions(jobs: Job[]) {
     setLoadingMachines(true);
 
     try {
-      const machinesRes = await fetchWithAuth('/api/machines');
+      const machinesRes = await fetchWithAuth(
+        `/api/machines?available=true&exclude_job=${jobId}`
+      );
       const machinesData = await machinesRes.json();
-
-      const activeMachineIds = new Set(
-        jobsRef.current
-          .filter((j) => ['pending', 'in_progress'].includes(j.status) && j.machine_id && j.id !== jobId)
-          .map((j) => j.machine_id as string)
-      );
-
-      const available = (machinesData.machines || []).filter(
-        (m: Machine) => !activeMachineIds.has(m.id)
-      );
-
-      setAvailableMachines(available);
+      setAvailableMachines(machinesData.machines || []);
     } catch {
       toast.error('Failed to load machines');
       setAssignJobId(null);
