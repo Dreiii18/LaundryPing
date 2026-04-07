@@ -3,6 +3,7 @@ import { isAdmin } from '@/lib/supabase/admin-auth';
 import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { Sidebar } from '@/components/sidebar';
 import { Topbar } from '@/components/topbar';
+import { PrinterProvider } from '@/components/printer-provider';
 
 export default async function DashboardLayout({
   children,
@@ -24,14 +25,16 @@ export default async function DashboardLayout({
   const adminUser = isAdmin(user);
 
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar isAdmin={adminUser} />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Topbar shopName={shopName} userInitials={userInitials} isAdmin={adminUser} />
-        <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background-light">
-          {children}
-        </main>
+    <PrinterProvider>
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar isAdmin={adminUser} />
+        <div className="flex-1 flex flex-col overflow-hidden">
+          <Topbar shopName={shopName} userInitials={userInitials} isAdmin={adminUser} />
+          <main className="flex-1 overflow-y-auto p-4 md:p-8 bg-background-light">
+            {children}
+          </main>
+        </div>
       </div>
-    </div>
+    </PrinterProvider>
   );
 }
