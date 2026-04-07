@@ -4,8 +4,7 @@ import { redirect } from 'next/navigation';
 import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
 import { StatCardWithTrend } from '@/components/dashboard/stat-card-with-trend';
-import { TodaysJobsSection } from '@/components/dashboard/todays-jobs-section';
-import { QueueSection } from '@/components/dashboard/queue-section';
+import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
 import { OnboardingBanner } from '@/components/onboarding-banner';
 import { createClient } from '@/lib/supabase/server';
 import type { ShopInfo } from '@/types/shop';
@@ -120,10 +119,7 @@ async function DashboardJobsTable({
     .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
-      <TodaysJobsSection jobs={todayJobs} shopInfo={shopInfo} />
-      <QueueSection jobs={queuedJobs} shopInfo={shopInfo} />
-    </div>
+    <DashboardTabs todayJobs={todayJobs} queuedJobs={queuedJobs} shopInfo={shopInfo} />
   );
 }
 

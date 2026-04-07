@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { ChevronDown, ChevronRight } from 'lucide-react';
 import { useJobActions } from '@/components/jobs-table/use-job-actions';
 import { useHandlePrint } from '@/hooks/use-handle-print';
 import { OverdueDialog } from '@/components/jobs-table/overdue-dialog';
@@ -12,21 +14,39 @@ import type { Job, ShopInfo } from '@/components/jobs-table/types';
 interface TodaysJobsSectionProps {
   jobs: Job[];
   shopInfo?: ShopInfo;
+  mobileTabMode?: boolean;
 }
 
-export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
+export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsSectionProps) {
   const actions = useJobActions(jobs);
   const handlePrint = useHandlePrint(shopInfo);
+  const [showCompleted, setShowCompleted] = useState(false);
+  const [showCancelled, setShowCancelled] = useState(false);
+
+  const activeJobs = jobs.filter((j) => j.status === 'in_progress');
+  const completedJobs = jobs.filter((j) => j.status === 'completed');
+  const cancelledJobs = jobs.filter((j) => j.status === 'cancelled');
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-[#0d968b]/10 overflow-hidden md:flex md:flex-col md:min-h-0">
-      <div className="shrink-0 px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
-        <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
-        <div className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
-          <span className="text-xs font-medium text-slate-500">Live</span>
+    <div className={`bg-white shadow-sm border border-[#0d968b]/10 overflow-hidden md:flex md:flex-col md:min-h-0 ${
+      mobileTabMode ? 'rounded-b-xl border-t-0' : 'rounded-xl'
+    }`}>
+      {!mobileTabMode && (
+        <div className="shrink-0 px-6 py-4 border-b border-[#0d968b]/5 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <h4 className="font-bold text-slate-800">Today&apos;s Jobs</h4>
+            {activeJobs.length > 0 && (
+              <span className="inline-flex items-center justify-center h-5 min-w-5 px-1.5 rounded-full bg-[#0d968b]/10 text-[#0d968b] text-xs font-bold">
+                {activeJobs.length}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
+            <span className="text-xs font-medium text-slate-500">Live</span>
+          </div>
         </div>
-      </div>
+      )}
 
       {jobs.length === 0 ? (
         <EmptyState
@@ -36,7 +56,7 @@ export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
         />
       ) : (
         <div className="p-3 space-y-2 max-h-[70vh] overflow-y-auto md:max-h-none md:flex-1 md:min-h-0 md:overflow-y-auto">
-          {jobs.map((job) => (
+          {activeJobs.map((job) => (
             <TodaysJobsCard
               key={job.id}
               job={job}
@@ -48,6 +68,62 @@ export function TodaysJobsSection({ jobs, shopInfo }: TodaysJobsSectionProps) {
               onPrint={handlePrint}
             />
           ))}
+
+          {completedJobs.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowCompleted(!showCompleted)}
+                className="flex items-center gap-1.5 w-full py-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showCompleted ? (
+                  <ChevronDown className="size-3.5" />
+                ) : (
+                  <ChevronRight className="size-3.5" />
+                )}
+                {completedJobs.length} completed
+              </button>
+              {showCompleted && completedJobs.map((job) => (
+                <TodaysJobsCard
+                  key={job.id}
+                  job={job}
+                  shopInfo={shopInfo}
+                  completingId={actions.completingId}
+                  cancellingId={actions.cancellingId}
+                  onMarkDone={actions.handleMarkDone}
+                  onCancel={actions.setCancelConfirmJobId}
+                  onPrint={handlePrint}
+                />
+              ))}
+            </>
+          )}
+
+          {cancelledJobs.length > 0 && (
+            <>
+              <button
+                onClick={() => setShowCancelled(!showCancelled)}
+                className="flex items-center gap-1.5 w-full py-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              >
+                {showCancelled ? (
+                  <ChevronDown className="size-3.5" />
+                ) : (
+                  <ChevronRight className="size-3.5" />
+                )}
+                {cancelledJobs.length} cancelled
+              </button>
+              {showCancelled && cancelledJobs.map((job) => (
+                <TodaysJobsCard
+                  key={job.id}
+                  job={job}
+                  shopInfo={shopInfo}
+                  completingId={actions.completingId}
+                  cancellingId={actions.cancellingId}
+                  onMarkDone={actions.handleMarkDone}
+                  onCancel={actions.setCancelConfirmJobId}
+                  onPrint={handlePrint}
+                />
+              ))}
+            </>
+          )}
         </div>
       )}
 
