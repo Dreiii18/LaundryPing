@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -21,7 +20,7 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
   const form = useStartJobForm(open, onOpenChange);
   const { step } = form;
 
-  const handleNext = useCallback(() => {
+  function handleNext() {
     form.setError('');
     const err = form.validateStep1();
     if (err) {
@@ -29,12 +28,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
       return;
     }
     form.setStep(2);
-  }, [form]);
+  }
 
-  const handleBack = useCallback(() => {
+  function handleBack() {
     form.setError('');
     form.setStep(1);
-  }, [form]);
+  }
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
