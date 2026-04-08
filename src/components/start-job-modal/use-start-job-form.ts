@@ -31,6 +31,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const [loading, setLoading] = useState(false);
   const [loadingMachines, setLoadingMachines] = useState(false);
   const [totalCredits, setTotalCredits] = useState<number | null>(null);
+  const [step, setStep] = useState<1 | 2>(1);
 
   const fetchMachines = useCallback(async () => {
     setLoadingMachines(true);
@@ -116,6 +117,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setError('');
       setLoading(false);
       setTotalCredits(null);
+      setStep(1);
       fetchMachines();
       fetchSmsCredits();
       fetchAvailableServices();
@@ -175,6 +177,16 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
     }
   }, [priceManuallyChanged, selectedServices, calculateTotal]);
+
+  const validateStep1 = useCallback((): string | null => {
+    if (selectedServices.length === 0) {
+      return 'Please select at least one service';
+    }
+    if (machines.length > 0 && !machineId) {
+      return 'Please select a machine';
+    }
+    return null;
+  }, [selectedServices, machines, machineId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -326,5 +338,10 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     handlePayAmountChange,
     resetToAutoPrice,
     handleSubmit,
+    // Step wizard support
+    step,
+    setStep,
+    validateStep1,
+    setError,
   };
 }

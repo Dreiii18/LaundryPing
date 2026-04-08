@@ -84,7 +84,7 @@ export function PaymentSection({
           <button
             type="button"
             onClick={() => { onSetIsPaid(true); onSetPaymentMethod(''); onSetCashTendered(''); }}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
               isPaid
                 ? 'bg-[#0d968b]/10 border-[#0d968b] text-[#0d968b]'
                 : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
@@ -95,7 +95,7 @@ export function PaymentSection({
           <button
             type="button"
             onClick={() => { onSetIsPaid(false); onSetPaymentMethod(''); onSetCashTendered(''); }}
-            className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
+            className={`flex-1 py-2 px-4 rounded-lg text-sm font-semibold border transition-colors outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 ${
               !isPaid
                 ? 'bg-amber-50 border-amber-400 text-amber-700'
                 : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
