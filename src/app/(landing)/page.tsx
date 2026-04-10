@@ -5,6 +5,7 @@ import { HowItWorks } from '@/components/landing/how-it-works';
 import { Features } from '@/components/landing/features';
 import { Pricing } from '@/components/landing/pricing';
 import { Faq } from '@/components/landing/faq';
+import { FAQ_ITEMS } from '@/components/landing/faq-data';
 import { FinalCta } from '@/components/landing/final-cta';
 import { Footer } from '@/components/landing/footer';
 
@@ -57,32 +58,14 @@ const jsonLd = [
   {
     '@context': 'https://schema.org',
     '@type': 'FAQPage',
-    mainEntity: [
-      {
-        '@type': 'Question',
-        name: 'Does the customer need an app?',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'No. It works with SMS, so any phone can receive messages.',
-        },
+    mainEntity: FAQ_ITEMS.map((item) => ({
+      '@type': 'Question',
+      name: item.question,
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: item.answer,
       },
-      {
-        '@type': 'Question',
-        name: 'How fast is the setup?',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: "Just a few minutes! Add your machines and you're ready to start.",
-        },
-      },
-      {
-        '@type': 'Question',
-        name: 'Can I upgrade?',
-        acceptedAnswer: {
-          '@type': 'Answer',
-          text: 'Yes! You can upgrade anytime without losing your data.',
-        },
-      },
-    ],
+    })),
   },
 ];
 
