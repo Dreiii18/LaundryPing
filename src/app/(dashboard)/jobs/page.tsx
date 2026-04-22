@@ -60,6 +60,8 @@ export default async function JobsPage({
       is_overdue,
       overdue_reason,
       services,
+      service_quantities,
+      total_weight,
       claim_number,
       customer_name,
       created_at,
@@ -134,6 +136,8 @@ export default async function JobsPage({
     is_overdue: job.is_overdue as boolean,
     overdue_reason: job.overdue_reason as string | null,
     services: (job.services || []) as string[],
+    service_quantities: (job.service_quantities as Record<string, number> | null) ?? null,
+    total_weight: job.total_weight as number | null,
     claim_number: job.claim_number as number | null,
     customer_name: job.customer_name as string | null,
     priority: (job.priority as 'normal' | 'rush') ?? 'normal',
@@ -163,6 +167,7 @@ export default async function JobsPage({
         address: laundromat.address,
         contactNumber: laundromat.contact_number,
         servicePrices: laundromat.service_prices || {},
+        serviceWeights: laundromat.service_weights || {},
         receiptPaperSize: laundromat.receipt_paper_size ?? '58mm',
       }}
     />

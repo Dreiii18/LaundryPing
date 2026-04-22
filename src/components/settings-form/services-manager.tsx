@@ -9,13 +9,17 @@ import type { ServicesManagerProps } from './types';
 export function ServicesManager({
   services,
   servicePrices,
+  serviceWeights,
   newService,
   newServicePrice,
+  newServiceWeight,
   onNewServiceChange,
   onNewServicePriceChange,
+  onNewServiceWeightChange,
   onAddService,
   onRemoveService,
   onUpdateServicePrice,
+  onUpdateServiceWeight,
 }: ServicesManagerProps) {
   return (
     <div className="flex flex-col gap-2 mt-2">
@@ -46,6 +50,21 @@ export function ServicesManager({
               className="h-8 pl-6 text-sm"
               aria-label={`Price for ${service}`}
             />
+          </div>
+          <div className="relative w-24">
+            <Input
+              type="number"
+              min="0"
+              step="0.1"
+              placeholder="0"
+              value={serviceWeights[service] || ''}
+              onChange={(e) => onUpdateServiceWeight(service, e.target.value)}
+              className="h-8 pr-7 text-sm"
+              aria-label={`Weight for ${service}`}
+            />
+            <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
+              kg
+            </span>
           </div>
         </div>
       ))}
@@ -84,6 +103,27 @@ export function ServicesManager({
               }
             }}
           />
+        </div>
+        <div className="relative w-24 shrink-0">
+          <Input
+            type="number"
+            min="0"
+            step="0.1"
+            placeholder="0"
+            value={newServiceWeight}
+            onChange={(e) => onNewServiceWeightChange(e.target.value)}
+            className="h-10 pr-7 text-sm"
+            aria-label="Weight for new service"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                onAddService();
+              }
+            }}
+          />
+          <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-medium">
+            kg
+          </span>
         </div>
         <Button
           type="button"

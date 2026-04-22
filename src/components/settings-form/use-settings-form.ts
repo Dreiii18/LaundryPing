@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import type { SettingsFormProps } from './types';
 
-function pricesEqual(a: Record<string, number>, b: Record<string, number>): boolean {
+function recordsEqual(a: Record<string, number>, b: Record<string, number>): boolean {
   const keysA = Object.keys(a);
   const keysB = Object.keys(b);
   if (keysA.length !== keysB.length) return false;
@@ -18,6 +18,7 @@ export function useSettingsForm({
   initialAddress,
   initialServices,
   initialServicePrices,
+  initialServiceWeights,
   initialRushFee,
   initialContactNumber,
   initialReceiptPaperSize,
@@ -30,10 +31,12 @@ export function useSettingsForm({
   const [contactNumber, setContactNumber] = useState(initialContactNumber);
   const [services, setServices] = useState<string[]>(initialServices);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>(initialServicePrices);
+  const [serviceWeights, setServiceWeights] = useState<Record<string, number>>(initialServiceWeights);
   const [rushFee, setRushFee] = useState(initialRushFee.toString());
   const [newService, setNewService] = useState('');
   const [receiptPaperSize, setReceiptPaperSize] = useState<'58mm' | '80mm'>(initialReceiptPaperSize);
   const [newServicePrice, setNewServicePrice] = useState('');
+  const [newServiceWeight, setNewServiceWeight] = useState('');
   const [saving, setSaving] = useState(false);
 
   const hasChanges =
@@ -41,7 +44,8 @@ export function useSettingsForm({
     address !== initialAddress ||
     contactNumber !== initialContactNumber ||
     JSON.stringify(services) !== JSON.stringify(initialServices) ||
-    !pricesEqual(servicePrices, initialServicePrices) ||
+    !recordsEqual(servicePrices, initialServicePrices) ||
+    !recordsEqual(serviceWeights, initialServiceWeights) ||
     (parseFloat(rushFee) || 0) !== initialRushFee ||
     receiptPaperSize !== initialReceiptPaperSize;
 
@@ -58,9 +62,11 @@ export function useSettingsForm({
     }
     setServices((prev) => [...prev, trimmed]);
     setServicePrices((prev) => ({ ...prev, [trimmed]: parseFloat(newServicePrice) || 0 }));
+    setServiceWeights((prev) => ({ ...prev, [trimmed]: parseFloat(newServiceWeight) || 0 }));
     setNewService('');
     setNewServicePrice('');
-  }, [newService, newServicePrice, services]);
+    setNewServiceWeight('');
+  }, [newService, newServicePrice, newServiceWeight, services]);
 
   const removeService = useCallback((index: number) => {
     if (services.length <= 1) {
@@ -72,11 +78,19 @@ export function useSettingsForm({
     setServicePrices((prev) =>
       Object.fromEntries(Object.entries(prev).filter(([key]) => key !== removedService))
     );
+    setServiceWeights((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => key !== removedService))
+    );
   }, [services]);
 
   const updateServicePrice = useCallback((service: string, price: string) => {
     const numPrice = parseFloat(price) || 0;
     setServicePrices((prev) => ({ ...prev, [service]: numPrice }));
+  }, []);
+
+  const updateServiceWeight = useCallback((service: string, weight: string) => {
+    const numWeight = parseFloat(weight) || 0;
+    setServiceWeights((prev) => ({ ...prev, [service]: numWeight }));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -104,6 +118,7 @@ export function useSettingsForm({
           contact_number: contactNumber.trim() || null,
           available_services: services,
           service_prices: servicePrices,
+          service_weights: serviceWeights,
           rush_fee: parseFloat(rushFee) || 0,
           receipt_paper_size: receiptPaperSize,
         }),
@@ -126,7 +141,7 @@ export function useSettingsForm({
     } finally {
       setSaving(false);
     }
-  }, [name, address, contactNumber, services, servicePrices, rushFee, receiptPaperSize, router, startTransition]);
+  }, [name, address, contactNumber, services, servicePrices, serviceWeights, rushFee, receiptPaperSize, router, startTransition]);
 
   return {
     name,
@@ -137,6 +152,7 @@ export function useSettingsForm({
     setContactNumber,
     services,
     servicePrices,
+    serviceWeights,
     rushFee,
     setRushFee,
     receiptPaperSize,
@@ -145,11 +161,14 @@ export function useSettingsForm({
     setNewService,
     newServicePrice,
     setNewServicePrice,
+    newServiceWeight,
+    setNewServiceWeight,
     saving,
     hasChanges,
     addService,
     removeService,
     updateServicePrice,
+    updateServiceWeight,
     handleSubmit,
   };
 }

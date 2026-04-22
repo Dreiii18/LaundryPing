@@ -10,6 +10,9 @@ const updateSettingsSchema = z.object({
   service_prices: z.record(z.string().min(1).max(50), z.number().min(0).max(99999))
     .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service prices')
     .optional(),
+  service_weights: z.record(z.string().min(1).max(50), z.number().min(0).max(9999))
+    .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service weights')
+    .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
   rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
   receipt_paper_size: z.enum(['58mm', '80mm']).optional(),
@@ -33,6 +36,7 @@ export async function GET() {
         address: laundromat.address,
         available_services: laundromat.available_services,
         service_prices: laundromat.service_prices,
+        service_weights: laundromat.service_weights,
         rush_fee: laundromat.rush_fee,
         contact_number: laundromat.contact_number,
         receipt_paper_size: laundromat.receipt_paper_size,
@@ -104,6 +108,15 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (parsed.data.service_weights !== undefined) {
+      const validServices = new Set(
+        (parsed.data.available_services ?? (updateData.available_services as string[] | undefined) ?? laundromat.available_services)
+      );
+      updateData.service_weights = Object.fromEntries(
+        Object.entries(parsed.data.service_weights).filter(([k]) => validServices.has(k))
+      );
+    }
+
     if (parsed.data.contact_number !== undefined) {
       const sanitized = parsed.data.contact_number
         ? sanitizeContactNumber(parsed.data.contact_number)
@@ -130,7 +143,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services, service_prices, rush_fee, contact_number, receipt_paper_size')
+      .select('id, name, address, available_services, service_prices, service_weights, rush_fee, contact_number, receipt_paper_size')
       .single();
 
     if (updateError) {
