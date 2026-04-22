@@ -20,6 +20,7 @@ function buildReceiptData(job: Job, shopInfo: ShopInfo): ReceiptData {
     serviceQuantities: job.service_quantities,
     servicePrices: shopInfo.servicePrices,
     totalWeight: job.total_weight,
+    notes: job.notes,
     payAmount: job.pay_amount ?? 0,
     cashTendered: job.cash_tendered,
     isPaid: job.is_paid,

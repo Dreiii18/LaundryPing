@@ -20,6 +20,7 @@ export interface ReceiptData {
   cashTendered: number | null;
   isPaid: boolean;
   paymentMethod: string | null;
+  notes?: string | null;
   paperSize?: '58mm' | '80mm';
 }
 
@@ -231,7 +232,15 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <tr><td colspan="3">NAME: &nbsp;${escapeHtml(customerName)}</td></tr>
     ${phoneLine}
   </table>
+${data.notes ? `
+  <div class="divider"></div>
 
+  <!-- Notes -->
+  <div class="section-title">NOTES</div>
+  <table>
+    <tr><td colspan="3">${escapeHtml(data.notes)}</td></tr>
+  </table>
+` : ''}
   <div class="divider"></div>
 
   <!-- Services -->
