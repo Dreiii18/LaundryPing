@@ -74,7 +74,10 @@ export const JobRow = React.memo(function JobRow({
       </TableCell>
       <TableCell className="px-6 py-4 text-sm text-slate-600">
         {job.services && job.services.length > 0 ? (
-          <span>{job.services.join(', ')}</span>
+          <span>{job.services.map((s) => {
+            const qty = job.service_quantities?.[s] ?? 1;
+            return qty > 1 ? `${s} \u00d7${qty}` : s;
+          }).join(', ')}</span>
         ) : (
           <span className="text-slate-400 italic">--</span>
         )}
@@ -88,7 +91,12 @@ export const JobRow = React.memo(function JobRow({
         </div>
       </TableCell>
       <TableCell className="px-6 py-4 text-sm text-slate-600 font-medium">
-        {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}
+        <div>
+          {job.pay_amount != null ? `₱${Number(job.pay_amount).toLocaleString('en-PH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : <span className="text-slate-400 italic">--</span>}
+          {job.total_weight != null && job.total_weight > 0 && (
+            <div className="text-xs text-slate-400 mt-0.5">{Number(job.total_weight).toFixed(1)} kg</div>
+          )}
+        </div>
       </TableCell>
       <TableCell className="px-6 py-4">
         {job.status === 'pending' ? (

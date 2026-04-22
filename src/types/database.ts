@@ -20,6 +20,7 @@ export interface Database {
           billing_cycle_start: string;
           available_services: string[];
           service_prices: Record<string, number>;
+          service_weights: Record<string, number>;
           rush_fee: number;
           contact_number: string | null;
           receipt_paper_size: '58mm' | '80mm';
@@ -36,6 +37,7 @@ export interface Database {
           billing_cycle_start?: string;
           available_services?: string[];
           service_prices?: Record<string, number>;
+          service_weights?: Record<string, number>;
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
@@ -52,6 +54,7 @@ export interface Database {
           billing_cycle_start?: string;
           available_services?: string[];
           service_prices?: Record<string, number>;
+          service_weights?: Record<string, number>;
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
@@ -105,6 +108,8 @@ export interface Database {
           is_overdue: boolean;
           overdue_reason: string | null;
           services: string[];
+          service_quantities: Record<string, number> | null;
+          total_weight: number | null;
           claim_number: number | null;
           customer_name: string | null;
           claim_date: string;
@@ -132,6 +137,8 @@ export interface Database {
           is_overdue?: boolean;
           overdue_reason?: string | null;
           services?: string[];
+          service_quantities?: Record<string, number> | null;
+          total_weight?: number | null;
           claim_number?: number | null;
           customer_name?: string | null;
           notify_queue_sms?: boolean;
@@ -158,6 +165,8 @@ export interface Database {
           is_overdue?: boolean;
           overdue_reason?: string | null;
           services?: string[];
+          service_quantities?: Record<string, number> | null;
+          total_weight?: number | null;
           claim_number?: number | null;
           customer_name?: string | null;
           notify_queue_sms?: boolean;

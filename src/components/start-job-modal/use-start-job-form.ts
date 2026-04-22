@@ -21,8 +21,10 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [smsOption, setSmsOption] = useState<'none' | 'completion' | 'queue_and_completion'>('completion');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [serviceQuantities, setServiceQuantities] = useState<Record<string, number>>({});
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
+  const [serviceWeights, setServiceWeights] = useState<Record<string, number>>({});
   const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
   const [cashTendered, setCashTendered] = useState('');
   const [priority, setPriority] = useState<'normal' | 'rush'>('normal');
@@ -86,15 +88,18 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         const data = await res.json();
         setAvailableServices(data.settings?.available_services || ['Wash', 'Dry']);
         setServicePrices(data.settings?.service_prices || {});
+        setServiceWeights(data.settings?.service_weights || {});
         setRushFeeAmount(Number(data.settings?.rush_fee) || 0);
       } else {
         setAvailableServices(['Wash', 'Dry']);
         setServicePrices({});
+        setServiceWeights({});
         setRushFeeAmount(0);
       }
     } catch {
       setAvailableServices(['Wash', 'Dry']);
       setServicePrices({});
+      setServiceWeights({});
       setRushFeeAmount(0);
     }
   }, []);
@@ -110,7 +115,9 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setPaymentMethod('');
       setSmsOption('completion');
       setSelectedServices([]);
+      setServiceQuantities({});
       setServicePrices({});
+      setServiceWeights({});
       setPriceManuallyChanged(false);
       setCashTendered('');
       setPriority('normal');
@@ -124,22 +131,49 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     }
   }, [open, fetchMachines, fetchSmsCredits, fetchAvailableServices]);
 
-  const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId) => {
-    const serviceTotal = services.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+  const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId, quantities: Record<string, number> = serviceQuantities) => {
+    const serviceTotal = services.reduce((sum, s) => sum + (servicePrices[s] || 0) * (quantities[s] || 1), 0);
     const rushSurcharge = (!currentMachineId && currentPriority === 'rush') ? rushFeeAmount : 0;
     return serviceTotal + rushSurcharge;
-  }, [servicePrices, rushFeeAmount, priority, machineId]);
+  }, [servicePrices, rushFeeAmount, priority, machineId, serviceQuantities]);
+
+  const calculateTotalWeight = useCallback((services: string[], quantities: Record<string, number> = serviceQuantities) => {
+    return services.reduce((sum, s) => {
+      const w = serviceWeights[s] || 0;
+      return w > 0 ? sum + w * (quantities[s] || 1) : sum;
+    }, 0);
+  }, [serviceWeights, serviceQuantities]);
 
   const toggleService = useCallback((service: string) => {
-    const next = selectedServices.includes(service)
+    const isSelected = selectedServices.includes(service);
+    const next = isSelected
       ? selectedServices.filter((s) => s !== service)
       : [...selectedServices, service];
     setSelectedServices(next);
+
+    const nextQuantities = { ...serviceQuantities };
+    if (isSelected) {
+      delete nextQuantities[service];
+    } else {
+      nextQuantities[service] = 1;
+    }
+    setServiceQuantities(nextQuantities);
+
     if (!priceManuallyChanged) {
-      const total = calculateTotal(next);
+      const total = calculateTotal(next, undefined, undefined, nextQuantities);
       setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
     }
-  }, [selectedServices, priceManuallyChanged, calculateTotal]);
+  }, [selectedServices, serviceQuantities, priceManuallyChanged, calculateTotal]);
+
+  const setServiceQuantity = useCallback((service: string, qty: number) => {
+    const clamped = Math.max(1, Math.min(10, qty));
+    const nextQuantities = { ...serviceQuantities, [service]: clamped };
+    setServiceQuantities(nextQuantities);
+    if (!priceManuallyChanged) {
+      const total = calculateTotal(selectedServices, undefined, undefined, nextQuantities);
+      setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
+    }
+  }, [serviceQuantities, priceManuallyChanged, calculateTotal, selectedServices]);
 
   const handlePayAmountChange = useCallback((value: string, currentServices: string[]) => {
     setPayAmount(value);
@@ -252,6 +286,11 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
           cash_tendered: isPaid && paymentMethod === 'cash' && cashTendered ? Number(cashTendered) : undefined,
           payment_method: isPaid ? paymentMethod : undefined,
           services: selectedServices,
+          service_quantities: Object.keys(serviceQuantities).length > 0 ? serviceQuantities : undefined,
+          total_weight: (() => {
+            const tw = calculateTotalWeight(selectedServices);
+            return tw > 0 ? Math.round(tw * 100) / 100 : undefined;
+          })(),
           ...(!machineId ? { priority } : {}),
         }),
       });
@@ -283,6 +322,8 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     }
   }, [
     selectedServices,
+    serviceQuantities,
+    calculateTotalWeight,
     machines.length,
     machineId,
     smsOption,
@@ -319,6 +360,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     smsOption,
     setSmsOption: handleSmsOptionChange,
     selectedServices,
+    serviceQuantities,
     availableServices,
     servicePrices,
     priceManuallyChanged,
@@ -333,8 +375,10 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     rushFeeAmount,
     // Computed
     autoTotal: calculateTotal(selectedServices),
+    totalWeight: calculateTotalWeight(selectedServices),
     // Handlers
     toggleService,
+    setServiceQuantity,
     handlePayAmountChange,
     resetToAutoPrice,
     handleSubmit,

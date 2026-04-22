@@ -28,6 +28,8 @@ export interface Job {
   is_overdue: boolean;
   overdue_reason: string | null;
   services: string[];
+  service_quantities: Record<string, number> | null;
+  total_weight: number | null;
   claim_number: number | null;
   customer_name: string | null;
   priority: 'normal' | 'rush';

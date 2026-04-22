@@ -13,7 +13,9 @@ export interface ReceiptData {
   customerName: string | null;
   customerPhone: string | null;
   services: string[];
+  serviceQuantities?: Record<string, number> | null;
   servicePrices: Record<string, number>;
+  totalWeight?: number | null;
   payAmount: number;
   cashTendered: number | null;
   isPaid: boolean;
@@ -66,14 +68,15 @@ export function generateReceiptHtml(data: ReceiptData): string {
   const invoiceNum = padInvoice(data.claimNumber);
   const customerName = data.customerName || 'Walk-in';
 
-  // Calculate per-service line items
+  // Calculate per-service line items with quantities
   const lineItems = data.services.map((service) => {
     const price = data.servicePrices[service] ?? 0;
-    return { name: service, price };
+    const qty = data.serviceQuantities?.[service] ?? 1;
+    return { name: service, price, qty, extended: price * qty };
   });
-  const subtotal = lineItems.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + item.extended, 0);
   const total = data.payAmount ?? 0;
-  const itemCount = lineItems.length;
+  const itemCount = lineItems.reduce((sum, item) => sum + item.qty, 0);
 
   // Build service lines HTML
   const serviceLines = lineItems
@@ -83,9 +86,9 @@ export function generateReceiptHtml(data: ReceiptData): string {
         <td colspan="3" style="padding-top:4px;font-weight:bold;">${escapeHtml(item.name)}</td>
       </tr>
       <tr>
-        <td>&nbsp;1.0 &nbsp;x &nbsp;${formatCurrency(item.price)}</td>
+        <td>&nbsp;${item.qty} &nbsp;x &nbsp;${formatCurrency(item.price)}</td>
         <td></td>
-        <td style="text-align:right;">${formatCurrency(item.price)}</td>
+        <td style="text-align:right;">${formatCurrency(item.extended)}</td>
       </tr>`
     )
     .join('');
@@ -243,7 +246,11 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <tr>
       <td colspan="2">${itemCount} &nbsp;Item(s)</td>
       <td></td>
-    </tr>
+    </tr>${data.totalWeight != null && data.totalWeight > 0 ? `
+    <tr>
+      <td colspan="2">TOTAL WEIGHT</td>
+      <td style="text-align:right;">${data.totalWeight.toFixed(1)} kg</td>
+    </tr>` : ''}
     <tr>
       <td colspan="2">SUBTOTAL</td>
       <td style="text-align:right;">${formatCurrency(subtotal)}</td>

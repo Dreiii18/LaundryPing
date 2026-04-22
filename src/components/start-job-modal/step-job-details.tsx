@@ -18,12 +18,15 @@ interface StepJobDetailsProps {
   availableServices: string[];
   selectedServices: string[];
   onToggle: (service: string) => void;
+  serviceQuantities: Record<string, number>;
+  onQuantityChange: (service: string, qty: number) => void;
   customerName: string;
   onCustomerNameChange: (value: string) => void;
   loadingMachines: boolean;
   machines: Machine[];
   machineId: string;
   onMachineChange: (id: string) => void;
+  totalWeight: number;
   priority: 'normal' | 'rush';
   onPriorityChange: (p: 'normal' | 'rush') => void;
   rushFeeAmount: number;
@@ -35,6 +38,9 @@ export function StepJobDetails({
   availableServices,
   selectedServices,
   onToggle,
+  serviceQuantities,
+  onQuantityChange,
+  totalWeight,
   customerName,
   onCustomerNameChange,
   loadingMachines,
@@ -58,7 +64,15 @@ export function StepJobDetails({
         availableServices={availableServices}
         selectedServices={selectedServices}
         onToggle={onToggle}
+        serviceQuantities={serviceQuantities}
+        onQuantityChange={onQuantityChange}
       />
+
+      {totalWeight > 0 && (
+        <p className="text-xs text-slate-500 -mt-2">
+          Total weight: {totalWeight.toFixed(1)} kg
+        </p>
+      )}
 
       {/* Customer Name */}
       <div className="flex flex-col gap-2">
