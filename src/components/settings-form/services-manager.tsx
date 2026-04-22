@@ -57,7 +57,7 @@ export function ServicesManager({
               min="0"
               step="0.1"
               placeholder="0"
-              value={serviceWeights[service] || ''}
+              value={serviceWeights[service] ?? ''}
               onChange={(e) => onUpdateServiceWeight(service, e.target.value)}
               className="h-8 pr-7 text-sm"
               aria-label={`Weight for ${service}`}

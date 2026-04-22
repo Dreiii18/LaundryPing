@@ -31,6 +31,9 @@ const createJobSchema = z.object({
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
+).refine(
+  (data) => !data.service_quantities || Object.keys(data.service_quantities).every(k => data.services.includes(k)),
+  { message: 'service_quantities keys must be a subset of services', path: ['service_quantities'] }
 );
 
 export async function GET() {
