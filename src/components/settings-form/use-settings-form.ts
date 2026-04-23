@@ -13,12 +13,20 @@ function recordsEqual(a: Record<string, number>, b: Record<string, number>): boo
   return keysA.every((k) => a[k] === b[k]);
 }
 
+function stringRecordsEqual(a: Record<string, string>, b: Record<string, string>): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  return keysA.every((k) => a[k] === b[k]);
+}
+
 export function useSettingsForm({
   initialName,
   initialAddress,
   initialServices,
   initialServicePrices,
   initialServiceWeights,
+  initialServiceTypes,
   initialRushFee,
   initialContactNumber,
   initialReceiptPaperSize,
@@ -32,11 +40,13 @@ export function useSettingsForm({
   const [services, setServices] = useState<string[]>(initialServices);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>(initialServicePrices);
   const [serviceWeights, setServiceWeights] = useState<Record<string, number>>(initialServiceWeights);
+  const [serviceTypes, setServiceTypes] = useState<Record<string, string>>(initialServiceTypes);
   const [rushFee, setRushFee] = useState(initialRushFee.toString());
   const [newService, setNewService] = useState('');
   const [receiptPaperSize, setReceiptPaperSize] = useState<'58mm' | '80mm'>(initialReceiptPaperSize);
   const [newServicePrice, setNewServicePrice] = useState('');
   const [newServiceWeight, setNewServiceWeight] = useState('');
+  const [newServiceType, setNewServiceType] = useState('per_load');
   const [saving, setSaving] = useState(false);
 
   const hasChanges =
@@ -46,6 +56,7 @@ export function useSettingsForm({
     JSON.stringify(services) !== JSON.stringify(initialServices) ||
     !recordsEqual(servicePrices, initialServicePrices) ||
     !recordsEqual(serviceWeights, initialServiceWeights) ||
+    !stringRecordsEqual(serviceTypes, initialServiceTypes) ||
     (parseFloat(rushFee) || 0) !== initialRushFee ||
     receiptPaperSize !== initialReceiptPaperSize;
 
@@ -63,10 +74,12 @@ export function useSettingsForm({
     setServices((prev) => [...prev, trimmed]);
     setServicePrices((prev) => ({ ...prev, [trimmed]: parseFloat(newServicePrice) || 0 }));
     setServiceWeights((prev) => ({ ...prev, [trimmed]: parseFloat(newServiceWeight) || 0 }));
+    setServiceTypes((prev) => ({ ...prev, [trimmed]: newServiceType }));
     setNewService('');
     setNewServicePrice('');
     setNewServiceWeight('');
-  }, [newService, newServicePrice, newServiceWeight, services]);
+    setNewServiceType('per_load');
+  }, [newService, newServicePrice, newServiceWeight, newServiceType, services]);
 
   const removeService = useCallback((index: number) => {
     if (services.length <= 1) {
@@ -81,6 +94,9 @@ export function useSettingsForm({
     setServiceWeights((prev) =>
       Object.fromEntries(Object.entries(prev).filter(([key]) => key !== removedService))
     );
+    setServiceTypes((prev) =>
+      Object.fromEntries(Object.entries(prev).filter(([key]) => key !== removedService))
+    );
   }, [services]);
 
   const updateServicePrice = useCallback((service: string, price: string) => {
@@ -91,6 +107,10 @@ export function useSettingsForm({
   const updateServiceWeight = useCallback((service: string, weight: string) => {
     const numWeight = parseFloat(weight) || 0;
     setServiceWeights((prev) => ({ ...prev, [service]: numWeight }));
+  }, []);
+
+  const updateServiceType = useCallback((service: string, type: string) => {
+    setServiceTypes((prev) => ({ ...prev, [service]: type }));
   }, []);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
@@ -119,6 +139,7 @@ export function useSettingsForm({
           available_services: services,
           service_prices: servicePrices,
           service_weights: serviceWeights,
+          service_types: serviceTypes,
           rush_fee: parseFloat(rushFee) || 0,
           receipt_paper_size: receiptPaperSize,
         }),
@@ -141,7 +162,7 @@ export function useSettingsForm({
     } finally {
       setSaving(false);
     }
-  }, [name, address, contactNumber, services, servicePrices, serviceWeights, rushFee, receiptPaperSize, router, startTransition]);
+  }, [name, address, contactNumber, services, servicePrices, serviceWeights, serviceTypes, rushFee, receiptPaperSize, router, startTransition]);
 
   return {
     name,
@@ -153,6 +174,7 @@ export function useSettingsForm({
     services,
     servicePrices,
     serviceWeights,
+    serviceTypes,
     rushFee,
     setRushFee,
     receiptPaperSize,
@@ -163,12 +185,15 @@ export function useSettingsForm({
     setNewServicePrice,
     newServiceWeight,
     setNewServiceWeight,
+    newServiceType,
+    setNewServiceType,
     saving,
     hasChanges,
     addService,
     removeService,
     updateServicePrice,
     updateServiceWeight,
+    updateServiceType,
     handleSubmit,
   };
 }

@@ -20,6 +20,9 @@ interface StepJobDetailsProps {
   onToggle: (service: string) => void;
   serviceQuantities: Record<string, number>;
   onQuantityChange: (service: string, qty: number) => void;
+  serviceTypes: Record<string, string>;
+  serviceWeightsActual: Record<string, number>;
+  onWeightActualChange: (service: string, weight: number) => void;
   customerName: string;
   onCustomerNameChange: (value: string) => void;
   loadingMachines: boolean;
@@ -40,6 +43,9 @@ export function StepJobDetails({
   onToggle,
   serviceQuantities,
   onQuantityChange,
+  serviceTypes,
+  serviceWeightsActual,
+  onWeightActualChange,
   totalWeight,
   customerName,
   onCustomerNameChange,
@@ -66,6 +72,9 @@ export function StepJobDetails({
         onToggle={onToggle}
         serviceQuantities={serviceQuantities}
         onQuantityChange={onQuantityChange}
+        serviceTypes={serviceTypes}
+        serviceWeightsActual={serviceWeightsActual}
+        onWeightActualChange={onWeightActualChange}
       />
 
       {totalWeight > 0 && (

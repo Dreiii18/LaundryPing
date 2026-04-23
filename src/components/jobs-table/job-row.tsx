@@ -75,6 +75,10 @@ export const JobRow = React.memo(function JobRow({
       <TableCell className="px-6 py-4 text-sm text-slate-600">
         {job.services && job.services.length > 0 ? (
           <span>{job.services.map((s) => {
+            const type = shopInfo?.serviceTypes?.[s] ?? 'per_load';
+            if (type === 'per_kg' && job.service_weights_actual?.[s]) {
+              return `${s} ${job.service_weights_actual[s].toFixed(1)}kg`;
+            }
             const qty = job.service_quantities?.[s] ?? 1;
             return qty > 1 ? `${s} \u00d7${qty}` : s;
           }).join(', ')}</span>

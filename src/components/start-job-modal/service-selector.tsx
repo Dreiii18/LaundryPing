@@ -1,6 +1,7 @@
 'use client';
 
 import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
 import { Minus, Plus } from 'lucide-react';
 
 interface ServiceSelectorProps {
@@ -9,6 +10,9 @@ interface ServiceSelectorProps {
   onToggle: (service: string) => void;
   serviceQuantities: Record<string, number>;
   onQuantityChange: (service: string, qty: number) => void;
+  serviceTypes: Record<string, string>;
+  serviceWeightsActual: Record<string, number>;
+  onWeightActualChange: (service: string, weight: number) => void;
 }
 
 export function ServiceSelector({
@@ -17,6 +21,9 @@ export function ServiceSelector({
   onToggle,
   serviceQuantities,
   onQuantityChange,
+  serviceTypes,
+  serviceWeightsActual,
+  onWeightActualChange,
 }: ServiceSelectorProps) {
   if (availableServices.length === 0) return null;
 
@@ -26,6 +33,7 @@ export function ServiceSelector({
       <div className="flex flex-wrap gap-1.5">
         {availableServices.map((service) => {
           const isSelected = selectedServices.includes(service);
+          const type = serviceTypes[service] ?? 'per_load';
           const qty = serviceQuantities[service] || 1;
 
           if (!isSelected) {
@@ -41,6 +49,41 @@ export function ServiceSelector({
             );
           }
 
+          // Per-kg services: show weight input instead of +/- quantity controls
+          if (type === 'per_kg') {
+            return (
+              <div
+                key={service}
+                className="flex items-center rounded-lg border border-[#0d968b] bg-[#0d968b]/10 transition-all"
+              >
+                <button
+                  type="button"
+                  onClick={() => onToggle(service)}
+                  className="py-1.5 pl-3 pr-1.5 text-sm font-semibold text-[#0d968b] outline-none focus-visible:ring-[3px] focus-visible:ring-[#0d968b]/30 rounded-l-lg"
+                >
+                  {service}
+                </button>
+                <div className="relative pr-1.5">
+                  <Input
+                    type="number"
+                    min="0"
+                    max="9999"
+                    step="0.1"
+                    value={serviceWeightsActual[service] || ''}
+                    onChange={(e) => onWeightActualChange(service, parseFloat(e.target.value) || 0)}
+                    className="h-6 w-16 text-xs text-center pr-6 bg-white/50 border-[#0d968b]/30"
+                    aria-label={`Weight for ${service} in kg`}
+                    placeholder="0"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-[#0d968b]/70 font-medium">
+                    kg
+                  </span>
+                </div>
+              </div>
+            );
+          }
+
+          // Per-load and fixed services: show +/- quantity controls
           return (
             <div
               key={service}
