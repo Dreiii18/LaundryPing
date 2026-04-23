@@ -20,6 +20,8 @@ export function SettingsForm(props: SettingsFormProps) {
     setContactNumber,
     services,
     servicePrices,
+    serviceWeights,
+    serviceTypes,
     rushFee,
     setRushFee,
     receiptPaperSize,
@@ -28,11 +30,17 @@ export function SettingsForm(props: SettingsFormProps) {
     setNewService,
     newServicePrice,
     setNewServicePrice,
+    newServiceWeight,
+    setNewServiceWeight,
+    newServiceType,
+    setNewServiceType,
     saving,
     hasChanges,
     addService,
     removeService,
     updateServicePrice,
+    updateServiceWeight,
+    updateServiceType,
     handleSubmit,
   } = useSettingsForm(props);
 
@@ -108,13 +116,21 @@ export function SettingsForm(props: SettingsFormProps) {
           <ServicesManager
             services={services}
             servicePrices={servicePrices}
+            serviceWeights={serviceWeights}
+            serviceTypes={serviceTypes}
             newService={newService}
             newServicePrice={newServicePrice}
+            newServiceWeight={newServiceWeight}
+            newServiceType={newServiceType}
             onNewServiceChange={setNewService}
             onNewServicePriceChange={setNewServicePrice}
+            onNewServiceWeightChange={setNewServiceWeight}
+            onNewServiceTypeChange={setNewServiceType}
             onAddService={addService}
             onRemoveService={removeService}
             onUpdateServicePrice={updateServicePrice}
+            onUpdateServiceWeight={updateServiceWeight}
+            onUpdateServiceType={updateServiceType}
           />
         </div>
 

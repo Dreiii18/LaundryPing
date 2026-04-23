@@ -117,6 +117,12 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 availableServices={form.availableServices}
                 selectedServices={form.selectedServices}
                 onToggle={form.toggleService}
+                serviceQuantities={form.serviceQuantities}
+                onQuantityChange={form.setServiceQuantity}
+                serviceTypes={form.serviceTypes}
+                serviceWeightsActual={form.serviceWeightsActual}
+                onWeightActualChange={form.setServiceWeightActual}
+                totalWeight={form.totalWeight}
                 customerName={form.customerName}
                 onCustomerNameChange={form.setCustomerName}
                 loadingMachines={form.loadingMachines}

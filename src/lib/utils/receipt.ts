@@ -13,11 +13,16 @@ export interface ReceiptData {
   customerName: string | null;
   customerPhone: string | null;
   services: string[];
+  serviceQuantities?: Record<string, number> | null;
   servicePrices: Record<string, number>;
+  totalWeight?: number | null;
   payAmount: number;
   cashTendered: number | null;
   isPaid: boolean;
   paymentMethod: string | null;
+  notes?: string | null;
+  serviceTypes?: Record<string, string> | null;
+  serviceWeightsActual?: Record<string, number> | null;
   paperSize?: '58mm' | '80mm';
 }
 
@@ -66,27 +71,38 @@ export function generateReceiptHtml(data: ReceiptData): string {
   const invoiceNum = padInvoice(data.claimNumber);
   const customerName = data.customerName || 'Walk-in';
 
-  // Calculate per-service line items
+  // Calculate per-service line items with quantities and per-kg weights
   const lineItems = data.services.map((service) => {
+    const type = data.serviceTypes?.[service] ?? 'per_load';
     const price = data.servicePrices[service] ?? 0;
-    return { name: service, price };
+    if (type === 'per_kg') {
+      const weight = data.serviceWeightsActual?.[service] ?? 0;
+      return { name: service, type, price, qty: 1, weight, extended: price * weight };
+    }
+    const qty = data.serviceQuantities?.[service] ?? 1;
+    return { name: service, type, price, qty, weight: 0, extended: price * qty };
   });
-  const subtotal = lineItems.reduce((sum, item) => sum + item.price, 0);
+  const subtotal = lineItems.reduce((sum, item) => sum + item.extended, 0);
   const total = data.payAmount ?? 0;
-  const itemCount = lineItems.length;
+  const itemCount = lineItems.reduce((sum, item) => sum + item.qty, 0);
 
   // Build service lines HTML
   const serviceLines = lineItems
     .map(
-      (item) => `
+      (item) => {
+        const detailLine = item.type === 'per_kg'
+          ? `<td>&nbsp;${item.weight.toFixed(1)}kg &nbsp;x &nbsp;${formatCurrency(item.price)}/kg</td>`
+          : `<td>&nbsp;${item.qty} &nbsp;x &nbsp;${formatCurrency(item.price)}</td>`;
+        return `
       <tr>
         <td colspan="3" style="padding-top:4px;font-weight:bold;">${escapeHtml(item.name)}</td>
       </tr>
       <tr>
-        <td>&nbsp;1.0 &nbsp;x &nbsp;${formatCurrency(item.price)}</td>
+        ${detailLine}
         <td></td>
-        <td style="text-align:right;">${formatCurrency(item.price)}</td>
-      </tr>`
+        <td style="text-align:right;">${formatCurrency(item.extended)}</td>
+      </tr>`;
+      }
     )
     .join('');
 
@@ -228,7 +244,15 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <tr><td colspan="3">NAME: &nbsp;${escapeHtml(customerName)}</td></tr>
     ${phoneLine}
   </table>
+${data.notes ? `
+  <div class="divider"></div>
 
+  <!-- Notes -->
+  <div class="section-title">NOTES</div>
+  <table>
+    <tr><td colspan="3">${escapeHtml(data.notes)}</td></tr>
+  </table>
+` : ''}
   <div class="divider"></div>
 
   <!-- Services -->
@@ -243,7 +267,11 @@ export function generateReceiptHtml(data: ReceiptData): string {
     <tr>
       <td colspan="2">${itemCount} &nbsp;Item(s)</td>
       <td></td>
-    </tr>
+    </tr>${data.totalWeight != null && data.totalWeight > 0 ? `
+    <tr>
+      <td colspan="2">TOTAL WEIGHT</td>
+      <td style="text-align:right;">${data.totalWeight.toFixed(1)} kg</td>
+    </tr>` : ''}
     <tr>
       <td colspan="2">SUBTOTAL</td>
       <td style="text-align:right;">${formatCurrency(subtotal)}</td>

@@ -21,8 +21,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const [paymentMethod, setPaymentMethod] = useState('');
   const [smsOption, setSmsOption] = useState<'none' | 'completion' | 'queue_and_completion'>('completion');
   const [selectedServices, setSelectedServices] = useState<string[]>([]);
+  const [serviceQuantities, setServiceQuantities] = useState<Record<string, number>>({});
+  const [serviceWeightsActual, setServiceWeightsActual] = useState<Record<string, number>>({});
   const [availableServices, setAvailableServices] = useState<string[]>([]);
   const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
+  const [serviceWeights, setServiceWeights] = useState<Record<string, number>>({});
+  const [serviceTypes, setServiceTypes] = useState<Record<string, string>>({});
   const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
   const [cashTendered, setCashTendered] = useState('');
   const [priority, setPriority] = useState<'normal' | 'rush'>('normal');
@@ -86,15 +90,21 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         const data = await res.json();
         setAvailableServices(data.settings?.available_services || ['Wash', 'Dry']);
         setServicePrices(data.settings?.service_prices || {});
+        setServiceWeights(data.settings?.service_weights || {});
+        setServiceTypes(data.settings?.service_types || {});
         setRushFeeAmount(Number(data.settings?.rush_fee) || 0);
       } else {
         setAvailableServices(['Wash', 'Dry']);
         setServicePrices({});
+        setServiceWeights({});
+        setServiceTypes({});
         setRushFeeAmount(0);
       }
     } catch {
       setAvailableServices(['Wash', 'Dry']);
       setServicePrices({});
+      setServiceWeights({});
+      setServiceTypes({});
       setRushFeeAmount(0);
     }
   }, []);
@@ -110,7 +120,11 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setPaymentMethod('');
       setSmsOption('completion');
       setSelectedServices([]);
+      setServiceQuantities({});
+      setServiceWeightsActual({});
       setServicePrices({});
+      setServiceWeights({});
+      setServiceTypes({});
       setPriceManuallyChanged(false);
       setCashTendered('');
       setPriority('normal');
@@ -124,22 +138,87 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     }
   }, [open, fetchMachines, fetchSmsCredits, fetchAvailableServices]);
 
-  const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId) => {
-    const serviceTotal = services.reduce((sum, s) => sum + (servicePrices[s] || 0), 0);
+  const getServiceType = useCallback((service: string) => {
+    return serviceTypes[service] ?? 'per_load';
+  }, [serviceTypes]);
+
+  const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId, quantities: Record<string, number> = serviceQuantities, weightsActual: Record<string, number> = serviceWeightsActual) => {
+    const serviceTotal = services.reduce((sum, s) => {
+      const type = serviceTypes[s] ?? 'per_load';
+      const price = servicePrices[s] || 0;
+      if (type === 'per_kg') {
+        return sum + price * (weightsActual[s] || 0);
+      }
+      // per_load and fixed: price * quantity
+      return sum + price * (quantities[s] || 1);
+    }, 0);
     const rushSurcharge = (!currentMachineId && currentPriority === 'rush') ? rushFeeAmount : 0;
     return serviceTotal + rushSurcharge;
-  }, [servicePrices, rushFeeAmount, priority, machineId]);
+  }, [servicePrices, serviceTypes, rushFeeAmount, priority, machineId, serviceQuantities, serviceWeightsActual]);
+
+  const calculateTotalWeight = useCallback((services: string[], quantities: Record<string, number> = serviceQuantities, weightsActual: Record<string, number> = serviceWeightsActual) => {
+    return services.reduce((sum, s) => {
+      const type = serviceTypes[s] ?? 'per_load';
+      if (type === 'per_kg') {
+        return sum + (weightsActual[s] || 0);
+      }
+      if (type === 'per_load') {
+        const w = serviceWeights[s] || 0;
+        return w > 0 ? sum + w * (quantities[s] || 1) : sum;
+      }
+      // fixed: no weight contribution
+      return sum;
+    }, 0);
+  }, [serviceWeights, serviceTypes, serviceQuantities, serviceWeightsActual]);
 
   const toggleService = useCallback((service: string) => {
-    const next = selectedServices.includes(service)
+    const isSelected = selectedServices.includes(service);
+    const next = isSelected
       ? selectedServices.filter((s) => s !== service)
       : [...selectedServices, service];
     setSelectedServices(next);
+
+    const nextQuantities = { ...serviceQuantities };
+    const nextWeightsActual = { ...serviceWeightsActual };
+    if (isSelected) {
+      delete nextQuantities[service];
+      delete nextWeightsActual[service];
+    } else {
+      const type = serviceTypes[service] ?? 'per_load';
+      if (type === 'per_kg') {
+        nextWeightsActual[service] = 0;
+      } else {
+        nextQuantities[service] = 1;
+      }
+    }
+    setServiceQuantities(nextQuantities);
+    setServiceWeightsActual(nextWeightsActual);
+
     if (!priceManuallyChanged) {
-      const total = calculateTotal(next);
+      const total = calculateTotal(next, undefined, undefined, nextQuantities, nextWeightsActual);
       setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
     }
-  }, [selectedServices, priceManuallyChanged, calculateTotal]);
+  }, [selectedServices, serviceQuantities, serviceWeightsActual, serviceTypes, priceManuallyChanged, calculateTotal]);
+
+  const setServiceQuantity = useCallback((service: string, qty: number) => {
+    const clamped = Math.max(1, Math.min(10, qty));
+    const nextQuantities = { ...serviceQuantities, [service]: clamped };
+    setServiceQuantities(nextQuantities);
+    if (!priceManuallyChanged) {
+      const total = calculateTotal(selectedServices, undefined, undefined, nextQuantities);
+      setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
+    }
+  }, [serviceQuantities, priceManuallyChanged, calculateTotal, selectedServices]);
+
+  const setServiceWeightActual = useCallback((service: string, weight: number) => {
+    const clamped = Math.max(0, Math.min(9999, weight));
+    const nextWeightsActual = { ...serviceWeightsActual, [service]: clamped };
+    setServiceWeightsActual(nextWeightsActual);
+    if (!priceManuallyChanged) {
+      const total = calculateTotal(selectedServices, undefined, undefined, undefined, nextWeightsActual);
+      setPayAmount(total > 0 ? (Math.round(total * 100) / 100).toString() : '');
+    }
+  }, [serviceWeightsActual, priceManuallyChanged, calculateTotal, selectedServices]);
 
   const handlePayAmountChange = useCallback((value: string, currentServices: string[]) => {
     setPayAmount(value);
@@ -182,11 +261,17 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     if (selectedServices.length === 0) {
       return 'Please select at least one service';
     }
+    // Validate per_kg services have weight > 0
+    for (const s of selectedServices) {
+      if ((serviceTypes[s] ?? 'per_load') === 'per_kg' && !(serviceWeightsActual[s] > 0)) {
+        return `Please enter weight for "${s}"`;
+      }
+    }
     if (machines.length > 0 && !machineId) {
       return 'Please select a machine';
     }
     return null;
-  }, [selectedServices, machines, machineId]);
+  }, [selectedServices, serviceTypes, serviceWeightsActual, machines, machineId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -235,6 +320,14 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
 
     setLoading(true);
 
+    // Build service_weights_actual for per_kg services only
+    const perKgWeights: Record<string, number> = {};
+    for (const s of selectedServices) {
+      if ((serviceTypes[s] ?? 'per_load') === 'per_kg' && serviceWeightsActual[s] > 0) {
+        perKgWeights[s] = serviceWeightsActual[s];
+      }
+    }
+
     try {
       const phoneClean = phone.replace(/[\s\-()]/g, '');
       const res = await fetchWithAuth('/api/jobs', {
@@ -252,6 +345,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
           cash_tendered: isPaid && paymentMethod === 'cash' && cashTendered ? Number(cashTendered) : undefined,
           payment_method: isPaid ? paymentMethod : undefined,
           services: selectedServices,
+          service_quantities: Object.keys(serviceQuantities).length > 0 ? serviceQuantities : undefined,
+          service_weights_actual: Object.keys(perKgWeights).length > 0 ? perKgWeights : undefined,
+          total_weight: (() => {
+            const tw = calculateTotalWeight(selectedServices);
+            return tw > 0 ? Math.round(tw * 100) / 100 : undefined;
+          })(),
           ...(!machineId ? { priority } : {}),
         }),
       });
@@ -283,6 +382,10 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     }
   }, [
     selectedServices,
+    serviceQuantities,
+    serviceWeightsActual,
+    serviceTypes,
+    calculateTotalWeight,
     machines.length,
     machineId,
     smsOption,
@@ -319,8 +422,11 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     smsOption,
     setSmsOption: handleSmsOptionChange,
     selectedServices,
+    serviceQuantities,
+    serviceWeightsActual,
     availableServices,
     servicePrices,
+    serviceTypes,
     priceManuallyChanged,
     cashTendered,
     setCashTendered,
@@ -333,8 +439,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     rushFeeAmount,
     // Computed
     autoTotal: calculateTotal(selectedServices),
+    totalWeight: calculateTotalWeight(selectedServices),
     // Handlers
     toggleService,
+    setServiceQuantity,
+    setServiceWeightActual,
+    getServiceType,
     handlePayAmountChange,
     resetToAutoPrice,
     handleSubmit,
