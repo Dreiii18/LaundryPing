@@ -25,6 +25,7 @@ const createJobSchema = z.object({
   payment_method: z.enum(PAYMENT_METHODS).optional(),
   services: z.array(z.string().min(1).max(50)).min(1, 'At least one service is required').max(10),
   service_quantities: z.record(z.string(), z.number().int().min(1).max(10)).optional(),
+  service_weights_actual: z.record(z.string(), z.number().min(0).max(9999)).optional(),
   total_weight: z.number().min(0).max(99999).optional(),
   notify_queue_sms: z.boolean().optional(),
   priority: z.enum(['normal', 'rush']).optional(),
@@ -34,6 +35,9 @@ const createJobSchema = z.object({
 ).refine(
   (data) => !data.service_quantities || Object.keys(data.service_quantities).every(k => data.services.includes(k)),
   { message: 'service_quantities keys must be a subset of services', path: ['service_quantities'] }
+).refine(
+  (data) => !data.service_weights_actual || Object.keys(data.service_weights_actual).every(k => data.services.includes(k)),
+  { message: 'service_weights_actual keys must be a subset of services', path: ['service_weights_actual'] }
 );
 
 export async function GET() {
@@ -78,6 +82,7 @@ export async function GET() {
         is_paid,
         services,
         service_quantities,
+        service_weights_actual,
         total_weight,
         claim_number,
         customer_name,
@@ -115,6 +120,7 @@ export async function GET() {
       is_paid: job.is_paid,
       services: job.services,
       service_quantities: job.service_quantities as Record<string, number> | null,
+      service_weights_actual: job.service_weights_actual as Record<string, number> | null,
       total_weight: job.total_weight as number | null,
       claim_number: job.claim_number,
       customer_name: job.customer_name,
@@ -255,6 +261,7 @@ export async function POST(request: Request) {
       payment_method: payment_method ?? null,
       services: parsed.data.services,
       service_quantities: parsed.data.service_quantities ?? null,
+      service_weights_actual: parsed.data.service_weights_actual ?? null,
       total_weight: parsed.data.total_weight ?? null,
       customer_name: sanitizedCustomerName,
       notify_queue_sms: notifyQueueSms,
@@ -265,7 +272,7 @@ export async function POST(request: Request) {
       id, laundromat_id, machine_id, customer_phone_masked, notes,
       status, started_at, completed_at, sms_sent, notify_sms,
       payment_method, pay_amount, cash_tendered, is_paid, services,
-      service_quantities, total_weight, claim_number, customer_name, created_at, priority
+      service_quantities, service_weights_actual, total_weight, claim_number, customer_name, created_at, priority
     `;
 
     const insertWithClaimNumber = async (attempt: number) => {

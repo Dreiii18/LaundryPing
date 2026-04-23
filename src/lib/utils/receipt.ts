@@ -21,6 +21,8 @@ export interface ReceiptData {
   isPaid: boolean;
   paymentMethod: string | null;
   notes?: string | null;
+  serviceTypes?: Record<string, string> | null;
+  serviceWeightsActual?: Record<string, number> | null;
   paperSize?: '58mm' | '80mm';
 }
 
@@ -69,11 +71,16 @@ export function generateReceiptHtml(data: ReceiptData): string {
   const invoiceNum = padInvoice(data.claimNumber);
   const customerName = data.customerName || 'Walk-in';
 
-  // Calculate per-service line items with quantities
+  // Calculate per-service line items with quantities and per-kg weights
   const lineItems = data.services.map((service) => {
+    const type = data.serviceTypes?.[service] ?? 'per_load';
     const price = data.servicePrices[service] ?? 0;
+    if (type === 'per_kg') {
+      const weight = data.serviceWeightsActual?.[service] ?? 0;
+      return { name: service, type, price, qty: 1, weight, extended: price * weight };
+    }
     const qty = data.serviceQuantities?.[service] ?? 1;
-    return { name: service, price, qty, extended: price * qty };
+    return { name: service, type, price, qty, weight: 0, extended: price * qty };
   });
   const subtotal = lineItems.reduce((sum, item) => sum + item.extended, 0);
   const total = data.payAmount ?? 0;
@@ -82,15 +89,20 @@ export function generateReceiptHtml(data: ReceiptData): string {
   // Build service lines HTML
   const serviceLines = lineItems
     .map(
-      (item) => `
+      (item) => {
+        const detailLine = item.type === 'per_kg'
+          ? `<td>&nbsp;${item.weight.toFixed(1)}kg &nbsp;x &nbsp;${formatCurrency(item.price)}/kg</td>`
+          : `<td>&nbsp;${item.qty} &nbsp;x &nbsp;${formatCurrency(item.price)}</td>`;
+        return `
       <tr>
         <td colspan="3" style="padding-top:4px;font-weight:bold;">${escapeHtml(item.name)}</td>
       </tr>
       <tr>
-        <td>&nbsp;${item.qty} &nbsp;x &nbsp;${formatCurrency(item.price)}</td>
+        ${detailLine}
         <td></td>
         <td style="text-align:right;">${formatCurrency(item.extended)}</td>
-      </tr>`
+      </tr>`;
+      }
     )
     .join('');
 
