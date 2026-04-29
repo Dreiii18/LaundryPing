@@ -1,83 +1,34 @@
 /**
- * SMS templates for laundry completion notifications.
- * Each must fit within a single 160-character GSM-7 SMS segment
- * even with a 25-character shop name.
+ * SMS template rendering for laundry notifications.
+ *
+ * Templates are free-form strings with `{{variable}}` placeholders. Only the
+ * variables in ALLOWED_VARS are substituted — any other `{{x}}` in the template
+ * renders as empty string. This is defense-in-depth: even if an owner writes
+ * `{{customer_phone}}` into their template, no sensitive field leaks.
  */
-const TEMPLATES = [
-  (name: string) =>
-    `Tapos na po ang labada mo sa ${name}. Ready na po for pickup. Salamat sa pagtitiwala!`,
-  (name: string) =>
-    `Ready na po ang labada mo sa ${name}. Maaari na po itong i-pickup. Maraming salamat!`,
-  (name: string) =>
-    `Hi! Tapos na po ang labada mo sa ${name}. Pwede na po itong i-pickup. Salamat!`,
-  (name: string) =>
-    `Magandang balita! Ready na po ang labada mo sa ${name}. Paki-pickup na po kapag available. Salamat!`,
-  (name: string) =>
-    `Update mula sa ${name}: Tapos na po ang labada mo at ready na for pickup. Maraming salamat!`,
-];
 
-/**
- * Builds a randomized Tagalog SMS message for laundry completion.
- * Rotates through 5 templates to keep messages fresh.
- * Shop names > 25 chars are truncated with ellipsis.
- * Optionally appends customer name if it fits in 160 chars.
- */
-export function buildLaundryDoneMessage(
-  shopName: string,
-  customerName?: string | null,
+export const DEFAULT_QUEUE_TEMPLATE =
+  '[{{shop_name}}] Salamat! Nakapila na po ang laundry niyo. I-text po namin pag tapos na. - {{shop_name}}';
+
+export const DEFAULT_COMPLETION_TEMPLATE =
+  '[{{shop_name}}] Hi {{customer_name}}, ready na po ang laundry niyo! Salamat po. - {{shop_name}}';
+
+export const ALLOWED_VARS = ['shop_name', 'customer_name', 'job_id'] as const;
+export type TemplateVar = (typeof ALLOWED_VARS)[number];
+export type TemplateVars = Partial<Record<TemplateVar, string>>;
+
+const ALLOWED_VAR_SET: ReadonlySet<string> = new Set(ALLOWED_VARS);
+
+export function renderSmsTemplate(
+  template: string | null | undefined,
+  fallback: string,
+  vars: TemplateVars,
 ): string {
-  const truncatedName = shopName.length > 25
-    ? shopName.slice(0, 22) + '...'
-    : shopName;
-
-  const index = Math.floor(Math.random() * TEMPLATES.length);
-  const base = TEMPLATES[index](truncatedName);
-
-  if (customerName) {
-    const withName = `${base} - ${customerName}`;
-    if (withName.length <= 160) return withName;
-  }
-
-  return base;
-}
-
-/**
- * SMS templates for queue notification.
- * Each must fit within a single 160-character GSM-7 SMS segment
- * even with a 25-character shop name.
- */
-const QUEUE_TEMPLATES = [
-  (name: string) =>
-    `Salamat! Nakapila na po ang labada mo sa ${name}. I-text po namin pag tapos na!`,
-  (name: string) =>
-    `Hi! Nareceive na po ang labada mo sa ${name}. Naka-queue na po. Abiso po namin pag ready!`,
-  (name: string) =>
-    `Update mula sa ${name}: Nakapila na po ang labada mo. Aabisuhan po namin kayo pag tapos!`,
-];
-
-/**
- * Builds a randomized Tagalog SMS message for queue notification.
- * Rotates through templates to keep messages fresh.
- * Shop names > 25 chars are truncated with ellipsis.
- * Optionally appends customer name if it fits in 160 chars.
- */
-export function buildQueueNotificationMessage(
-  shopName: string,
-  customerName?: string | null,
-): string {
-  const truncatedName = shopName.length > 25
-    ? shopName.slice(0, 22) + '...'
-    : shopName;
-
-  const index = Math.floor(Math.random() * QUEUE_TEMPLATES.length);
-  const base = QUEUE_TEMPLATES[index](truncatedName);
-
-  if (customerName) {
-    const withName = `${base} - ${customerName}`;
-    if (withName.length <= 160) return withName;
-  }
-
-  return base;
+  const trimmed = template?.trim();
+  const tpl = trimmed && trimmed.length > 0 ? template! : fallback;
+  return tpl.replace(/\{\{(\w+)\}\}/g, (_, key: string) =>
+    ALLOWED_VAR_SET.has(key) ? (vars[key as TemplateVar] ?? '') : '',
+  );
 }
 
 /**
@@ -87,7 +38,7 @@ export function buildQueueNotificationMessage(
  */
 export function getMessageSegmentCount(message: string): number {
   // Check if message contains non-GSM-7 characters
-  const gsm7Chars = /^[@\u00a3\$\u00a5\u00e8\u00e9\u00f9\u00ec\u00f2\u00c7\n\u00d8\u00f8\r\u00c5\u00e5\u0394_\u03a6\u0393\u039b\u03a9\u03a0\u03a8\u03a3\u0398\u039e\u00c6\u00e6\u00df\u00c9 !"#\u00a4%&'()*+,\-.\/0-9:;<=>?\u00a1A-Za-z\u00c4\u00d6\u00d1\u00dc\u00a7\u00bf\u00e4\u00f6\u00f1\u00fc\u00e0\^{}\[~\]|\u20ac]*$/;
+  const gsm7Chars = /^[@£\$¥èéùìòÇ\nØø\rÅåΔ_ΦΓΛΩΠΨΣΘΞÆæßÉ !"#¤%&'()*+,\-.\/0-9:;<=>?¡A-Za-zÄÖÑÜ§¿äöñüà\^{}\[~\]|€]*$/;
   const isGsm7 = gsm7Chars.test(message);
 
   if (isGsm7) {

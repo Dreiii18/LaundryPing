@@ -4,7 +4,7 @@ import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
 import { decryptPhone } from '@/lib/utils/encryption';
 import { normalizeToLocal } from '@/lib/utils/phone';
 import { sendSms } from '@/lib/sms/provider';
-import { buildLaundryDoneMessage } from '@/lib/sms/templates';
+import { renderSmsTemplate, DEFAULT_COMPLETION_TEMPLATE } from '@/lib/sms/templates';
 import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 
 const completeJobSchema = z.object({
@@ -223,7 +223,15 @@ export async function POST(
     }
 
     // Build message and send SMS
-    const message = buildLaundryDoneMessage(laundromat.name, job.customer_name);
+    const message = renderSmsTemplate(
+      laundromat.sms_completion_template,
+      DEFAULT_COMPLETION_TEMPLATE,
+      {
+        shop_name: laundromat.name,
+        customer_name: job.customer_name ?? '',
+        job_id: job.id.slice(0, 8),
+      },
+    );
     const smsResult = await sendSms(phoneNumber, message);
 
     if (smsResult.success) {
