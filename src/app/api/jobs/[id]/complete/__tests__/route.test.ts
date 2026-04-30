@@ -13,7 +13,8 @@ vi.mock('@/lib/utils/phone', () => ({
   normalizeToLocal: vi.fn((phone: string) => phone),
 }));
 vi.mock('@/lib/sms/templates', () => ({
-  buildLaundryDoneMessage: vi.fn(() => 'Your laundry is done!'),
+  renderSmsTemplate: vi.fn(() => 'Your laundry is done!'),
+  DEFAULT_COMPLETION_TEMPLATE: 'default-completion',
 }));
 
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';

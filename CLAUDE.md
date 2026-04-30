@@ -59,7 +59,9 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 
 ### Database
 
-7 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`, `sms_topup_packages`, `sms_topup_logs`, `blog_posts`. Schema in `supabase/migrations/00001_initial_schema.sql` through `00011_credit_based_sms.sql`. Types manually defined in `types/database.ts` (not auto-generated).
+7 tables with RLS on all: `laundromats`, `machines`, `jobs`, `sms_logs`, `sms_topup_packages`, `sms_topup_logs`, `blog_posts`. Types manually defined in `types/database.ts` (not auto-generated).
+
+**Migrations**: The local `supabase/migrations/` folder uses sequential `NNNNN_name.sql` naming (e.g. `00001_initial_schema.sql`, `00002_sms_templates.sql`). `00001_initial_schema.sql` is a squashed baseline that consolidates the project's earlier history -- the remote Supabase project tracks migrations under their original timestamp-style names (`YYYYMMDDHHMMSS_name`), which don't appear in the repo. When adding a migration, use the next free sequential prefix (check `ls supabase/migrations/`) and a descriptive snake_case name.
 
 ### SMS Credits (Free + Top-up Model)
 

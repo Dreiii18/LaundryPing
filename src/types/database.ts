@@ -25,6 +25,9 @@ export interface Database {
           rush_fee: number;
           contact_number: string | null;
           receipt_paper_size: '58mm' | '80mm';
+          sms_queue_template: string | null;
+          sms_completion_template: string | null;
+          sender_name: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -43,6 +46,9 @@ export interface Database {
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
+          sms_queue_template?: string | null;
+          sms_completion_template?: string | null;
+          sender_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -61,6 +67,9 @@ export interface Database {
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
+          sms_queue_template?: string | null;
+          sms_completion_template?: string | null;
+          sender_name?: string | null;
           created_at?: string;
           updated_at?: string;
         };

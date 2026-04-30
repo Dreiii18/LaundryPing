@@ -1,218 +1,122 @@
-import { describe, it, expect, afterAll } from 'vitest';
-import { buildLaundryDoneMessage, buildQueueNotificationMessage, getMessageSegmentCount } from '../templates';
+import { describe, it, expect } from 'vitest';
+import {
+  renderSmsTemplate,
+  getMessageSegmentCount,
+  DEFAULT_QUEUE_TEMPLATE,
+  DEFAULT_COMPLETION_TEMPLATE,
+} from '../templates';
 
-describe('buildLaundryDoneMessage', () => {
-  const originalRandom = Math.random;
+describe('renderSmsTemplate', () => {
+  const sampleVars = {
+    shop_name: 'SpinClean',
+    customer_name: 'Maria',
+    job_id: 'abc12345',
+  };
 
-  afterAll(() => {
-    Math.random = originalRandom;
-  });
-
-  describe('rotates through 5 templates', () => {
-    it('template 1: "Tapos na po ... Salamat sa pagtitiwala!"', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toBe(
-        'Tapos na po ang labada mo sa SpinClean. Ready na po for pickup. Salamat sa pagtitiwala!'
+  describe('variable substitution', () => {
+    it('substitutes all three allowed variables', () => {
+      const tpl = '[{{shop_name}}] Hi {{customer_name}}, ref {{job_id}}';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, sampleVars)).toBe(
+        '[SpinClean] Hi Maria, ref abc12345',
       );
     });
 
-    it('template 2: "Ready na po ... Maraming salamat!"', () => {
-      Math.random = () => 0.2;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toBe(
-        'Ready na po ang labada mo sa SpinClean. Maaari na po itong i-pickup. Maraming salamat!'
+    it('substitutes repeated occurrences of the same variable', () => {
+      const tpl = '{{shop_name}} and {{shop_name}} again - {{shop_name}}';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, sampleVars)).toBe(
+        'SpinClean and SpinClean again - SpinClean',
       );
     });
 
-    it('template 3: "Hi! Tapos na po ... Salamat!"', () => {
-      Math.random = () => 0.4;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toBe(
-        'Hi! Tapos na po ang labada mo sa SpinClean. Pwede na po itong i-pickup. Salamat!'
+    it('renders missing var in vars object as empty string', () => {
+      const tpl = 'Hi {{customer_name}}';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, { shop_name: 'x' })).toBe(
+        'Hi ',
       );
     });
 
-    it('template 4: "Magandang balita! ... Salamat!"', () => {
-      Math.random = () => 0.6;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toBe(
-        'Magandang balita! Ready na po ang labada mo sa SpinClean. Paki-pickup na po kapag available. Salamat!'
+    it('preserves newlines in the template verbatim', () => {
+      const tpl = '{{shop_name}}\nReady na po!';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, sampleVars)).toBe(
+        'SpinClean\nReady na po!',
       );
     });
 
-    it('template 5: "Update mula sa ... Maraming salamat!"', () => {
-      Math.random = () => 0.8;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toBe(
-        'Update mula sa SpinClean: Tapos na po ang labada mo at ready na for pickup. Maraming salamat!'
+    it('preserves emoji in the template verbatim', () => {
+      const tpl = '{{shop_name}} 🧺 ready!';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, sampleVars)).toBe(
+        'SpinClean 🧺 ready!',
       );
     });
   });
 
-  describe('shop name handling', () => {
-    it('includes the shop name in the message', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).toContain('SpinClean');
+  describe('defense in depth — variable whitelist', () => {
+    it('renders unknown variable {{foo}} as empty string', () => {
+      const tpl = 'Hi {{foo}}';
+      expect(renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, sampleVars)).toBe('Hi ');
     });
 
-    it('uses a shop name exactly 25 chars without truncation', () => {
-      Math.random = () => 0;
-      const shopName = 'A'.repeat(25);
-      const msg = buildLaundryDoneMessage(shopName);
-      expect(msg).toContain(shopName);
-      expect(msg).not.toContain('...');
-    });
-
-    it('truncates a 26-character name to 22 + "..."', () => {
-      Math.random = () => 0;
-      const shopName = 'A'.repeat(26);
-      const msg = buildLaundryDoneMessage(shopName);
-      const truncated = 'A'.repeat(22) + '...';
-      expect(msg).toContain(truncated);
-    });
-
-    it('does not include the full un-truncated name in the message', () => {
-      Math.random = () => 0;
-      const shopName = 'VeryLongLaundromatNameThatExceedsLimit';
-      const msg = buildLaundryDoneMessage(shopName);
-      expect(msg).not.toContain(shopName);
-    });
-
-    it('uses "..." ellipsis for truncation', () => {
-      Math.random = () => 0;
-      const shopName = 'B'.repeat(30);
-      const msg = buildLaundryDoneMessage(shopName);
-      expect(msg).toContain('...');
+    it('renders {{customer_phone}} as empty string (sensitive field never leaks)', () => {
+      const tpl = 'Call {{customer_phone}} now';
+      expect(
+        renderSmsTemplate(tpl, DEFAULT_COMPLETION_TEMPLATE, {
+          ...sampleVars,
+          // @ts-expect-error — intentionally passing a non-allowed key
+          customer_phone: '09171234567',
+        }),
+      ).toBe('Call  now');
     });
   });
 
-  describe('message structure', () => {
-    it('all templates fit in a single 160-char SMS segment with a 25-char name', () => {
-      const shopName = 'A'.repeat(25);
-      for (let i = 0; i < 5; i++) {
-        Math.random = () => i / 5;
-        const msg = buildLaundryDoneMessage(shopName);
-        expect(msg.length).toBeLessThanOrEqual(160);
-        expect(getMessageSegmentCount(msg)).toBe(1);
-      }
+  describe('fallback behaviour', () => {
+    it('uses fallback when template is null', () => {
+      const rendered = renderSmsTemplate(null, DEFAULT_COMPLETION_TEMPLATE, sampleVars);
+      expect(rendered).toContain('SpinClean');
+      expect(rendered).toContain('Maria');
+      expect(rendered).not.toContain('{{');
     });
 
-    it('produces a single-line message (no newlines)', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).not.toContain('\n');
+    it('uses fallback when template is undefined', () => {
+      const rendered = renderSmsTemplate(undefined, DEFAULT_QUEUE_TEMPLATE, sampleVars);
+      expect(rendered).toContain('SpinClean');
+      expect(rendered).not.toContain('{{');
+    });
+
+    it('uses fallback when template is an empty string', () => {
+      const rendered = renderSmsTemplate('', DEFAULT_QUEUE_TEMPLATE, sampleVars);
+      expect(rendered).toContain('SpinClean');
+      expect(rendered).not.toContain('{{');
+    });
+
+    it('uses fallback when template is whitespace-only', () => {
+      const rendered = renderSmsTemplate('   \n  ', DEFAULT_COMPLETION_TEMPLATE, sampleVars);
+      expect(rendered).toContain('SpinClean');
+      expect(rendered).not.toContain('{{');
     });
   });
 
-  describe('customer name (no tags)', () => {
-    it('does not append any tag to the message', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean');
-      expect(msg).not.toContain('Tag');
-    });
-
-    it('appends customer name when provided and fits in 160 chars', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean', 'Juan');
-      expect(msg).toContain(' - Juan');
-      expect(msg).not.toContain('Tag');
-      expect(msg.length).toBeLessThanOrEqual(160);
-    });
-
-    it('drops customer name if it would exceed 160 chars', () => {
-      Math.random = () => 0;
-      const shopName = 'A'.repeat(25);
-      const longName = 'B'.repeat(60);
-      const msg = buildLaundryDoneMessage(shopName, longName);
-      expect(msg).not.toContain(longName);
-      expect(msg.length).toBeLessThanOrEqual(160);
-    });
-
-    it('does not append anything when customerName is null', () => {
-      Math.random = () => 0;
-      const msg = buildLaundryDoneMessage('SpinClean', null);
-      expect(msg).toBe(
-        'Tapos na po ang labada mo sa SpinClean. Ready na po for pickup. Salamat sa pagtitiwala!'
+  describe('default template rendering', () => {
+    it('DEFAULT_QUEUE_TEMPLATE renders cleanly with sample vars', () => {
+      const rendered = renderSmsTemplate(null, DEFAULT_QUEUE_TEMPLATE, sampleVars);
+      expect(rendered).toBe(
+        '[SpinClean] Salamat! Nakapila na po ang laundry niyo. I-text po namin pag tapos na. - SpinClean',
       );
     });
 
-    it('all templates fit in 1 segment with short customer name', () => {
-      const shopName = 'A'.repeat(25);
-      for (let i = 0; i < 5; i++) {
-        Math.random = () => i / 5;
-        const msg = buildLaundryDoneMessage(shopName, 'Juan');
-        expect(msg.length).toBeLessThanOrEqual(160);
-        expect(getMessageSegmentCount(msg)).toBe(1);
-      }
+    it('DEFAULT_COMPLETION_TEMPLATE renders cleanly with sample vars', () => {
+      const rendered = renderSmsTemplate(null, DEFAULT_COMPLETION_TEMPLATE, sampleVars);
+      expect(rendered).toBe(
+        '[SpinClean] Hi Maria, ready na po ang laundry niyo! Salamat po. - SpinClean',
+      );
     });
-  });
-});
 
-describe('buildQueueNotificationMessage', () => {
-  const originalRandom = Math.random;
-
-  afterAll(() => {
-    Math.random = originalRandom;
-  });
-
-  it('rotates through 3 templates', () => {
-    const templates = new Set<string>();
-    for (let i = 0; i < 3; i++) {
-      Math.random = () => i / 3;
-      templates.add(buildQueueNotificationMessage('SpinClean'));
-    }
-    expect(templates.size).toBe(3);
-  });
-
-  it('includes the shop name', () => {
-    Math.random = () => 0;
-    const msg = buildQueueNotificationMessage('SpinClean');
-    expect(msg).toContain('SpinClean');
-  });
-
-  it('truncates shop names longer than 25 chars', () => {
-    Math.random = () => 0;
-    const shopName = 'A'.repeat(26);
-    const msg = buildQueueNotificationMessage(shopName);
-    expect(msg).toContain('A'.repeat(22) + '...');
-    expect(msg).not.toContain(shopName);
-  });
-
-  it('appends customer name when it fits in 160 chars', () => {
-    Math.random = () => 0;
-    const msg = buildQueueNotificationMessage('SpinClean', 'Juan');
-    expect(msg).toContain(' - Juan');
-    expect(msg.length).toBeLessThanOrEqual(160);
-  });
-
-  it('drops customer name if it would exceed 160 chars', () => {
-    Math.random = () => 0;
-    const longName = 'B'.repeat(80);
-    const msg = buildQueueNotificationMessage('A'.repeat(25), longName);
-    expect(msg).not.toContain(longName);
-    expect(msg.length).toBeLessThanOrEqual(160);
-  });
-
-  it('all templates fit in 1 SMS segment with 25-char name', () => {
-    const shopName = 'A'.repeat(25);
-    for (let i = 0; i < 3; i++) {
-      Math.random = () => i / 3;
-      const msg = buildQueueNotificationMessage(shopName);
-      expect(msg.length).toBeLessThanOrEqual(160);
-      expect(getMessageSegmentCount(msg)).toBe(1);
-    }
-  });
-
-  it('all templates fit in 1 segment with short customer name', () => {
-    const shopName = 'A'.repeat(25);
-    for (let i = 0; i < 3; i++) {
-      Math.random = () => i / 3;
-      const msg = buildQueueNotificationMessage(shopName, 'Juan');
-      expect(msg.length).toBeLessThanOrEqual(160);
-      expect(getMessageSegmentCount(msg)).toBe(1);
-    }
+    it('both default templates fit within a single SMS segment with a 25-char shop name', () => {
+      const vars = { shop_name: 'A'.repeat(25), customer_name: 'Juan', job_id: 'abc12345' };
+      const q = renderSmsTemplate(null, DEFAULT_QUEUE_TEMPLATE, vars);
+      const c = renderSmsTemplate(null, DEFAULT_COMPLETION_TEMPLATE, vars);
+      expect(getMessageSegmentCount(q)).toBe(1);
+      expect(getMessageSegmentCount(c)).toBe(1);
+    });
   });
 });
 
@@ -223,76 +127,53 @@ describe('getMessageSegmentCount', () => {
     });
 
     it('returns 1 for a message of exactly 160 GSM-7 characters', () => {
-      const msg = 'A'.repeat(160);
-      expect(getMessageSegmentCount(msg)).toBe(1);
+      expect(getMessageSegmentCount('A'.repeat(160))).toBe(1);
     });
 
     it('returns 1 for a message shorter than 160 GSM-7 characters', () => {
-      const msg = 'Hello World!';
-      expect(getMessageSegmentCount(msg)).toBe(1);
+      expect(getMessageSegmentCount('Hello World!')).toBe(1);
     });
 
     it('returns 2 for a message of 161 GSM-7 characters (multipart, 153/segment)', () => {
-      const msg = 'A'.repeat(161);
-      expect(getMessageSegmentCount(msg)).toBe(2);
+      expect(getMessageSegmentCount('A'.repeat(161))).toBe(2);
     });
 
     it('returns 2 for a message of 306 GSM-7 characters (2 x 153)', () => {
-      const msg = 'A'.repeat(306);
-      expect(getMessageSegmentCount(msg)).toBe(2);
+      expect(getMessageSegmentCount('A'.repeat(306))).toBe(2);
     });
 
     it('returns 3 for a message of 307 GSM-7 characters (3rd segment starts)', () => {
-      const msg = 'A'.repeat(307);
-      expect(getMessageSegmentCount(msg)).toBe(3);
-    });
-
-    it('all templates fit in 1 segment with a short name', () => {
-      const originalRandom = Math.random;
-      for (let i = 0; i < 5; i++) {
-        Math.random = () => i / 5;
-        const msg = buildLaundryDoneMessage('SpinClean');
-        expect(getMessageSegmentCount(msg)).toBe(1);
-      }
-      Math.random = originalRandom;
+      expect(getMessageSegmentCount('A'.repeat(307))).toBe(3);
     });
   });
 
   describe('UCS-2 (unicode) messages', () => {
+    const unicodeChar = 'こ';
+
     it('returns 1 for a unicode message of exactly 70 characters', () => {
-      const unicodeChar = '\u3053';
-      const msg = unicodeChar.repeat(70);
-      expect(getMessageSegmentCount(msg)).toBe(1);
+      expect(getMessageSegmentCount(unicodeChar.repeat(70))).toBe(1);
     });
 
     it('returns 2 for a unicode message of 71 characters (multipart, 67/segment)', () => {
-      const unicodeChar = '\u3053';
-      const msg = unicodeChar.repeat(71);
-      expect(getMessageSegmentCount(msg)).toBe(2);
+      expect(getMessageSegmentCount(unicodeChar.repeat(71))).toBe(2);
     });
 
     it('returns 2 for a unicode message of 134 characters (2 x 67)', () => {
-      const unicodeChar = '\u3053';
-      const msg = unicodeChar.repeat(134);
-      expect(getMessageSegmentCount(msg)).toBe(2);
+      expect(getMessageSegmentCount(unicodeChar.repeat(134))).toBe(2);
     });
 
     it('returns 3 for a unicode message of 135 characters (3rd segment starts)', () => {
-      const unicodeChar = '\u3053';
-      const msg = unicodeChar.repeat(135);
-      expect(getMessageSegmentCount(msg)).toBe(3);
+      expect(getMessageSegmentCount(unicodeChar.repeat(135))).toBe(3);
     });
   });
 
   describe('edge cases', () => {
     it('GSM-7 numbers and basic punctuation are counted as GSM-7', () => {
-      const msg = '0917 123 4567 - Your laundry is ready!';
-      expect(getMessageSegmentCount(msg)).toBe(1);
+      expect(getMessageSegmentCount('0917 123 4567 - Your laundry is ready!')).toBe(1);
     });
 
     it('message with only newlines counts as GSM-7', () => {
-      const msg = '\n'.repeat(50);
-      expect(getMessageSegmentCount(msg)).toBe(1);
+      expect(getMessageSegmentCount('\n'.repeat(50))).toBe(1);
     });
   });
 });

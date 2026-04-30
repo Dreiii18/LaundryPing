@@ -5,7 +5,7 @@ import { isValidPhNumber, normalizeToLocal, maskPhone } from '@/lib/utils/phone'
 import { encryptPhone, decryptPhone } from '@/lib/utils/encryption';
 import { sanitizeNotes, sanitizeCustomerName } from '@/lib/utils/sanitize';
 import { sendSms } from '@/lib/sms/provider';
-import { buildQueueNotificationMessage } from '@/lib/sms/templates';
+import { renderSmsTemplate, DEFAULT_QUEUE_TEMPLATE } from '@/lib/sms/templates';
 import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
 
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
@@ -336,9 +336,14 @@ export async function POST(request: Request) {
           try {
             const decryptedPhone = decryptPhone(encryptedPhone);
             const phoneNumber = normalizeToLocal(decryptedPhone);
-            const message = buildQueueNotificationMessage(
-              laundromat.name,
-              sanitizedCustomerName,
+            const message = renderSmsTemplate(
+              laundromat.sms_queue_template,
+              DEFAULT_QUEUE_TEMPLATE,
+              {
+                shop_name: laundromat.name,
+                customer_name: sanitizedCustomerName ?? '',
+                job_id: job.id.slice(0, 8),
+              },
             );
             const smsResult = await sendSms(phoneNumber, message);
 

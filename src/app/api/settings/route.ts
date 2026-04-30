@@ -19,6 +19,18 @@ const updateSettingsSchema = z.object({
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
   rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
   receipt_paper_size: z.enum(['58mm', '80mm']).optional(),
+  sms_queue_template: z
+    .string()
+    .max(480, 'Queue template must be 480 characters or less')
+    .transform((s) => s.replace(/\r/g, ''))
+    .optional()
+    .nullable(),
+  sms_completion_template: z
+    .string()
+    .max(480, 'Completion template must be 480 characters or less')
+    .transform((s) => s.replace(/\r/g, ''))
+    .optional()
+    .nullable(),
 });
 
 export async function GET() {
@@ -44,6 +56,8 @@ export async function GET() {
         rush_fee: laundromat.rush_fee,
         contact_number: laundromat.contact_number,
         receipt_paper_size: laundromat.receipt_paper_size,
+        sms_queue_template: laundromat.sms_queue_template,
+        sms_completion_template: laundromat.sms_completion_template,
       },
     });
   } catch {
@@ -145,6 +159,19 @@ export async function PUT(request: Request) {
       updateData.receipt_paper_size = parsed.data.receipt_paper_size;
     }
 
+    if (parsed.data.sms_queue_template !== undefined) {
+      // Empty string → null so the renderer falls back to the default.
+      updateData.sms_queue_template = parsed.data.sms_queue_template?.trim()
+        ? parsed.data.sms_queue_template
+        : null;
+    }
+
+    if (parsed.data.sms_completion_template !== undefined) {
+      updateData.sms_completion_template = parsed.data.sms_completion_template?.trim()
+        ? parsed.data.sms_completion_template
+        : null;
+    }
+
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(
         { error: 'No fields to update' },
@@ -156,7 +183,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services, service_prices, service_weights, service_types, rush_fee, contact_number, receipt_paper_size')
+      .select('id, name, address, available_services, service_prices, service_weights, service_types, rush_fee, contact_number, receipt_paper_size, sms_queue_template, sms_completion_template')
       .single();
 
     if (updateError) {
