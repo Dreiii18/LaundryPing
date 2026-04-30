@@ -9,6 +9,7 @@ import {
   WashingMachine,
   Settings,
   MessageSquare,
+  FileText,
   Wallet,
   Shield,
   LogOut,
@@ -22,6 +23,7 @@ const navItems = [
   { href: '/machines', label: 'Machines', icon: WashingMachine },
   { href: '/plan-billing', label: 'SMS Credits', icon: Wallet },
   { href: '/sms-history', label: 'SMS History', icon: MessageSquare },
+  { href: '/settings/sms-template', label: 'SMS Template', icon: FileText },
   { href: '/settings', label: 'Settings', icon: Settings },
 ];
 
