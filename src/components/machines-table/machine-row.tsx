@@ -36,9 +36,14 @@ function MachineRowComponent({ machine, onEdit, onDelete }: MachineRowProps) {
           <div className="size-8 rounded-lg bg-[#0d968b]/10 flex items-center justify-center text-[#0d968b] font-bold text-xs">
             {machine.label.slice(0, 2).toUpperCase()}
           </div>
-          <span className="text-sm font-semibold text-slate-900">
-            {machine.label}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-semibold text-slate-900">
+              {machine.label}
+            </span>
+            <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-slate-500 border-slate-200">
+              {machine.machine_type}
+            </Badge>
+          </div>
         </div>
       </TableCell>
       <TableCell className="px-6 py-5">
@@ -50,7 +55,9 @@ function MachineRowComponent({ machine, onEdit, onDelete }: MachineRowProps) {
         ) : machine.operationalStatus === 'in_use' ? (
           <Badge className="bg-[#0d968b]/10 text-[#0d968b] border-transparent gap-1.5">
             <span className="size-2 rounded-full bg-[#0d968b] animate-pulse" />
-            In Use
+            {machine.currentPhase
+              ? `${machine.currentPhase.phaseType}${machine.currentPhase.claimNumber != null ? ` · #${machine.currentPhase.claimNumber}` : ''}`
+              : 'In Use'}
           </Badge>
         ) : (
           <Badge className="bg-emerald-100 text-emerald-700 border-transparent gap-1.5">
@@ -100,9 +107,12 @@ export const MachineRow = React.memo(MachineRowComponent, (prev, next) => {
     prev.machine.id === next.machine.id &&
     prev.machine.label === next.machine.label &&
     prev.machine.status === next.machine.status &&
+    prev.machine.machine_type === next.machine.machine_type &&
     prev.machine.operationalStatus === next.machine.operationalStatus &&
     prev.machine.cyclesToday === next.machine.cyclesToday &&
     prev.machine.lastActivityAt === next.machine.lastActivityAt &&
+    prev.machine.currentPhase?.jobId === next.machine.currentPhase?.jobId &&
+    prev.machine.currentPhase?.phaseType === next.machine.currentPhase?.phaseType &&
     prev.onEdit === next.onEdit &&
     prev.onDelete === next.onDelete
   );

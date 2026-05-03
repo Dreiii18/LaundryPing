@@ -5,16 +5,39 @@ export const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ] as const;
 
+export type MachineType = 'washer' | 'dryer' | 'combo' | 'other';
+
 export interface Machine {
   id: string;
   label: string;
+  machine_type?: MachineType;
+}
+
+export type JobStatus = 'pending' | 'in_progress' | 'ready_for_pickup' | 'completed' | 'cancelled';
+
+export type PhaseStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface JobPhase {
+  id: string;
+  phase_type: string;
+  machine_id: string | null;
+  sequence: number;
+  status: PhaseStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  estimated_minutes: number | null;
+  machine: {
+    id: string;
+    label: string;
+    machine_type?: MachineType;
+  } | null;
 }
 
 export interface Job {
   id: string;
   machine_id: string | null;
   customer_phone_masked: string | null;
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  status: JobStatus;
   started_at: string;
   completed_at: string | null;
   sms_sent: boolean;
@@ -38,7 +61,9 @@ export interface Job {
   machine: {
     id: string;
     label: string;
+    machine_type?: MachineType;
   } | null;
+  phases?: JobPhase[];
 }
 
 import type { ShopInfo } from '@/types/shop';

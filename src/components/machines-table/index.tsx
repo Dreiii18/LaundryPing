@@ -47,6 +47,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     editingMachine,
     label,
     status,
+    machineType,
     modalError,
     saving,
     deleteOpen,
@@ -57,6 +58,7 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
     setDeleteOpen,
     setLabel,
     setStatus,
+    setMachineType,
     openAddModal,
     openEditModal,
     openDeleteDialog,
@@ -356,6 +358,8 @@ export function MachinesTable({ machines: initialMachines }: MachinesTableProps)
         onLabelChange={setLabel}
         status={status}
         onStatusChange={setStatus}
+        machineType={machineType}
+        onMachineTypeChange={setMachineType}
         onSave={handleSave}
         saving={saving}
         error={modalError}

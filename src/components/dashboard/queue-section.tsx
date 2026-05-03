@@ -3,7 +3,7 @@
 import { useJobActions } from '@/components/jobs-table/use-job-actions';
 import { useHandlePrint } from '@/hooks/use-handle-print';
 import { CancelDialog } from '@/components/jobs-table/cancel-dialog';
-import { AssignDialog } from '@/components/jobs-table/assign-dialog';
+import { StartPhaseDialog } from '@/components/jobs-table/start-phase-dialog';
 import { QueueCard } from './queue-card';
 import { ListTodo } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
@@ -49,7 +49,7 @@ export function QueueSection({ jobs, shopInfo, mobileTabMode }: QueueSectionProp
               shopInfo={shopInfo}
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
-              onAssign={actions.openAssignDialog}
+              onStartPhase={actions.openStartPhaseDialog}
               onCancel={actions.setCancelConfirmJobId}
               onPrint={handlePrint}
             />
@@ -62,15 +62,16 @@ export function QueueSection({ jobs, shopInfo, mobileTabMode }: QueueSectionProp
         onConfirm={actions.handleCancelJob}
         onClose={() => actions.setCancelConfirmJobId(null)}
       />
-      <AssignDialog
-        assignJobId={actions.assignJobId}
-        assignMachineId={actions.assignMachineId}
-        assigningMachine={actions.assigningMachine}
+      <StartPhaseDialog
+        open={actions.startPhaseJobId !== null}
+        phaseType={actions.startPhaseType}
+        machineId={actions.startPhaseMachineId}
+        starting={actions.startingPhase}
         availableMachines={actions.availableMachines}
         loadingMachines={actions.loadingMachines}
-        onMachineChange={actions.setAssignMachineId}
-        onConfirm={actions.handleAssignMachine}
-        onClose={() => actions.setAssignJobId(null)}
+        onMachineChange={actions.setStartPhaseMachineId}
+        onConfirm={actions.handleStartPhase}
+        onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
       />
     </div>
   );

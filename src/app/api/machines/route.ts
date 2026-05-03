@@ -5,6 +5,7 @@ import { sanitizeMachineLabel } from '@/lib/utils/sanitize';
 
 const createMachineSchema = z.object({
   label: z.string().min(1, 'Label is required').max(20, 'Label must be 20 characters or less'),
+  machine_type: z.enum(['washer', 'dryer', 'combo', 'other']).optional(),
 });
 
 export async function GET(request: Request) {
@@ -21,9 +22,14 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const availableOnly = searchParams.get('available') === 'true';
     const excludeJobId = searchParams.get('exclude_job');
+    const machineTypeFilter = searchParams.get('machine_type');
 
     if (excludeJobId && !z.string().uuid().safeParse(excludeJobId).success) {
       return NextResponse.json({ error: 'Invalid exclude_job parameter' }, { status: 400 });
+    }
+
+    if (machineTypeFilter && !['washer', 'dryer', 'combo', 'other'].includes(machineTypeFilter)) {
+      return NextResponse.json({ error: 'Invalid machine_type parameter' }, { status: 400 });
     }
 
     let query = supabase
@@ -34,20 +40,22 @@ export async function GET(request: Request) {
     if (availableOnly) {
       query = query.eq('status', 'active');
 
-      let jobsQuery = supabase
-        .from('jobs')
-        .select('machine_id')
+      // Occupancy is derived from job_phases: a machine is busy iff there's an
+      // in_progress phase pointing at it.
+      let phasesQuery = supabase
+        .from('job_phases')
+        .select('machine_id, job_id')
         .eq('laundromat_id', laundromat.id)
-        .in('status', ['pending', 'in_progress'])
+        .eq('status', 'in_progress')
         .not('machine_id', 'is', null);
 
       if (excludeJobId) {
-        jobsQuery = jobsQuery.neq('id', excludeJobId);
+        phasesQuery = phasesQuery.neq('job_id', excludeJobId);
       }
 
-      const { data: busyJobs } = await jobsQuery;
-      const busyMachineIds = (busyJobs || [])
-        .map((j: { machine_id: string | null }) => j.machine_id)
+      const { data: busyPhases } = await phasesQuery;
+      const busyMachineIds = (busyPhases || [])
+        .map((p: { machine_id: string | null }) => p.machine_id)
         .filter(Boolean) as string[];
 
       if (busyMachineIds.length > 0) {
@@ -55,6 +63,15 @@ export async function GET(request: Request) {
       }
     } else {
       query = query.in('status', ['active', 'maintenance']);
+    }
+
+    if (machineTypeFilter) {
+      // 'combo' machines are universal — return them for any type filter.
+      if (machineTypeFilter === 'combo') {
+        query = query.eq('machine_type', 'combo');
+      } else {
+        query = query.in('machine_type', [machineTypeFilter, 'combo']);
+      }
     }
 
     query = query.order('created_at', { ascending: true });
@@ -106,6 +123,7 @@ export async function POST(request: Request) {
       .insert({
         laundromat_id: laundromat.id,
         label: sanitizedLabel,
+        machine_type: parsed.data.machine_type ?? 'washer',
       })
       .select()
       .single();

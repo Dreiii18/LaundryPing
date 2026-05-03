@@ -28,11 +28,31 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Only pending or in_progress jobs can be cancelled
-    if (!['pending', 'in_progress'].includes(job.status)) {
+    // Only pending, in_progress, or ready_for_pickup jobs can be cancelled
+    if (!['pending', 'in_progress', 'ready_for_pickup'].includes(job.status)) {
       return NextResponse.json(
         { error: 'Job is already completed or cancelled', toastType: 'warning' },
         { status: 409 }
+      );
+    }
+
+    // Skip any open phases first so machines free up. Do this BEFORE setting
+    // jobs.status = 'cancelled' — once the job is cancelled, the trigger ignores
+    // phase mutations (terminal status).
+    const { error: skipPhasesError } = await supabase
+      .from('job_phases')
+      .update({ status: 'skipped', completed_at: new Date().toISOString() })
+      .eq('job_id', id)
+      .in('status', ['pending', 'in_progress']);
+
+    if (skipPhasesError) {
+      // Fail loud: lingering in_progress phase rows would permanently lock
+      // their machines (unique partial index + busy-machine queries) with no
+      // in-app recovery. The update is idempotent, so a retry is safe.
+      console.error('[Cancel Job] Phase skip failed:', skipPhasesError);
+      return NextResponse.json(
+        { error: 'Failed to free machines, please retry' },
+        { status: 500 }
       );
     }
 
@@ -44,7 +64,7 @@ export async function POST(
         completed_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .in('status', ['pending', 'in_progress']);
+      .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
     if (updateError) {
       console.error('[Cancel Job] Update failed:', updateError);

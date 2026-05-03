@@ -10,7 +10,7 @@ interface QueueCardProps {
   shopInfo?: ShopInfo;
   completingId: string | null;
   cancellingId: string | null;
-  onAssign: (jobId: string) => void;
+  onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onCancel: (jobId: string) => void;
   onPrint: (job: Job) => void;
 }
@@ -20,11 +20,13 @@ export function QueueCard({
   shopInfo,
   completingId,
   cancellingId,
-  onAssign,
+  onStartPhase,
   onCancel,
   onPrint,
 }: QueueCardProps) {
   const isActionDisabled = completingId !== null || cancellingId !== null;
+  const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
+  const nextPending = phases.find((p) => p.status === 'pending') ?? null;
 
   // Secondary info fragments
   const secondaryParts: string[] = [];
@@ -55,14 +57,16 @@ export function QueueCard({
           {secondaryParts.join(' · ')}
         </span>
         <div className="flex items-center gap-1.5 shrink-0">
-          <Button
-            size="sm"
-            onClick={() => onAssign(job.id)}
-            disabled={isActionDisabled}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-7 px-3"
-          >
-            Assign
-          </Button>
+          {nextPending && (
+            <Button
+              size="sm"
+              onClick={() => onStartPhase(job.id, nextPending)}
+              disabled={isActionDisabled}
+              className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-7 px-3"
+            >
+              Start {nextPending.phase_type}
+            </Button>
+          )}
           <button
             onClick={() => onCancel(job.id)}
             disabled={isActionDisabled}
