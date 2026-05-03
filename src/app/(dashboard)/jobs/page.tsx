@@ -1,6 +1,7 @@
 import { getCachedUser } from '@/lib/supabase/cached-auth';
 import { redirect } from 'next/navigation';
 import { JobsPageContent } from '@/components/jobs-page-content';
+import type { MachineType } from '@/components/jobs-table/types';
 
 const PAGE_SIZE = 15;
 
@@ -69,7 +70,23 @@ export default async function JobsPage({
       priority,
       machines (
         id,
-        label
+        label,
+        machine_type
+      ),
+      job_phases (
+        id,
+        phase_type,
+        machine_id,
+        sequence,
+        status,
+        started_at,
+        completed_at,
+        estimated_minutes,
+        machines (
+          id,
+          label,
+          machine_type
+        )
       )
     `,
       { count: 'exact' }
@@ -119,36 +136,67 @@ export default async function JobsPage({
       .eq('laundromat_id', laundromat.id),
   ]);
 
-  const safeJobs = (jobs || []).map((job) => ({
-    id: job.id,
-    machine_id: job.machine_id as string | null,
-    customer_phone_masked: job.customer_phone_masked as string | null,
-    status: job.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-    started_at: job.started_at,
-    completed_at: job.completed_at,
-    sms_sent: job.sms_sent,
-    notify_sms: job.notify_sms as boolean,
-    notify_queue_sms: job.notify_queue_sms as boolean,
-    notes: job.notes,
-    payment_method: job.payment_method as string | null,
-    pay_amount: job.pay_amount as number | null,
-    cash_tendered: job.cash_tendered as number | null,
-    is_paid: job.is_paid as boolean,
-    is_overdue: job.is_overdue as boolean,
-    overdue_reason: job.overdue_reason as string | null,
-    services: (job.services || []) as string[],
-    service_quantities: (job.service_quantities as Record<string, number> | null) ?? null,
-    service_weights_actual: (job.service_weights_actual as Record<string, number> | null) ?? null,
-    total_weight: job.total_weight as number | null,
-    claim_number: job.claim_number as number | null,
-    customer_name: job.customer_name as string | null,
-    priority: (job.priority as 'normal' | 'rush') ?? 'normal',
-    created_at: job.created_at as string,
-    machine:
-      Array.isArray(job.machines)
-        ? ((job.machines[0] as { id: string; label: string }) ?? null)
-        : (job.machines as { id: string; label: string } | null),
-  }));
+  // Supabase types nested relations as arrays even for many-to-one joins.
+  type JoinedMachine = { id: string; label: string; machine_type?: MachineType };
+  type JoinedPhase = {
+    id: string;
+    phase_type: string;
+    machine_id: string | null;
+    sequence: number;
+    status: string;
+    started_at: string | null;
+    completed_at: string | null;
+    estimated_minutes: number | null;
+    machines: JoinedMachine | JoinedMachine[] | null;
+  };
+  const pickOne = <T,>(v: T | T[] | null): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : v;
+
+  const safeJobs = (jobs || []).map((job) => {
+    const phases = ((job.job_phases ?? []) as unknown as JoinedPhase[])
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((p) => ({
+        id: p.id,
+        phase_type: p.phase_type,
+        machine_id: p.machine_id,
+        sequence: p.sequence,
+        status: p.status as 'pending' | 'in_progress' | 'completed' | 'skipped',
+        started_at: p.started_at,
+        completed_at: p.completed_at,
+        estimated_minutes: p.estimated_minutes,
+        machine: pickOne(p.machines),
+      }));
+
+    return {
+      id: job.id,
+      machine_id: job.machine_id as string | null,
+      customer_phone_masked: job.customer_phone_masked as string | null,
+      status: job.status as 'pending' | 'in_progress' | 'ready_for_pickup' | 'completed' | 'cancelled',
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      sms_sent: job.sms_sent,
+      notify_sms: job.notify_sms as boolean,
+      notify_queue_sms: job.notify_queue_sms as boolean,
+      notes: job.notes,
+      payment_method: job.payment_method as string | null,
+      pay_amount: job.pay_amount as number | null,
+      cash_tendered: job.cash_tendered as number | null,
+      is_paid: job.is_paid as boolean,
+      is_overdue: job.is_overdue as boolean,
+      overdue_reason: job.overdue_reason as string | null,
+      services: (job.services || []) as string[],
+      service_quantities: (job.service_quantities as Record<string, number> | null) ?? null,
+      service_weights_actual: (job.service_weights_actual as Record<string, number> | null) ?? null,
+      total_weight: job.total_weight as number | null,
+      claim_number: job.claim_number as number | null,
+      customer_name: job.customer_name as string | null,
+      priority: (job.priority as 'normal' | 'rush') ?? 'normal',
+      created_at: job.created_at as string,
+      machine: pickOne(job.machines as JoinedMachine | JoinedMachine[] | null),
+      phases,
+    };
+  });
 
   const safeMachines = (machines || []).map((m) => ({
     id: m.id,

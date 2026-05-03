@@ -2,17 +2,21 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Printer, MessageSquare } from 'lucide-react';
-import type { Job, ShopInfo } from '@/components/jobs-table/types';
+import { Loader2, Printer, MessageSquare, Bell, Check, Play, SkipForward } from 'lucide-react';
+import type { Job, JobPhase, ShopInfo } from '@/components/jobs-table/types';
 
 interface TodaysJobsCardProps {
   job: Job;
   shopInfo?: ShopInfo;
   completingId: string | null;
   cancellingId: string | null;
+  phaseInFlight: string | null;
   onMarkDone: (job: Job) => void;
   onCancel: (jobId: string) => void;
   onPrint: (job: Job) => void;
+  onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onCompletePhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onSkipPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
 }
 
 const formatTime = (dateStr: string) => {
@@ -33,37 +37,59 @@ const formatAmount = (amount: number | null) => {
 const getBorderColor = (job: Job) => {
   if (job.status === 'in_progress' && job.is_overdue) return 'border-l-red-500';
   if (job.status === 'in_progress') return 'border-l-amber-400';
+  if (job.status === 'ready_for_pickup') return 'border-l-teal-500';
   if (job.status === 'completed') return 'border-l-[#0d968b]';
-  return 'border-l-slate-200'; // cancelled — greyed out
+  return 'border-l-slate-200';
 };
+
+function PhaseChip({ phase }: { phase: JobPhase }) {
+  const base = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border';
+  if (phase.status === 'completed') {
+    return <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`}><Check className="size-2.5" />{phase.phase_type}</span>;
+  }
+  if (phase.status === 'in_progress') {
+    return <span className={`${base} bg-amber-50 text-amber-800 border-amber-300`}><span className="size-1 rounded-full bg-amber-500 animate-pulse" />{phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}</span>;
+  }
+  if (phase.status === 'skipped') {
+    return <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`}>{phase.phase_type}</span>;
+  }
+  return <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`}><span className="size-1 rounded-full bg-slate-300" />{phase.phase_type}</span>;
+}
 
 export function TodaysJobsCard({
   job,
   shopInfo,
   completingId,
   cancellingId,
+  phaseInFlight,
   onMarkDone,
   onCancel,
   onPrint,
+  onStartPhase,
+  onCompletePhase,
+  onSkipPhase,
 }: TodaysJobsCardProps) {
-  const isActionDisabled = completingId !== null || cancellingId !== null;
-  const isActive = job.status === 'in_progress';
+  const isActionDisabled = completingId !== null || cancellingId !== null || phaseInFlight !== null;
+  const isOpen = job.status === 'in_progress' || job.status === 'ready_for_pickup';
   const borderColor = getBorderColor(job);
   const amount = formatAmount(job.pay_amount);
 
-  // Secondary info fragments
+  const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
+  const activePhase = phases.find((p) => p.status === 'in_progress') ?? null;
+  const nextPendingPhase = phases.find((p) => p.status === 'pending') ?? null;
+
+  // Secondary info: claim# + customer name (machine label is now inside the phase strip)
   const secondaryParts: string[] = [];
   if (job.claim_number != null) secondaryParts.push(`#${job.claim_number}`);
-  if (job.machine) secondaryParts.push(job.machine.label);
-  else secondaryParts.push('No machine');
+  if (phases.length === 0 && job.machine) secondaryParts.push(job.machine.label);
   if (job.customer_name) secondaryParts.push(job.customer_name);
 
   // Compact row for completed/cancelled jobs
-  if (!isActive) {
+  if (!isOpen) {
     return <CompactJobRow job={job} shopInfo={shopInfo} amount={amount} borderColor={borderColor} secondaryParts={secondaryParts} onPrint={onPrint} formatTime={formatTime} />;
   }
 
-  // Full card for active (in_progress) jobs
+  // Full card for active (in_progress / ready_for_pickup) jobs
   return (
     <div className={`rounded-lg border border-slate-200 border-l-4 ${borderColor} p-3 space-y-2`}>
       {/* Row 1: Service type (primary) + amount */}
@@ -78,10 +104,17 @@ export function TodaysJobsCard({
         )}
       </div>
 
+      {/* Phase strip (when phases exist) */}
+      {phases.length > 0 && (
+        <div className="flex flex-wrap gap-1">
+          {phases.map((p) => <PhaseChip key={p.id} phase={p} />)}
+        </div>
+      )}
+
       {/* Row 2: Secondary info + time + SMS */}
       <div className="flex items-center gap-1.5 text-xs text-slate-400 flex-wrap">
-        <span>{secondaryParts.join(' · ')}</span>
-        <span>·</span>
+        {secondaryParts.length > 0 && <span>{secondaryParts.join(' · ')}</span>}
+        {secondaryParts.length > 0 && <span>·</span>}
         <span>{formatTime(job.started_at)}</span>
         {job.sms_sent && (
           <span className="flex items-center gap-0.5 text-[#0d968b]">
@@ -94,20 +127,63 @@ export function TodaysJobsCard({
         )}
       </div>
 
-      {/* Row 3: Actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          size="sm"
-          onClick={() => onMarkDone(job)}
-          disabled={isActionDisabled}
-          className="text-xs font-bold bg-[#0d968b] hover:bg-[#0b7f75] text-white h-8 px-4"
-        >
-          {completingId === job.id ? (
-            <Loader2 className="size-3 animate-spin" />
-          ) : (
-            'Done'
-          )}
-        </Button>
+      {/* Row 3: Phase-aware actions */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {/* Active phase: complete + skip */}
+        {activePhase && (
+          <>
+            <Button
+              size="sm"
+              onClick={() => onCompletePhase(job.id, activePhase)}
+              disabled={isActionDisabled}
+              className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white h-8 px-3"
+            >
+              {phaseInFlight === activePhase.id ? (
+                <Loader2 className="size-3 animate-spin" />
+              ) : (
+                <><Check className="size-3" /><span className="ml-1">Done {activePhase.phase_type}</span></>
+              )}
+            </Button>
+            <button
+              onClick={() => onSkipPhase(job.id, activePhase)}
+              disabled={isActionDisabled}
+              className="text-xs text-slate-400 hover:text-slate-600 disabled:opacity-50 px-1"
+              aria-label={`Skip ${activePhase.phase_type}`}
+            >
+              <SkipForward className="size-3.5" />
+            </button>
+          </>
+        )}
+
+        {/* Next pending phase: start it */}
+        {!activePhase && nextPendingPhase && (
+          <Button
+            size="sm"
+            onClick={() => onStartPhase(job.id, nextPendingPhase)}
+            disabled={isActionDisabled}
+            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+          >
+            <Play className="size-3" />
+            <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
+          </Button>
+        )}
+
+        {/* Ready for pickup OR no phases at all: notify customer */}
+        {(job.status === 'ready_for_pickup' || (!activePhase && !nextPendingPhase)) && (
+          <Button
+            size="sm"
+            onClick={() => onMarkDone(job)}
+            disabled={isActionDisabled}
+            className="text-xs font-bold bg-[#0d968b] hover:bg-[#0b7f75] text-white h-8 px-3"
+          >
+            {completingId === job.id ? (
+              <Loader2 className="size-3 animate-spin" />
+            ) : (
+              <><Bell className="size-3" /><span className="ml-1">Notify &amp; complete</span></>
+            )}
+          </Button>
+        )}
+
         <button
           onClick={() => onCancel(job.id)}
           disabled={isActionDisabled}

@@ -7,6 +7,7 @@ import { useHandlePrint } from '@/hooks/use-handle-print';
 import { OverdueDialog } from '@/components/jobs-table/overdue-dialog';
 import { CancelDialog } from '@/components/jobs-table/cancel-dialog';
 import { PaymentDialog } from '@/components/jobs-table/payment-dialog';
+import { StartPhaseDialog } from '@/components/jobs-table/start-phase-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { TodaysJobsCard } from './todays-jobs-card';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
@@ -23,7 +24,9 @@ export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsS
   const [showCompleted, setShowCompleted] = useState(false);
   const [showCancelled, setShowCancelled] = useState(false);
 
-  const activeJobs = jobs.filter((j) => j.status === 'in_progress');
+  // ready_for_pickup is part of the active workflow (waiting on operator
+  // to notify the customer + complete) — render it like in_progress.
+  const activeJobs = jobs.filter((j) => j.status === 'in_progress' || j.status === 'ready_for_pickup');
   const completedJobs = jobs.filter((j) => j.status === 'completed');
   const cancelledJobs = jobs.filter((j) => j.status === 'cancelled');
 
@@ -63,9 +66,13 @@ export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsS
               shopInfo={shopInfo}
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
+              phaseInFlight={actions.phaseInFlight}
               onMarkDone={actions.handleMarkDone}
               onCancel={actions.setCancelConfirmJobId}
               onPrint={handlePrint}
+              onStartPhase={actions.openStartPhaseDialog}
+              onCompletePhase={actions.handleCompletePhase}
+              onSkipPhase={actions.handleSkipPhase}
             />
           ))}
 
@@ -89,9 +96,13 @@ export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsS
                   shopInfo={shopInfo}
                   completingId={actions.completingId}
                   cancellingId={actions.cancellingId}
+                  phaseInFlight={actions.phaseInFlight}
                   onMarkDone={actions.handleMarkDone}
                   onCancel={actions.setCancelConfirmJobId}
                   onPrint={handlePrint}
+                  onStartPhase={actions.openStartPhaseDialog}
+                  onCompletePhase={actions.handleCompletePhase}
+                  onSkipPhase={actions.handleSkipPhase}
                 />
               ))}
             </>
@@ -117,9 +128,13 @@ export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsS
                   shopInfo={shopInfo}
                   completingId={actions.completingId}
                   cancellingId={actions.cancellingId}
+                  phaseInFlight={actions.phaseInFlight}
                   onMarkDone={actions.handleMarkDone}
                   onCancel={actions.setCancelConfirmJobId}
                   onPrint={handlePrint}
+                  onStartPhase={actions.openStartPhaseDialog}
+                  onCompletePhase={actions.handleCompletePhase}
+                  onSkipPhase={actions.handleSkipPhase}
                 />
               ))}
             </>
@@ -149,6 +164,17 @@ export function TodaysJobsSection({ jobs, shopInfo, mobileTabMode }: TodaysJobsS
         onCashTenderedChange={actions.setPayLaterCashTendered}
         onConfirm={actions.handlePayLaterConfirm}
         onClose={() => { actions.setPayLaterJobId(null); actions.setOverdueReason(''); }}
+      />
+      <StartPhaseDialog
+        open={actions.startPhaseJobId !== null}
+        phaseType={actions.startPhaseType}
+        machineId={actions.startPhaseMachineId}
+        starting={actions.startingPhase}
+        availableMachines={actions.availableMachines}
+        loadingMachines={actions.loadingMachines}
+        onMachineChange={actions.setStartPhaseMachineId}
+        onConfirm={actions.handleStartPhase}
+        onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
       />
     </div>
   );
