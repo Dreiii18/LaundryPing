@@ -40,8 +40,10 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Check job is still pending or in progress
-    if (!['pending', 'in_progress'].includes(job.status)) {
+    // Check job is in a completable state. Accept ready_for_pickup (the normal
+    // post-phases path) plus pending/in_progress for backwards-compat with
+    // backfilled legacy single-phase jobs.
+    if (!['pending', 'in_progress', 'ready_for_pickup'].includes(job.status)) {
       return NextResponse.json(
         { error: 'Job already completed', toastType: 'warning' },
         { status: 409 }
@@ -100,7 +102,7 @@ export async function POST(
           ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (noSmsUpdateError) {
         console.error('Job completion update failed (no-SMS path):', noSmsUpdateError);
@@ -132,7 +134,7 @@ export async function POST(
           sms_sent: existingSmsLog.status === 'sent',
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (idempotentUpdateError) {
         console.error('Job completion update failed (idempotency path):', idempotentUpdateError);
@@ -166,7 +168,7 @@ export async function POST(
           ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (noCreditsUpdateError) {
         console.error('Job completion update failed (no-credits path):', noCreditsUpdateError);
@@ -207,7 +209,7 @@ export async function POST(
           ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (decryptUpdateError) {
         console.error('Job completion update failed (decrypt-error path):', decryptUpdateError);
@@ -263,7 +265,7 @@ export async function POST(
           ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (successUpdateError) {
         // SMS was already sent -- log for ops but don't fail the response
@@ -305,7 +307,7 @@ export async function POST(
           ...(overdueReason && { overdue_reason: overdueReason }),
         })
         .eq('id', id)
-        .in('status', ['pending', 'in_progress']);
+        .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (smsFailUpdateError) {
         console.error('Job completion update failed (SMS-failed path):', smsFailUpdateError);

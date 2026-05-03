@@ -1,11 +1,12 @@
 'use client';
 
-import { useState, useEffect, useTransition, useCallback } from 'react';
+import { useState, useEffect, useTransition, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
 import type { Machine } from './types';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 
 export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => void) {
   const router = useRouter();
@@ -27,6 +28,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const [servicePrices, setServicePrices] = useState<Record<string, number>>({});
   const [serviceWeights, setServiceWeights] = useState<Record<string, number>>({});
   const [serviceTypes, setServiceTypes] = useState<Record<string, string>>({});
+  const [servicePhaseConfig, setServicePhaseConfig] = useState<Record<string, ServicePhaseConfigEntry>>({});
   const [priceManuallyChanged, setPriceManuallyChanged] = useState(false);
   const [cashTendered, setCashTendered] = useState('');
   const [priority, setPriority] = useState<'normal' | 'rush'>('normal');
@@ -40,24 +42,10 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const fetchMachines = useCallback(async () => {
     setLoadingMachines(true);
     try {
-      const machinesRes = await fetchWithAuth('/api/machines');
+      // Server-side filtering by active phases is more accurate than client-side joining.
+      const machinesRes = await fetchWithAuth('/api/machines?available=true');
       const machinesData = await machinesRes.json();
-
-      const jobsRes = await fetchWithAuth('/api/jobs');
-      const jobsData = await jobsRes.json();
-
-      const activeMachineIds = new Set(
-        (jobsData.jobs || [])
-          .filter((j: { status: string; machine_id: string | null }) =>
-            ['pending', 'in_progress'].includes(j.status) && j.machine_id
-          )
-          .map((j: { machine_id: string }) => j.machine_id)
-      );
-
-      const allMachines = machinesData.machines || [];
-      const available = allMachines.filter(
-        (m: Machine) => !activeMachineIds.has(m.id)
-      );
+      const available = (machinesData.machines || []) as Machine[];
 
       setMachines(available);
 
@@ -92,12 +80,14 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         setServicePrices(data.settings?.service_prices || {});
         setServiceWeights(data.settings?.service_weights || {});
         setServiceTypes(data.settings?.service_types || {});
+        setServicePhaseConfig(data.settings?.service_phase_config || {});
         setRushFeeAmount(Number(data.settings?.rush_fee) || 0);
       } else {
         setAvailableServices(['Wash', 'Dry']);
         setServicePrices({});
         setServiceWeights({});
         setServiceTypes({});
+        setServicePhaseConfig({});
         setRushFeeAmount(0);
       }
     } catch {
@@ -105,6 +95,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setServicePrices({});
       setServiceWeights({});
       setServiceTypes({});
+      setServicePhaseConfig({});
       setRushFeeAmount(0);
     }
   }, []);
@@ -125,6 +116,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setServicePrices({});
       setServiceWeights({});
       setServiceTypes({});
+      setServicePhaseConfig({});
       setPriceManuallyChanged(false);
       setCashTendered('');
       setPriority('normal');
@@ -141,6 +133,36 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   const getServiceType = useCallback((service: string) => {
     return serviceTypes[service] ?? 'per_load';
   }, [serviceTypes]);
+
+  /** First selected service that's an operational phase, in user-selection order. */
+  const firstPhaseRequiredType = useMemo(() => {
+    for (const s of selectedServices) {
+      const cfg = servicePhaseConfig[s];
+      // If config says is_phase=false, skip this service. Unknown services
+      // default to is_phase=true so they participate.
+      if (cfg && cfg.is_phase === false) continue;
+      return cfg?.machine_type ?? null; // null = no machine required
+    }
+    return undefined; // no selected phase requires a machine
+  }, [selectedServices, servicePhaseConfig]);
+
+  /** Machines compatible with the first phase. 'combo' fits any required type. */
+  const compatibleMachines = useMemo(() => {
+    if (firstPhaseRequiredType === undefined) return machines;
+    if (firstPhaseRequiredType === null) return [];
+    return machines.filter((m) => {
+      if (!m.machine_type) return true; // legacy machines without type metadata
+      if (m.machine_type === 'combo') return true;
+      return m.machine_type === firstPhaseRequiredType;
+    });
+  }, [machines, firstPhaseRequiredType]);
+
+  /** Should the modal show a machine picker at all? */
+  const machineRequired = firstPhaseRequiredType !== null && firstPhaseRequiredType !== undefined
+    ? true
+    : firstPhaseRequiredType === null
+      ? false
+      : machines.length > 0;
 
   const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId, quantities: Record<string, number> = serviceQuantities, weightsActual: Record<string, number> = serviceWeightsActual) => {
     const serviceTotal = services.reduce((sum, s) => {
@@ -267,11 +289,11 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
         return `Please enter weight for "${s}"`;
       }
     }
-    if (machines.length > 0 && !machineId) {
+    if (machineRequired && compatibleMachines.length > 0 && !machineId) {
       return 'Please select a machine';
     }
     return null;
-  }, [selectedServices, serviceTypes, serviceWeightsActual, machines, machineId]);
+  }, [selectedServices, serviceTypes, serviceWeightsActual, machineRequired, compatibleMachines, machineId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -282,7 +304,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       return;
     }
 
-    if (machines.length > 0 && !machineId) {
+    if (machineRequired && compatibleMachines.length > 0 && !machineId) {
       setError('Please select a machine');
       return;
     }
@@ -386,7 +408,8 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     serviceWeightsActual,
     serviceTypes,
     calculateTotalWeight,
-    machines.length,
+    compatibleMachines,
+    machineRequired,
     machineId,
     smsOption,
     phone,
@@ -405,7 +428,9 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
 
   return {
     // State
-    machines,
+    machines: compatibleMachines,
+    allMachines: machines,
+    machineRequired,
     machineId,
     setMachineId: handleMachineChange,
     phone,

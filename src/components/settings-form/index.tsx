@@ -22,6 +22,7 @@ export function SettingsForm(props: SettingsFormProps) {
     servicePrices,
     serviceWeights,
     serviceTypes,
+    servicePhaseConfig,
     rushFee,
     setRushFee,
     receiptPaperSize,
@@ -41,6 +42,9 @@ export function SettingsForm(props: SettingsFormProps) {
     updateServicePrice,
     updateServiceWeight,
     updateServiceType,
+    updatePhaseIsPhase,
+    updatePhaseMachineType,
+    updatePhaseMinutes,
     handleSubmit,
   } = useSettingsForm(props);
 
@@ -118,6 +122,7 @@ export function SettingsForm(props: SettingsFormProps) {
             servicePrices={servicePrices}
             serviceWeights={serviceWeights}
             serviceTypes={serviceTypes}
+            servicePhaseConfig={servicePhaseConfig}
             newService={newService}
             newServicePrice={newServicePrice}
             newServiceWeight={newServiceWeight}
@@ -131,6 +136,9 @@ export function SettingsForm(props: SettingsFormProps) {
             onUpdateServicePrice={updateServicePrice}
             onUpdateServiceWeight={updateServiceWeight}
             onUpdateServiceType={updateServiceType}
+            onUpdatePhaseIsPhase={updatePhaseIsPhase}
+            onUpdatePhaseMachineType={updatePhaseMachineType}
+            onUpdatePhaseMinutes={updatePhaseMinutes}
           />
         </div>
 

@@ -16,6 +16,17 @@ const updateSettingsSchema = z.object({
   service_types: z.record(z.string().min(1).max(50), z.enum(['per_load', 'per_kg', 'fixed']))
     .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service types')
     .optional(),
+  service_phase_config: z.record(
+    z.string().min(1).max(50),
+    z.object({
+      is_phase: z.boolean(),
+      machine_type: z.enum(['washer', 'dryer', 'combo', 'other']).nullable(),
+      default_minutes: z.number().int().min(1).max(1440),
+      sequence: z.number().int().min(1).max(99),
+    })
+  )
+    .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service phase configs')
+    .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
   rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
   receipt_paper_size: z.enum(['58mm', '80mm']).optional(),
@@ -53,6 +64,7 @@ export async function GET() {
         service_prices: laundromat.service_prices,
         service_weights: laundromat.service_weights,
         service_types: laundromat.service_types,
+        service_phase_config: laundromat.service_phase_config,
         rush_fee: laundromat.rush_fee,
         contact_number: laundromat.contact_number,
         receipt_paper_size: laundromat.receipt_paper_size,
@@ -86,7 +98,7 @@ export async function PUT(request: Request) {
       );
     }
 
-    const updateData: Record<string, string | string[] | Record<string, number> | Record<string, string> | number | null> = {};
+    const updateData: Record<string, unknown> = {};
 
     if (parsed.data.name !== undefined) {
       const sanitizedName = sanitizeLaundromatName(parsed.data.name);
@@ -144,6 +156,15 @@ export async function PUT(request: Request) {
       );
     }
 
+    if (parsed.data.service_phase_config !== undefined) {
+      const validServices = new Set(
+        (parsed.data.available_services ?? (updateData.available_services as string[] | undefined) ?? laundromat.available_services)
+      );
+      updateData.service_phase_config = Object.fromEntries(
+        Object.entries(parsed.data.service_phase_config).filter(([k]) => validServices.has(k))
+      );
+    }
+
     if (parsed.data.contact_number !== undefined) {
       const sanitized = parsed.data.contact_number
         ? sanitizeContactNumber(parsed.data.contact_number)
@@ -183,7 +204,7 @@ export async function PUT(request: Request) {
       .from('laundromats')
       .update(updateData)
       .eq('id', laundromat.id)
-      .select('id, name, address, available_services, service_prices, service_weights, service_types, rush_fee, contact_number, receipt_paper_size, sms_queue_template, sms_completion_template')
+      .select('id, name, address, available_services, service_prices, service_weights, service_types, service_phase_config, rush_fee, contact_number, receipt_paper_size, sms_queue_template, sms_completion_template')
       .single();
 
     if (updateError) {

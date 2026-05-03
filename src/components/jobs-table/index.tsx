@@ -14,7 +14,7 @@ import { JobRow } from './job-row';
 import { OverdueDialog } from './overdue-dialog';
 import { CancelDialog } from './cancel-dialog';
 import { PaymentDialog } from './payment-dialog';
-import { AssignDialog } from './assign-dialog';
+import { StartPhaseDialog } from './start-phase-dialog';
 import type { Job, JobsTableProps } from './types';
 
 export type { Job };
@@ -100,9 +100,12 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
               shopInfo={shopInfo}
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
+              phaseInFlight={actions.phaseInFlight}
               onMarkDone={actions.handleMarkDone}
               onCancelConfirm={actions.setCancelConfirmJobId}
-              onAssign={actions.openAssignDialog}
+              onStartPhase={actions.openStartPhaseDialog}
+              onCompletePhase={actions.handleCompletePhase}
+              onSkipPhase={actions.handleSkipPhase}
               onPrint={handlePrint}
             />
           ))}
@@ -136,15 +139,16 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
         onClose={() => { actions.setPayLaterJobId(null); actions.setOverdueReason(''); }}
       />
 
-      <AssignDialog
-        assignJobId={actions.assignJobId}
-        assignMachineId={actions.assignMachineId}
-        assigningMachine={actions.assigningMachine}
+      <StartPhaseDialog
+        open={actions.startPhaseJobId !== null}
+        phaseType={actions.startPhaseType}
+        machineId={actions.startPhaseMachineId}
+        starting={actions.startingPhase}
         availableMachines={actions.availableMachines}
         loadingMachines={actions.loadingMachines}
-        onMachineChange={actions.setAssignMachineId}
-        onConfirm={actions.handleAssignMachine}
-        onClose={() => actions.setAssignJobId(null)}
+        onMachineChange={actions.setStartPhaseMachineId}
+        onConfirm={actions.handleStartPhase}
+        onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
       />
     </div>
   );

@@ -28,12 +28,26 @@ export async function POST(
       return NextResponse.json({ error: 'Job not found' }, { status: 404 });
     }
 
-    // Only pending or in_progress jobs can be cancelled
-    if (!['pending', 'in_progress'].includes(job.status)) {
+    // Only pending, in_progress, or ready_for_pickup jobs can be cancelled
+    if (!['pending', 'in_progress', 'ready_for_pickup'].includes(job.status)) {
       return NextResponse.json(
         { error: 'Job is already completed or cancelled', toastType: 'warning' },
         { status: 409 }
       );
+    }
+
+    // Skip any open phases first so machines free up. Do this BEFORE setting
+    // jobs.status = 'cancelled' — once the job is cancelled, the trigger ignores
+    // phase mutations (terminal status).
+    const { error: skipPhasesError } = await supabase
+      .from('job_phases')
+      .update({ status: 'skipped', completed_at: new Date().toISOString() })
+      .eq('job_id', id)
+      .in('status', ['pending', 'in_progress']);
+
+    if (skipPhasesError) {
+      console.error('[Cancel Job] Phase skip failed:', skipPhasesError);
+      // Continue anyway — the cancel is still valuable even if phase rows linger.
     }
 
     // Cancel the job -- no SMS sent
@@ -44,7 +58,7 @@ export async function POST(
         completed_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .in('status', ['pending', 'in_progress']);
+      .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
     if (updateError) {
       console.error('[Cancel Job] Update failed:', updateError);

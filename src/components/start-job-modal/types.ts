@@ -5,9 +5,12 @@ export const PAYMENT_METHODS = [
   { value: 'bank_transfer', label: 'Bank Transfer' },
 ] as const;
 
+export type MachineType = 'washer' | 'dryer' | 'combo' | 'other';
+
 export interface Machine {
   id: string;
   label: string;
+  machine_type?: MachineType;
 }
 
 export interface StartJobModalProps {

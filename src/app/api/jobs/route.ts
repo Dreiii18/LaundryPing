@@ -7,6 +7,8 @@ import { sanitizeNotes, sanitizeCustomerName } from '@/lib/utils/sanitize';
 import { sendSms } from '@/lib/sms/provider';
 import { renderSmsTemplate, DEFAULT_QUEUE_TEMPLATE } from '@/lib/sms/templates';
 import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
+import { buildPhaseRecords, machineTypeMatches } from '@/lib/jobs/phases';
+import type { MachineType, ServicePhaseConfigEntry } from '@/types/database';
 
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
 
@@ -61,7 +63,7 @@ export async function GET() {
     });
     const todayPH = phFormatter.format(now); // YYYY-MM-DD format
 
-    // Get jobs started today (PH timezone) OR still in_progress (overdue)
+    // Get jobs started today (PH timezone) OR still pending/in_progress/ready_for_pickup
     const { data: jobs, error: queryError } = await supabase
       .from('jobs')
       .select(`
@@ -90,44 +92,95 @@ export async function GET() {
         priority,
         machines (
           id,
-          label
+          label,
+          machine_type
+        ),
+        job_phases (
+          id,
+          phase_type,
+          machine_id,
+          sequence,
+          status,
+          started_at,
+          completed_at,
+          estimated_minutes,
+          machines (
+            id,
+            label,
+            machine_type
+          )
         )
       `)
       .eq('laundromat_id', laundromat.id)
-      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
+      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending,status.eq.ready_for_pickup`)
       .order('started_at', { ascending: false });
 
     if (queryError) {
       return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
     }
 
-    // Never send encrypted phone to client -- only masked
-    const safeJobs = (jobs || []).map((job) => ({
-      id: job.id,
-      laundromat_id: job.laundromat_id,
-      machine_id: job.machine_id,
-      customer_phone_masked: job.customer_phone_masked,
-      notes: job.notes,
-      status: job.status,
-      started_at: job.started_at,
-      completed_at: job.completed_at,
-      sms_sent: job.sms_sent,
-      notify_sms: job.notify_sms,
-      notify_queue_sms: job.notify_queue_sms,
-      payment_method: job.payment_method,
-      pay_amount: job.pay_amount,
-      cash_tendered: job.cash_tendered,
-      is_paid: job.is_paid,
-      services: job.services,
-      service_quantities: job.service_quantities as Record<string, number> | null,
-      service_weights_actual: job.service_weights_actual as Record<string, number> | null,
-      total_weight: job.total_weight as number | null,
-      claim_number: job.claim_number,
-      customer_name: job.customer_name,
-      created_at: job.created_at,
-      priority: job.priority,
-      machine: job.machines,
-    }));
+    // Never send encrypted phone to client -- only masked.
+    // Supabase types nested relations as arrays even for many-to-one joins;
+    // we tolerate both shapes.
+    type JoinedMachine = { id: string; label: string; machine_type: string };
+    type JoinedPhase = {
+      id: string;
+      phase_type: string;
+      machine_id: string | null;
+      sequence: number;
+      status: string;
+      started_at: string | null;
+      completed_at: string | null;
+      estimated_minutes: number | null;
+      machines: JoinedMachine | JoinedMachine[] | null;
+    };
+    const pickOne = <T,>(v: T | T[] | null): T | null =>
+      Array.isArray(v) ? (v[0] ?? null) : v;
+
+    const safeJobs = (jobs || []).map((job) => {
+      const phases = ((job.job_phases ?? []) as unknown as JoinedPhase[])
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((p) => ({
+          id: p.id,
+          phase_type: p.phase_type,
+          machine_id: p.machine_id,
+          sequence: p.sequence,
+          status: p.status,
+          started_at: p.started_at,
+          completed_at: p.completed_at,
+          estimated_minutes: p.estimated_minutes,
+          machine: pickOne(p.machines),
+        }));
+
+      return {
+        id: job.id,
+        laundromat_id: job.laundromat_id,
+        machine_id: job.machine_id,
+        customer_phone_masked: job.customer_phone_masked,
+        notes: job.notes,
+        status: job.status,
+        started_at: job.started_at,
+        completed_at: job.completed_at,
+        sms_sent: job.sms_sent,
+        notify_sms: job.notify_sms,
+        notify_queue_sms: job.notify_queue_sms,
+        payment_method: job.payment_method,
+        pay_amount: job.pay_amount,
+        cash_tendered: job.cash_tendered,
+        is_paid: job.is_paid,
+        services: job.services,
+        service_quantities: job.service_quantities as Record<string, number> | null,
+        service_weights_actual: job.service_weights_actual as Record<string, number> | null,
+        total_weight: job.total_weight as number | null,
+        claim_number: job.claim_number,
+        customer_name: job.customer_name,
+        created_at: job.created_at,
+        priority: job.priority,
+        machine: job.machines,
+        phases,
+      };
+    });
 
     return NextResponse.json({ jobs: safeJobs });
   } catch {
@@ -171,12 +224,12 @@ export async function POST(request: Request) {
     }
 
     // Validate machine if provided
-    let machine: { id: string; label: string } | null = null;
+    let machine: { id: string; label: string; machine_type: MachineType } | null = null;
 
     if (machine_id) {
       const { data: machineData, error: machineError } = await supabase
         .from('machines')
-        .select('*')
+        .select('id, label, machine_type')
         .eq('id', machine_id)
         .eq('laundromat_id', laundromat.id)
         .eq('status', 'active')
@@ -191,17 +244,17 @@ export async function POST(request: Request) {
 
       machine = machineData;
 
-      // Check if machine already has an active job
-      const { data: activeJobs } = await supabase
-        .from('jobs')
+      // Check if machine is currently in an in_progress phase
+      const { data: activePhases } = await supabase
+        .from('job_phases')
         .select('id')
         .eq('machine_id', machine_id)
-        .in('status', ['pending', 'in_progress'])
+        .eq('status', 'in_progress')
         .limit(1);
 
-      if (activeJobs && activeJobs.length > 0) {
+      if (activePhases && activePhases.length > 0) {
         return NextResponse.json(
-          { error: 'This machine already has an active job' },
+          { error: 'This machine is currently in use' },
           { status: 409 }
         );
       }
@@ -302,6 +355,53 @@ export async function POST(request: Request) {
 
     if (insertError || !job) {
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
+    }
+
+    // Expand services into phase rows. The trg_sync_job_from_phases trigger
+    // will keep jobs.status / jobs.machine_id in sync as phases activate/complete.
+    const phaseConfig = (laundromat.service_phase_config ?? {}) as Record<string, ServicePhaseConfigEntry>;
+    const phaseRecords = buildPhaseRecords({
+      jobId: job.id,
+      laundromatId: laundromat.id,
+      services: parsed.data.services,
+      phaseConfig,
+    });
+
+    // If a machine was supplied, validate type compatibility with the first phase
+    // and start that phase immediately.
+    if (machine && phaseRecords.length > 0) {
+      const firstPhase = phaseRecords[0];
+      const requiredType = (phaseConfig[firstPhase.phase_type] ?? { machine_type: 'combo' as MachineType | null }).machine_type;
+      if (!machineTypeMatches(machine.machine_type, requiredType)) {
+        // Roll back the job to keep state consistent
+        await supabase.from('jobs').delete().eq('id', job.id);
+        return NextResponse.json(
+          {
+            error: `Selected machine is a ${machine.machine_type} but the first phase (${firstPhase.phase_type}) requires a ${requiredType}.`,
+          },
+          { status: 400 }
+        );
+      }
+      firstPhase.machine_id = machine.id;
+      firstPhase.status = 'in_progress';
+      firstPhase.started_at = new Date().toISOString();
+    }
+
+    if (phaseRecords.length > 0) {
+      const { error: phasesError } = await supabase.from('job_phases').insert(phaseRecords);
+      if (phasesError) {
+        console.error('Phase insert failed:', phasesError);
+        await supabase.from('jobs').delete().eq('id', job.id);
+        return NextResponse.json({ error: 'Failed to create job phases' }, { status: 500 });
+      }
+    } else {
+      // All services are administrative (is_phase=false) — no operational work needed.
+      // Skip straight to ready_for_pickup so staff can complete + notify the customer.
+      await supabase
+        .from('jobs')
+        .update({ status: 'ready_for_pickup' })
+        .eq('id', job.id);
+      job.status = 'ready_for_pickup';
     }
 
     // Queue SMS: send notification if job is queued, queue SMS enabled, and phone exists
