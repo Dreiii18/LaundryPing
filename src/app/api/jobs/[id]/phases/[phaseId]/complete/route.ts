@@ -50,7 +50,15 @@ export async function POST(
 
     if (updateError || !updated) {
       console.error('[Complete Phase] Update failed:', updateError);
-      return NextResponse.json({ error: 'Failed to complete phase' }, { status: 500 });
+      return NextResponse.json(
+        {
+          error: updateError?.message || 'Failed to complete phase',
+          code: updateError?.code,
+          details: updateError?.details,
+          hint: updateError?.hint,
+        },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ phase: updated });
