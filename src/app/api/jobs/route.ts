@@ -396,12 +396,14 @@ export async function POST(request: Request) {
       }
     } else {
       // All services are administrative (is_phase=false) — no operational work needed.
-      // Skip straight to ready_for_pickup so staff can complete + notify the customer.
+      // Skip straight to ready_for_pickup, and clear the inherited machine_id so
+      // jobs.machine_id never points at a machine that has no associated phase row.
       await supabase
         .from('jobs')
-        .update({ status: 'ready_for_pickup' })
+        .update({ status: 'ready_for_pickup', machine_id: null })
         .eq('id', job.id);
       job.status = 'ready_for_pickup';
+      job.machine_id = null;
     }
 
     // Queue SMS: send notification if job is queued, queue SMS enabled, and phone exists

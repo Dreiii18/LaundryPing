@@ -50,7 +50,13 @@ export function ServicesManager({
         const type = serviceTypes[service] ?? 'per_load';
         const phaseEntry = servicePhaseConfig[service];
         const isPhase = phaseEntry?.is_phase ?? true;
-        const phaseMachineType: PhaseMachineType = phaseEntry?.machine_type ?? 'combo';
+        // null is a meaningful value (no machine required, e.g. Fold) — map it
+        // to the 'none' UI sentinel explicitly. The `??` fallback only kicks in
+        // for genuinely-missing entries (new services without config yet).
+        const phaseMachineType: PhaseMachineType =
+          phaseEntry?.machine_type === null
+            ? 'none'
+            : (phaseEntry?.machine_type ?? 'combo');
         const phaseMinutes = phaseEntry?.default_minutes ?? 30;
         return (
           <div key={service} className="flex flex-col gap-2 p-2 rounded-lg hover:bg-slate-50/50">

@@ -50,6 +50,20 @@ export async function POST(
       );
     }
 
+    // Close any open phase rows so machines free up. Order matters — once
+    // jobs.status flips to terminal, the trg_sync_job_from_phases trigger
+    // short-circuits and won't reconcile orphan in_progress phases. No-op for
+    // the normal ready_for_pickup path (no open phases).
+    const { error: closePhasesError } = await supabase
+      .from('job_phases')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('job_id', id)
+      .in('status', ['pending', 'in_progress']);
+    if (closePhasesError) {
+      console.error('[Complete Job] Phase close failed:', closePhasesError);
+      return NextResponse.json({ error: 'Failed to close job phases' }, { status: 500 });
+    }
+
     // Parse optional payment_method and overdue_reason from request body
     let paymentMethod: string | undefined;
     let cashTendered: number | undefined;

@@ -157,12 +157,24 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     });
   }, [machines, firstPhaseRequiredType]);
 
-  /** Should the modal show a machine picker at all? */
-  const machineRequired = firstPhaseRequiredType !== null && firstPhaseRequiredType !== undefined
-    ? true
-    : firstPhaseRequiredType === null
-      ? false
-      : machines.length > 0;
+  /** Should the modal show a machine picker at all?
+   *  - undefined: no service selected yet, or all selected services are admin
+   *    (is_phase=false). Backend handles admin-only jobs by skipping straight
+   *    to ready_for_pickup, so no machine is needed in the UI either.
+   *  - null: a phase is selected but it explicitly needs no machine (e.g. Fold).
+   *  - washer/dryer/combo/other: a phase needs a specific machine. */
+  const machineRequired =
+    firstPhaseRequiredType !== null && firstPhaseRequiredType !== undefined;
+
+  // Auto-clear stale machineId when the user's service choice makes the
+  // previously-selected machine incompatible (e.g. single-machine washer shop
+  // auto-selects W1, then user picks Dry → W1 disappears from the picker but
+  // would still be submitted without this guard).
+  useEffect(() => {
+    if (machineId && !compatibleMachines.find((m) => m.id === machineId)) {
+      setMachineId('');
+    }
+  }, [compatibleMachines, machineId]);
 
   const calculateTotal = useCallback((services: string[], currentPriority: 'normal' | 'rush' = priority, currentMachineId: string = machineId, quantities: Record<string, number> = serviceQuantities, weightsActual: Record<string, number> = serviceWeightsActual) => {
     const serviceTotal = services.reduce((sum, s) => {

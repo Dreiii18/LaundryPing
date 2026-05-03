@@ -46,8 +46,14 @@ export async function POST(
       .in('status', ['pending', 'in_progress']);
 
     if (skipPhasesError) {
+      // Fail loud: lingering in_progress phase rows would permanently lock
+      // their machines (unique partial index + busy-machine queries) with no
+      // in-app recovery. The update is idempotent, so a retry is safe.
       console.error('[Cancel Job] Phase skip failed:', skipPhasesError);
-      // Continue anyway — the cancel is still valuable even if phase rows linger.
+      return NextResponse.json(
+        { error: 'Failed to free machines, please retry' },
+        { status: 500 }
+      );
     }
 
     // Cancel the job -- no SMS sent
