@@ -5,7 +5,7 @@ import { machineTypeMatches } from '@/lib/jobs/phases';
 import type { MachineType, ServicePhaseConfigEntry } from '@/types/database';
 
 const startPhaseSchema = z.object({
-  machine_id: z.string().uuid('Invalid machine ID'),
+  machine_id: z.string().uuid('Invalid machine ID').optional(),
 });
 
 export async function POST(
@@ -52,25 +52,36 @@ export async function POST(
       );
     }
 
-    // Validate machine: ownership, active, type compatible with phase
-    const { data: machine, error: machineError } = await supabase
-      .from('machines')
-      .select('id, label, machine_type')
-      .eq('id', parsed.data.machine_id)
-      .eq('laundromat_id', laundromat.id)
-      .eq('status', 'active')
-      .single();
-
-    if (machineError || !machine) {
-      return NextResponse.json({ error: 'Machine not found or not active' }, { status: 404 });
-    }
-
     const phaseConfig = (laundromat.service_phase_config ?? {}) as Record<string, ServicePhaseConfigEntry>;
     const requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
 
-    if (!machineTypeMatches(machine.machine_type as MachineType, requiredType)) {
+    // Validate machine if one was provided. Phases with requiredType=null
+    // (e.g. Fold) can start without a machine.
+    let machine: { id: string; label: string; machine_type: MachineType } | null = null;
+    if (parsed.data.machine_id) {
+      const { data: machineData, error: machineError } = await supabase
+        .from('machines')
+        .select('id, label, machine_type')
+        .eq('id', parsed.data.machine_id)
+        .eq('laundromat_id', laundromat.id)
+        .eq('status', 'active')
+        .single();
+
+      if (machineError || !machineData) {
+        return NextResponse.json({ error: 'Machine not found or not active' }, { status: 404 });
+      }
+
+      machine = machineData;
+
+      if (!machineTypeMatches(machine.machine_type, requiredType)) {
+        return NextResponse.json(
+          { error: `This machine is a ${machine.machine_type} but the phase (${phase.phase_type}) requires a ${requiredType}.` },
+          { status: 400 }
+        );
+      }
+    } else if (requiredType !== null) {
       return NextResponse.json(
-        { error: `This machine is a ${machine.machine_type} but the phase (${phase.phase_type}) requires a ${requiredType}.` },
+        { error: `Phase ${phase.phase_type} requires a ${requiredType} machine.` },
         { status: 400 }
       );
     }
@@ -80,7 +91,7 @@ export async function POST(
     const { data: updated, error: updateError } = await supabase
       .from('job_phases')
       .update({
-        machine_id: machine.id,
+        machine_id: machine?.id ?? null,
         status: 'in_progress',
         started_at: new Date().toISOString(),
       })
@@ -105,7 +116,10 @@ export async function POST(
     }
 
     return NextResponse.json({
-      phase: { ...updated, machine: { id: machine.id, label: machine.label, machine_type: machine.machine_type } },
+      phase: {
+        ...updated,
+        machine: machine ? { id: machine.id, label: machine.label, machine_type: machine.machine_type } : null,
+      },
     });
   } catch (err) {
     console.error('[Start Phase] Unexpected error:', err);

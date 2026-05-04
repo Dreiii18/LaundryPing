@@ -191,19 +191,31 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
   }, [servicePrices, serviceTypes, rushFeeAmount, priority, machineId, serviceQuantities, serviceWeightsActual]);
 
   const calculateTotalWeight = useCallback((services: string[], quantities: Record<string, number> = serviceQuantities, weightsActual: Record<string, number> = serviceWeightsActual) => {
-    return services.reduce((sum, s) => {
+    // Phase services (Wash, Dry, Fold, ...) describe sequential processing of the
+    // SAME physical batch, so their weights overlap — take the max contribution.
+    // Non-phase services (admin items like Pickup/Delivery) are independent and sum.
+    // Unknown services default to is_phase=true (matches firstPhaseRequiredType logic).
+    let phaseMax = 0;
+    let nonPhaseSum = 0;
+    for (const s of services) {
       const type = serviceTypes[s] ?? 'per_load';
+      let contrib = 0;
       if (type === 'per_kg') {
-        return sum + (weightsActual[s] || 0);
-      }
-      if (type === 'per_load') {
+        contrib = weightsActual[s] || 0;
+      } else if (type === 'per_load') {
         const w = serviceWeights[s] || 0;
-        return w > 0 ? sum + w * (quantities[s] || 1) : sum;
+        contrib = w > 0 ? w * (quantities[s] || 1) : 0;
       }
-      // fixed: no weight contribution
-      return sum;
-    }, 0);
-  }, [serviceWeights, serviceTypes, serviceQuantities, serviceWeightsActual]);
+      // 'fixed': no weight contribution
+      const isPhase = servicePhaseConfig[s]?.is_phase ?? true;
+      if (isPhase) {
+        if (contrib > phaseMax) phaseMax = contrib;
+      } else {
+        nonPhaseSum += contrib;
+      }
+    }
+    return phaseMax + nonPhaseSum;
+  }, [serviceWeights, serviceTypes, servicePhaseConfig, serviceQuantities, serviceWeightsActual]);
 
   const toggleService = useCallback((service: string) => {
     const isSelected = selectedServices.includes(service);
