@@ -146,8 +146,47 @@ export function useJobActions(jobs: Job[]) {
   }, [payLaterJobId, payLaterMethod, payLaterCashTendered, overdueReason, completeJob]);
 
   /** Open the "start phase" dialog. Looks up machines compatible with the
-   *  phase's required machine_type from settings.service_phase_config. */
+   *  phase's required machine_type from settings.service_phase_config.
+   *  If the phase needs no machine (e.g. Fold), starts it immediately
+   *  without opening the dialog. */
   const openStartPhaseDialog = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
+    // First: figure out the phase's required machine type so we know whether
+    // a dialog is needed at all.
+    let requiredType: string | null = null;
+    try {
+      const settingsRes = await fetchWithAuth('/api/settings');
+      const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+      const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
+      requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+    } catch {
+      toast.error('Failed to load settings');
+      return;
+    }
+
+    // Phase needs no machine — start it immediately.
+    if (requiredType === null) {
+      setPhaseInFlight(phase.id);
+      try {
+        const res = await fetchWithAuth(
+          `/api/jobs/${jobId}/phases/${phase.id}/start`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Failed to start phase');
+          return;
+        }
+        toast.success(`${phase.phase_type} started.`);
+        startTransition(() => router.refresh());
+      } catch {
+        toast.error('An unexpected error occurred');
+      } finally {
+        setPhaseInFlight(null);
+      }
+      return;
+    }
+
+    // Phase needs a machine — open the picker dialog.
     setStartPhaseJobId(jobId);
     setStartPhaseId(phase.id);
     setStartPhaseType(phase.phase_type);
@@ -155,15 +194,7 @@ export function useJobActions(jobs: Job[]) {
     setLoadingMachines(true);
 
     try {
-      // Fetch the phase config so we can filter machines by required type.
-      const settingsRes = await fetchWithAuth('/api/settings');
-      const settingsData = settingsRes.ok ? await settingsRes.json() : null;
-      const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
-      const requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
-
-      const url = requiredType
-        ? `/api/machines?available=true&machine_type=${requiredType}&exclude_job=${jobId}`
-        : `/api/machines?available=true&exclude_job=${jobId}`;
+      const url = `/api/machines?available=true&machine_type=${requiredType}&exclude_job=${jobId}`;
       const machinesRes = await fetchWithAuth(url);
       const machinesData = await machinesRes.json();
       setAvailableMachines(machinesData.machines || []);
@@ -174,7 +205,7 @@ export function useJobActions(jobs: Job[]) {
     } finally {
       setLoadingMachines(false);
     }
-  }, []);
+  }, [router, startTransition]);
 
   const handleStartPhase = useCallback(async () => {
     if (!startPhaseJobId || !startPhaseId || !startPhaseMachineId) return;
