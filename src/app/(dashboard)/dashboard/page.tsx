@@ -5,7 +5,6 @@ import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
 import { StatCardWithTrend } from '@/components/dashboard/stat-card-with-trend';
 import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
-import { OnboardingBanner } from '@/components/onboarding-banner';
 import { createClient } from '@/lib/supabase/server';
 import type { ShopInfo } from '@/types/shop';
 import type { MachineType } from '@/components/jobs-table/types';
@@ -211,13 +210,8 @@ export default async function DashboardPage() {
   // Run all independent queries in parallel.
   // mark_overdue_jobs only modifies in_progress rows, so the todayCompleted/yesterdayCompleted
   // queries (filtered to status=completed) are unaffected by execution order.
-  const [{ count: machineCount }, { error: overdueError }, { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
+  const [{ error: overdueError }, { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
     await Promise.all([
-      supabase
-        .from('machines')
-        .select('id', { count: 'exact', head: true })
-        .eq('laundromat_id', laundromat.id)
-        .in('status', ['active', 'maintenance']),
       supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id }),
       supabase
         .from('jobs')
@@ -236,8 +230,6 @@ export default async function DashboardPage() {
 
   if (overdueError) console.error('mark_overdue_jobs failed:', overdueError.message);
 
-  const hasNoMachines = (machineCount ?? 0) === 0;
-
   const completedToday = todayCompletedJobs?.length ?? 0;
   const todayRevenue = (todayCompletedJobs || [])
     .filter((j) => j.pay_amount != null)
@@ -250,9 +242,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 md:h-full">
-      {/* Onboarding Banner - only when no machines */}
-      {hasNoMachines && <OnboardingBanner />}
-
       {/* SMS Credit Warning */}
       <SmsQuotaWarning totalCredits={totalCredits} />
 

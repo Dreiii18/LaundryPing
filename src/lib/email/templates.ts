@@ -329,3 +329,191 @@ export function buildPasswordResetEmail(data: PasswordResetEmailData): {
   return { subject, html };
 }
 
+// =============================================================================
+// Lifecycle emails (D0 welcome / D2 no-machine / D7 no-SMS / D30 recap)
+// Shared shell: teal header, white card body, light gray footer.
+// =============================================================================
+
+interface LifecycleShellOptions {
+  heading: string;
+  bodyHtml: string;
+  ctaLabel?: string;
+  ctaUrl?: string;
+}
+
+function lifecycleShell({ heading, bodyHtml, ctaLabel, ctaUrl }: LifecycleShellOptions): string {
+  const ctaBlock = ctaLabel && ctaUrl
+    ? `<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom:16px;">
+                <tr>
+                  <td align="center" style="padding:8px 0;">
+                    <a href="${escapeHtml(ctaUrl)}" style="display:inline-block;padding:12px 32px;background-color:#0d968b;color:#ffffff;font-size:14px;font-weight:700;text-decoration:none;border-radius:6px;">${escapeHtml(ctaLabel)}</a>
+                  </td>
+                </tr>
+              </table>`
+    : '';
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin:0;padding:0;background-color:#f4f4f5;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;padding:32px 16px;">
+    <tr>
+      <td align="center">
+        <table width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background-color:#ffffff;border-radius:8px;overflow:hidden;">
+          <tr>
+            <td style="background-color:#0d968b;padding:24px;text-align:center;">
+              <h1 style="margin:0;color:#ffffff;font-size:20px;font-weight:700;">LaundryPing</h1>
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:24px;">
+              <h2 style="margin:0 0 16px;color:#18181b;font-size:18px;">${escapeHtml(heading)}</h2>
+              ${bodyHtml}
+              ${ctaBlock}
+            </td>
+          </tr>
+          <tr>
+            <td style="padding:16px 24px;border-top:1px solid #e4e4e7;text-align:center;">
+              <p style="margin:0;color:#a1a1aa;font-size:11px;">LaundryPing — SMS notifications for Philippine laundromats</p>
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
+}
+
+export interface WelcomeEmailData {
+  shopName: string;
+  onboardingUrl: string;
+}
+
+export function buildWelcomeEmail(data: WelcomeEmailData): { subject: string; html: string } {
+  const subject = 'Welcome to LaundryPing — send your first SMS today';
+  const html = lifecycleShell({
+    heading: `Welcome, ${data.shopName}!`,
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        You&#39;re three quick steps away from your first &ldquo;laundry done&rdquo; SMS:
+      </p>
+      <ol style="margin:0 0 16px;padding-left:20px;color:#3f3f46;font-size:14px;line-height:1.6;">
+        <li>Confirm how your shop name appears in the SMS</li>
+        <li>Add your first machine</li>
+        <li>Send a test SMS to your own phone</li>
+      </ol>
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        Takes about a minute. You&#39;ve got 50 free SMS this month — no credit card needed.
+      </p>`,
+    ctaLabel: 'Finish setup',
+    ctaUrl: data.onboardingUrl,
+  });
+  return { subject, html };
+}
+
+export interface D2NoMachineEmailData {
+  shopName: string;
+  onboardingUrl: string;
+}
+
+export function buildD2NoMachineEmail(data: D2NoMachineEmailData): { subject: string; html: string } {
+  const subject = 'Add your first machine in under a minute';
+  const html = lifecycleShell({
+    heading: `Hi ${data.shopName}, finish your setup`,
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        You signed up for LaundryPing but haven&#39;t added a machine yet — that&#39;s
+        the only thing standing between you and your first automatic SMS.
+      </p>
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        It takes about 30 seconds: pick washer or dryer, give it a label
+        (e.g. &ldquo;W1&rdquo;), and you&#39;re ready to start jobs.
+      </p>`,
+    ctaLabel: 'Add a machine',
+    ctaUrl: data.onboardingUrl,
+  });
+  return { subject, html };
+}
+
+export interface D7NoSmsEmailData {
+  shopName: string;
+  appUrl: string;
+}
+
+export function buildD7NoSmsEmail(data: D7NoSmsEmailData): { subject: string; html: string } {
+  const subject = 'Send your first "laundry done" SMS today';
+  const html = lifecycleShell({
+    heading: `${data.shopName} — your customers are still waiting`,
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        It&#39;s been a week and you haven&#39;t sent an SMS through LaundryPing yet.
+        Your customers are still calling and walking in to ask if their load is done.
+      </p>
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        Start a job, mark it done, and we&#39;ll text the customer for you. Each
+        SMS that goes out is one less interruption for your staff and one
+        machine that turns over faster.
+      </p>
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        You still have your 50 free SMS this month.
+      </p>`,
+    ctaLabel: 'Open LaundryPing',
+    ctaUrl: data.appUrl,
+  });
+  return { subject, html };
+}
+
+export interface D30RecapEmailData {
+  shopName: string;
+  appUrl: string;
+  jobsCount: number;
+  smsSent: number;
+  freeCreditsRemaining: number;
+}
+
+export function buildD30RecapEmail(data: D30RecapEmailData): { subject: string; html: string } {
+  const subject = `Your first 30 days on LaundryPing`;
+  const stats = `
+      <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f4f5;border-radius:6px;padding:16px;margin-bottom:16px;">
+        <tr>
+          <td style="padding:6px 16px;color:#71717a;font-size:13px;">Jobs logged</td>
+          <td style="padding:6px 16px;color:#18181b;font-size:13px;text-align:right;font-weight:600;">${data.jobsCount}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 16px;color:#71717a;font-size:13px;">SMS sent</td>
+          <td style="padding:6px 16px;color:#18181b;font-size:13px;text-align:right;font-weight:600;">${data.smsSent}</td>
+        </tr>
+        <tr>
+          <td style="padding:6px 16px;color:#71717a;font-size:13px;">Free SMS left this month</td>
+          <td style="padding:6px 16px;color:#0d968b;font-size:14px;text-align:right;font-weight:700;">${data.freeCreditsRemaining}</td>
+        </tr>
+      </table>`;
+
+  const lowActivityNote =
+    data.smsSent === 0
+      ? `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+          You haven&#39;t sent any SMS yet — would love to know what&#39;s blocking
+          you. Reply to this email and a real human will read it.
+        </p>`
+      : `<p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+          Thanks for using LaundryPing. Reply to this email anytime if you
+          have feedback or need help.
+        </p>`;
+
+  const html = lifecycleShell({
+    heading: `${data.shopName} — your first 30 days`,
+    bodyHtml: `
+      <p style="margin:0 0 16px;color:#3f3f46;font-size:14px;line-height:1.5;">
+        Quick recap from your first month:
+      </p>
+      ${stats}
+      ${lowActivityNote}`,
+    ctaLabel: 'Open dashboard',
+    ctaUrl: data.appUrl,
+  });
+  return { subject, html };
+}

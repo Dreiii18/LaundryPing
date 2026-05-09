@@ -13,15 +13,15 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://laundryping.com';
 
 export const metadata: Metadata = {
   title: {
-    absolute: 'LaundryPing - SMS Notifications for Philippine Laundromats',
+    absolute: 'LaundryPing — Faster pickups for Philippine laundromats',
   },
   description:
-    'Automatically send SMS notifications to your laundromat customers when their laundry is done. Simple, fast, and built for the Philippines.',
+    'Auto-text customers when their laundry is done. Pickups happen sooner, machines free up faster, and you take more loads — no app, no chasing.',
   openGraph: {
-    title: 'LaundryPing - SMS Notifications for Philippine Laundromats',
+    title: 'LaundryPing — Faster pickups for Philippine laundromats',
     description:
-      'Automatically send SMS notifications to your laundromat customers when their laundry is done. Simple, fast, and built for the Philippines.',
-    url: '/',
+      'Auto-text customers when their laundry is done. Pickups happen sooner, machines free up faster, and you take more loads — no app, no chasing.',
+    url: siteUrl,
     type: 'website',
   },
   alternates: { canonical: '/' },

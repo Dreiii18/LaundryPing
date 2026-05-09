@@ -16,6 +16,10 @@ export default async function DashboardLayout({
     redirect('/login');
   }
 
+  if (!laundromat.onboarding_completed_at) {
+    redirect('/onboarding');
+  }
+
   const shopName = laundromat.name || 'My Laundromat';
   const userEmail = user.email || '';
   const userInitials = userEmail
