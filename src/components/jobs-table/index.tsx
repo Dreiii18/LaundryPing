@@ -15,6 +15,8 @@ import { OverdueDialog } from './overdue-dialog';
 import { CancelDialog } from './cancel-dialog';
 import { PaymentDialog } from './payment-dialog';
 import { StartPhaseDialog } from './start-phase-dialog';
+import { AssignMachineDialog } from './assign-machine-dialog';
+import { useMemo } from 'react';
 import type { Job, JobsTableProps } from './types';
 
 export type { Job };
@@ -23,6 +25,20 @@ export { type ShopInfo } from './types';
 export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }: JobsTableProps) {
   const actions = useJobActions(initialJobs);
   const handlePrint = useHandlePrint(shopInfo);
+
+  // Pre-compute the set of machine_ids that are currently in_progress across
+  // all visible jobs. Drives the Ready/Waiting badge on rows whose next
+  // pending phase has a pre-assigned machine.
+  const busyMachineIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of initialJobs) {
+      for (const p of j.phases ?? []) {
+        if (p.status === 'in_progress' && p.machine_id) set.add(p.machine_id);
+      }
+    }
+    return set;
+  }, [initialJobs]);
+  const isMachineFree = (machineId: string) => !busyMachineIds.has(machineId);
 
   if (initialJobs.length === 0) {
     return (
@@ -101,9 +117,12 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
               phaseInFlight={actions.phaseInFlight}
+              isMachineFree={isMachineFree}
               onMarkDone={actions.handleMarkDone}
               onCancelConfirm={actions.setCancelConfirmJobId}
               onStartPhase={actions.openStartPhaseDialog}
+              onStartPhaseDirect={actions.startPhaseDirect}
+              onAssignMachine={actions.openAssignMachineDialog}
               onCompletePhase={actions.handleCompletePhase}
               onSkipPhase={actions.handleSkipPhase}
               onPrint={handlePrint}
@@ -149,6 +168,20 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
         onMachineChange={actions.setStartPhaseMachineId}
         onConfirm={actions.handleStartPhase}
         onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
+      />
+
+      <AssignMachineDialog
+        open={actions.assignMachineJobId !== null}
+        phaseType={actions.assignMachinePhaseType}
+        machineId={actions.assignMachineSelectedId}
+        saving={actions.assigningMachine}
+        availableMachines={actions.availableMachines}
+        loadingMachines={actions.loadingMachines}
+        hasExistingAssignment={!!actions.assignMachineCurrentId}
+        onMachineChange={actions.setAssignMachineSelectedId}
+        onConfirm={actions.handleAssignMachine}
+        onUnassign={actions.handleUnassignMachine}
+        onClose={() => { actions.setAssignMachineJobId(null); actions.setAssignMachinePhaseId(null); }}
       />
     </div>
   );

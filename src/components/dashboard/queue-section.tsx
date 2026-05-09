@@ -1,22 +1,60 @@
 'use client';
 
+import { useMemo } from 'react';
 import { useJobActions } from '@/components/jobs-table/use-job-actions';
 import { useHandlePrint } from '@/hooks/use-handle-print';
 import { CancelDialog } from '@/components/jobs-table/cancel-dialog';
 import { StartPhaseDialog } from '@/components/jobs-table/start-phase-dialog';
+import { AssignMachineDialog } from '@/components/jobs-table/assign-machine-dialog';
 import { QueueCard } from './queue-card';
 import { ListTodo } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
 
 interface QueueSectionProps {
+  /** Queued jobs (status='pending') — what the section actually renders. */
   jobs: Job[];
+  /** Full set of jobs the dashboard knows about (today + all open). Used to
+   *  derive "is machine free" — must include in_progress jobs from other
+   *  sections so the Ready/Waiting badge is accurate. */
+  allJobs?: Job[];
   shopInfo?: ShopInfo;
   mobileTabMode?: boolean;
 }
 
-export function QueueSection({ jobs, shopInfo, mobileTabMode }: QueueSectionProps) {
+export function QueueSection({ jobs, allJobs, shopInfo, mobileTabMode }: QueueSectionProps) {
   const actions = useJobActions(jobs);
   const handlePrint = useHandlePrint(shopInfo);
+
+  const busyMachineIds = useMemo(() => {
+    const set = new Set<string>();
+    const source = allJobs ?? jobs;
+    for (const j of source) {
+      for (const p of j.phases ?? []) {
+        if (p.status === 'in_progress' && p.machine_id) set.add(p.machine_id);
+      }
+    }
+    return set;
+  }, [allJobs, jobs]);
+  const isMachineFree = (machineId: string) => !busyMachineIds.has(machineId);
+
+  // Sort: Ready (pre-assigned + free) first, then Waiting (pre-assigned + busy),
+  // then unassigned. Within each bucket, rush before normal, then FIFO.
+  const sortedJobs = useMemo(() => {
+    const readiness = (j: Job) => {
+      const pending = (j.phases ?? []).find((p) => p.status === 'pending');
+      if (!pending) return 3;
+      if (!pending.machine_id) return 2; // unassigned
+      return busyMachineIds.has(pending.machine_id) ? 1 : 0; // ready=0, waiting=1
+    };
+    return [...jobs].sort((a, b) => {
+      const ra = readiness(a);
+      const rb = readiness(b);
+      if (ra !== rb) return ra - rb;
+      if (a.priority === 'rush' && b.priority !== 'rush') return -1;
+      if (a.priority !== 'rush' && b.priority === 'rush') return 1;
+      return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+    });
+  }, [jobs, busyMachineIds]);
 
   return (
     <div className={`bg-white shadow-sm border border-[#0d968b]/10 overflow-hidden md:flex md:flex-col md:min-h-0 ${
@@ -42,14 +80,18 @@ export function QueueSection({ jobs, shopInfo, mobileTabMode }: QueueSectionProp
         </div>
       ) : (
         <div className="p-3 space-y-2 max-h-[70vh] overflow-y-auto md:max-h-none md:flex-1 md:min-h-0 md:overflow-y-auto">
-          {jobs.map((job) => (
+          {sortedJobs.map((job) => (
             <QueueCard
               key={job.id}
               job={job}
               shopInfo={shopInfo}
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
+              phaseInFlight={actions.phaseInFlight}
+              isMachineFree={isMachineFree}
               onStartPhase={actions.openStartPhaseDialog}
+              onStartPhaseDirect={actions.startPhaseDirect}
+              onAssignMachine={actions.openAssignMachineDialog}
               onCancel={actions.setCancelConfirmJobId}
               onPrint={handlePrint}
             />
@@ -72,6 +114,19 @@ export function QueueSection({ jobs, shopInfo, mobileTabMode }: QueueSectionProp
         onMachineChange={actions.setStartPhaseMachineId}
         onConfirm={actions.handleStartPhase}
         onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
+      />
+      <AssignMachineDialog
+        open={actions.assignMachineJobId !== null}
+        phaseType={actions.assignMachinePhaseType}
+        machineId={actions.assignMachineSelectedId}
+        saving={actions.assigningMachine}
+        availableMachines={actions.availableMachines}
+        loadingMachines={actions.loadingMachines}
+        hasExistingAssignment={!!actions.assignMachineCurrentId}
+        onMachineChange={actions.setAssignMachineSelectedId}
+        onConfirm={actions.handleAssignMachine}
+        onUnassign={actions.handleUnassignMachine}
+        onClose={() => { actions.setAssignMachineJobId(null); actions.setAssignMachinePhaseId(null); }}
       />
     </div>
   );

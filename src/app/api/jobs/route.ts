@@ -31,6 +31,17 @@ const createJobSchema = z.object({
   total_weight: z.number().min(0).max(99999).optional(),
   notify_queue_sms: z.boolean().optional(),
   priority: z.enum(['normal', 'rush']).optional(),
+  // Optional pre-assignments for phases beyond the first. Map of phase_type
+  // (matches a service in `services`) → machine_id (uuid). The machines are
+  // validated up-front (ownership, active, type-compatible) and set on the
+  // corresponding phase rows after they're inserted, while status='pending'.
+  // The legacy `machine_id` parameter still wins for the FIRST phase (it
+  // starts that phase immediately) — phase_assignments only pre-assigns,
+  // never starts.
+  phase_assignments: z
+    .record(z.string().min(1).max(50), z.string().uuid('Invalid machine ID'))
+    .refine((obj) => Object.keys(obj).length <= 20, 'Maximum 20 phase assignments')
+    .optional(),
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
@@ -385,6 +396,67 @@ export async function POST(request: Request) {
       firstPhase.machine_id = machine.id;
       firstPhase.status = 'in_progress';
       firstPhase.started_at = new Date().toISOString();
+    }
+
+    // Apply phase_assignments (pre-assignments for phases that won't start
+    // immediately). Skips any phase already in_progress (legacy machine_id wins).
+    // Validates ownership/active/type-compat in a single batched fetch.
+    const phaseAssignments = parsed.data.phase_assignments ?? {};
+    if (Object.keys(phaseAssignments).length > 0) {
+      const machineIds = Array.from(new Set(Object.values(phaseAssignments)));
+      const { data: assignedMachines, error: assignedMachinesErr } = await supabase
+        .from('machines')
+        .select('id, label, machine_type, status')
+        .eq('laundromat_id', laundromat.id)
+        .in('id', machineIds);
+
+      if (assignedMachinesErr) {
+        await supabase.from('jobs').delete().eq('id', job.id);
+        console.error('phase_assignments machine fetch failed:', assignedMachinesErr);
+        return NextResponse.json({ error: 'Failed to validate phase assignments' }, { status: 500 });
+      }
+
+      const machineMap = new Map((assignedMachines ?? []).map((m) => [m.id, m]));
+
+      for (const [phaseType, machineId] of Object.entries(phaseAssignments)) {
+        const m = machineMap.get(machineId);
+        if (!m) {
+          await supabase.from('jobs').delete().eq('id', job.id);
+          return NextResponse.json(
+            { error: `Pre-assigned machine for "${phaseType}" not found` },
+            { status: 404 }
+          );
+        }
+        if (m.status !== 'active') {
+          await supabase.from('jobs').delete().eq('id', job.id);
+          return NextResponse.json(
+            { error: `Machine "${m.label}" is not active` },
+            { status: 400 }
+          );
+        }
+        const requiredType = phaseConfig[phaseType]?.machine_type ?? null;
+        if (!machineTypeMatches(m.machine_type as MachineType, requiredType)) {
+          await supabase.from('jobs').delete().eq('id', job.id);
+          return NextResponse.json(
+            { error: `Machine "${m.label}" (${m.machine_type}) does not match phase "${phaseType}" (requires ${requiredType}).` },
+            { status: 400 }
+          );
+        }
+
+        const phaseRow = phaseRecords.find((p) => p.phase_type === phaseType);
+        if (!phaseRow) {
+          await supabase.from('jobs').delete().eq('id', job.id);
+          return NextResponse.json(
+            { error: `phase_assignments references "${phaseType}" but it is not a phase of this job.` },
+            { status: 400 }
+          );
+        }
+
+        // Skip any phase already in_progress (legacy machine_id won that slot).
+        if (phaseRow.status === 'pending') {
+          phaseRow.machine_id = machineId;
+        }
+      }
     }
 
     if (phaseRecords.length > 0) {

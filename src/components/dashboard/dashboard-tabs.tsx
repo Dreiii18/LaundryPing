@@ -14,6 +14,10 @@ interface DashboardTabsProps {
 export function DashboardTabs({ todayJobs, queuedJobs, shopInfo }: DashboardTabsProps) {
   const [activeTab, setActiveTab] = useState<'jobs' | 'queue'>('jobs');
   const activeJobCount = todayJobs.filter((j) => j.status === 'in_progress').length;
+  // Combined view so each section can compute "is machine free" across the
+  // full dashboard data (queue cards need to see in_progress jobs from
+  // Today's Jobs to render Ready/Waiting cues correctly).
+  const allJobs = [...todayJobs, ...queuedJobs];
 
   return (
     <>
@@ -62,16 +66,16 @@ export function DashboardTabs({ todayJobs, queuedJobs, shopInfo }: DashboardTabs
           </button>
         </div>
         {activeTab === 'jobs' ? (
-          <TodaysJobsSection jobs={todayJobs} shopInfo={shopInfo} mobileTabMode />
+          <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} mobileTabMode />
         ) : (
-          <QueueSection jobs={queuedJobs} shopInfo={shopInfo} mobileTabMode />
+          <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} mobileTabMode />
         )}
       </div>
 
       {/* Desktop: Side-by-side grid */}
       <div className="hidden md:grid md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
-        <TodaysJobsSection jobs={todayJobs} shopInfo={shopInfo} />
-        <QueueSection jobs={queuedJobs} shopInfo={shopInfo} />
+        <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} />
+        <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} />
       </div>
     </>
   );

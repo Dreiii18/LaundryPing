@@ -4,7 +4,7 @@ import React from 'react';
 import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer, Flame, Bell, Play, Check, SkipForward } from 'lucide-react';
+import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer, Flame, Bell, Play, Check, SkipForward, Pencil } from 'lucide-react';
 import type { Job, JobPhase, ShopInfo } from './types';
 
 interface JobRowProps {
@@ -14,9 +14,17 @@ interface JobRowProps {
   completingId: string | null;
   cancellingId: string | null;
   phaseInFlight: string | null;
+  /** Is the pre-assigned machine on `phase` currently free? Used to show
+   *  Ready vs Waiting on rows whose next pending phase has machine_id. */
+  isMachineFree?: (machineId: string) => boolean;
   onMarkDone: (job: Job) => void;
   onCancelConfirm: (jobId: string) => void;
+  /** Open machine picker (no pre-assignment yet) */
   onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  /** 1-tap start when phase already has a pre-assigned machine */
+  onStartPhaseDirect: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  /** Open the pre-assign dialog (queue: edit which machine is pre-assigned) */
+  onAssignMachine: (jobId: string, phase: { id: string; phase_type: string; machine_id?: string | null }) => void;
   onCompletePhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onSkipPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onPrint: (job: Job) => void;
@@ -65,11 +73,11 @@ function PhaseChip({ phase }: { phase: JobPhase }) {
       </span>
     );
   }
-  // pending
+  // pending — show pre-assigned machine label if the phase has been pre-assigned
   return (
     <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`} title={`${phase.phase_type} pending`}>
       <span className="size-1.5 rounded-full bg-slate-300" />
-      {phase.phase_type}
+      {phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}
     </span>
   );
 }
@@ -81,9 +89,12 @@ export const JobRow = React.memo(function JobRow({
   completingId,
   cancellingId,
   phaseInFlight,
+  isMachineFree,
   onMarkDone,
   onCancelConfirm,
   onStartPhase,
+  onStartPhaseDirect,
+  onAssignMachine,
   onCompletePhase,
   onSkipPhase,
   onPrint,
@@ -93,6 +104,14 @@ export const JobRow = React.memo(function JobRow({
   const activePhase = phases.find((p) => p.status === 'in_progress') ?? null;
   const nextPendingPhase = phases.find((p) => p.status === 'pending') ?? null;
   const isJobOpen = ['pending', 'in_progress', 'ready_for_pickup'].includes(job.status);
+
+  // Pre-assignment state for the next pending phase. Drives 1-tap start
+  // (server uses phase.machine_id when body is empty) and Ready/Waiting
+  // visual cues.
+  const preassignedMachineId = nextPendingPhase?.machine_id ?? null;
+  const preassignedMachineLabel = nextPendingPhase?.machine?.label ?? null;
+  const preassignedMachineFree =
+    preassignedMachineId && isMachineFree ? isMachineFree(preassignedMachineId) : null;
 
   return (
     <TableRow className="hover:bg-slate-50/50 transition-colors">
@@ -237,19 +256,77 @@ export const JobRow = React.memo(function JobRow({
               </>
             )}
 
-            {/* No active phase but next pending: start it */}
+            {/* No active phase but next pending: start it.
+                Pre-assigned → 1-tap (label includes machine).
+                Pre-assigned + machine busy → show "Waiting" cue.
+                Unassigned → opens picker dialog. */}
             {!activePhase && nextPendingPhase && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onStartPhase(job.id, nextPendingPhase)}
-                disabled={isActionDisabled}
-                aria-label={`Start ${nextPendingPhase.phase_type}`}
-                className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11"
-              >
-                <Play className="size-3" />
-                <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
-              </Button>
+              <>
+                {preassignedMachineId ? (
+                  <>
+                    {preassignedMachineFree === false && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                        <Clock className="size-3" aria-hidden="true" />
+                        Waiting on {preassignedMachineLabel}
+                      </span>
+                    )}
+                    {preassignedMachineFree !== false && (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700 bg-teal-50 border border-teal-200 px-2 py-0.5 rounded-full">
+                        Ready
+                      </span>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onStartPhaseDirect(job.id, nextPendingPhase)}
+                      disabled={isActionDisabled || preassignedMachineFree === false}
+                      aria-label={`Start ${nextPendingPhase.phase_type} on ${preassignedMachineLabel}`}
+                      className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11 disabled:opacity-50"
+                    >
+                      {phaseInFlight === nextPendingPhase.id ? (
+                        <><Loader2 className="size-3 animate-spin" /><span className="ml-1">…</span></>
+                      ) : (
+                        <><Play className="size-3" /><span className="ml-1">Start {nextPendingPhase.phase_type} · {preassignedMachineLabel}</span></>
+                      )}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                      disabled={isActionDisabled}
+                      aria-label="Change pre-assigned machine"
+                      className="text-xs text-slate-400 hover:text-slate-600 min-h-11 min-w-11"
+                    >
+                      <Pencil className="size-3" />
+                    </Button>
+                  </>
+                ) : (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => onStartPhase(job.id, nextPendingPhase)}
+                      disabled={isActionDisabled}
+                      aria-label={`Start ${nextPendingPhase.phase_type}`}
+                      className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11"
+                    >
+                      <Play className="size-3" />
+                      <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                      disabled={isActionDisabled}
+                      aria-label={`Pre-assign machine for ${nextPendingPhase.phase_type}`}
+                      className="text-xs text-slate-400 hover:text-slate-600 min-h-11 min-w-11"
+                      title="Pre-assign machine"
+                    >
+                      <Pencil className="size-3" />
+                    </Button>
+                  </>
+                )}
+              </>
             )}
 
             {/* Ready for pickup or no phases left: notify customer + complete */}

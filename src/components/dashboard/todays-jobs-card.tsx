@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Printer, MessageSquare, Bell, Check, Play, SkipForward } from 'lucide-react';
+import { Loader2, Printer, MessageSquare, Bell, Check, Play, SkipForward, Pencil, Clock } from 'lucide-react';
 import type { Job, JobPhase, ShopInfo } from '@/components/jobs-table/types';
 
 interface TodaysJobsCardProps {
@@ -11,10 +11,13 @@ interface TodaysJobsCardProps {
   completingId: string | null;
   cancellingId: string | null;
   phaseInFlight: string | null;
+  isMachineFree?: (machineId: string) => boolean;
   onMarkDone: (job: Job) => void;
   onCancel: (jobId: string) => void;
   onPrint: (job: Job) => void;
   onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onStartPhaseDirect: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onAssignMachine: (jobId: string, phase: { id: string; phase_type: string; machine_id?: string | null }) => void;
   onCompletePhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onSkipPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
 }
@@ -53,7 +56,8 @@ function PhaseChip({ phase }: { phase: JobPhase }) {
   if (phase.status === 'skipped') {
     return <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`}>{phase.phase_type}</span>;
   }
-  return <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`}><span className="size-1 rounded-full bg-slate-300" />{phase.phase_type}</span>;
+  // pending — show pre-assigned machine label if any
+  return <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`}><span className="size-1 rounded-full bg-slate-300" />{phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}</span>;
 }
 
 export function TodaysJobsCard({
@@ -62,10 +66,13 @@ export function TodaysJobsCard({
   completingId,
   cancellingId,
   phaseInFlight,
+  isMachineFree,
   onMarkDone,
   onCancel,
   onPrint,
   onStartPhase,
+  onStartPhaseDirect,
+  onAssignMachine,
   onCompletePhase,
   onSkipPhase,
 }: TodaysJobsCardProps) {
@@ -77,6 +84,10 @@ export function TodaysJobsCard({
   const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
   const activePhase = phases.find((p) => p.status === 'in_progress') ?? null;
   const nextPendingPhase = phases.find((p) => p.status === 'pending') ?? null;
+  const preassignedMachineId = nextPendingPhase?.machine_id ?? null;
+  const preassignedMachineLabel = nextPendingPhase?.machine?.label ?? null;
+  const preassignedFree =
+    preassignedMachineId && isMachineFree ? isMachineFree(preassignedMachineId) : null;
 
   // Secondary info: claim# + customer name (machine label is now inside the phase strip)
   const secondaryParts: string[] = [];
@@ -155,17 +166,65 @@ export function TodaysJobsCard({
           </>
         )}
 
-        {/* Next pending phase: start it */}
+        {/* Next pending phase: start it. Pre-assigned → 1-tap (machine in label).
+            Pre-assigned + busy → Waiting cue + disabled button.
+            Unassigned → opens picker. */}
         {!activePhase && nextPendingPhase && (
-          <Button
-            size="sm"
-            onClick={() => onStartPhase(job.id, nextPendingPhase)}
-            disabled={isActionDisabled}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
-          >
-            <Play className="size-3" />
-            <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
-          </Button>
+          preassignedMachineId ? (
+            <>
+              {preassignedFree === false && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+                  <Clock className="size-3" />
+                  Waiting on {preassignedMachineLabel}
+                </span>
+              )}
+              {preassignedFree !== false && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700">
+                  Ready
+                </span>
+              )}
+              <Button
+                size="sm"
+                onClick={() => onStartPhaseDirect(job.id, nextPendingPhase)}
+                disabled={isActionDisabled || preassignedFree === false}
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 disabled:opacity-50"
+              >
+                {phaseInFlight === nextPendingPhase.id ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <><Play className="size-3" /><span className="ml-1">Start {nextPendingPhase.phase_type} · {preassignedMachineLabel}</span></>
+                )}
+              </Button>
+              <button
+                onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50 p-1"
+                title="Change pre-assigned machine"
+              >
+                <Pencil className="size-3" />
+              </button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                onClick={() => onStartPhase(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+              >
+                <Play className="size-3" />
+                <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
+              </Button>
+              <button
+                onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                className="text-slate-400 hover:text-slate-600 disabled:opacity-50 p-1"
+                title="Pre-assign machine"
+              >
+                <Pencil className="size-3" />
+              </button>
+            </>
+          )
         )}
 
         {/* Ready for pickup OR no phases at all: notify customer */}
