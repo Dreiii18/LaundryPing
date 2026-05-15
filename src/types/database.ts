@@ -42,6 +42,11 @@ export interface Database {
           sms_queue_template: string | null;
           sms_completion_template: string | null;
           sender_name: string | null;
+          onboarding_completed_at: string | null;
+          welcome_email_sent_at: string | null;
+          d2_email_sent_at: string | null;
+          d7_email_sent_at: string | null;
+          d30_email_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -64,6 +69,11 @@ export interface Database {
           sms_queue_template?: string | null;
           sms_completion_template?: string | null;
           sender_name?: string | null;
+          onboarding_completed_at?: string | null;
+          welcome_email_sent_at?: string | null;
+          d2_email_sent_at?: string | null;
+          d7_email_sent_at?: string | null;
+          d30_email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -86,6 +96,11 @@ export interface Database {
           sms_queue_template?: string | null;
           sms_completion_template?: string | null;
           sender_name?: string | null;
+          onboarding_completed_at?: string | null;
+          welcome_email_sent_at?: string | null;
+          d2_email_sent_at?: string | null;
+          d7_email_sent_at?: string | null;
+          d30_email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };

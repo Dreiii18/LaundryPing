@@ -8,11 +8,12 @@ export function Hero() {
         {/* Left column — Text */}
         <div className="text-center md:text-left">
           <h1 className="text-4xl md:text-5xl font-extrabold text-[#111817] leading-tight tracking-tight">
-            Stop Wasting Time Texting Customers!
+            Get customers to pick up faster — free up machines, take more loads.
           </h1>
           <p className="mt-5 text-lg text-[#618986] leading-relaxed max-w-[540px]">
-            LaundryPing automates SMS notifications so customers know exactly
-            when to pick up. Simple, fast, stress-free.
+            Automatic SMS the moment a load is done. Customers come back
+            sooner, machines turn over faster, and you handle more jobs without
+            hiring.
           </p>
 
           {/* CTA buttons */}

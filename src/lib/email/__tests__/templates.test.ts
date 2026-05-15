@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest';
-import { buildTopupConfirmationEmail, buildPasswordResetEmail, buildNewSignupEmail, buildDailyPulseEmail } from '../templates';
+import {
+  buildTopupConfirmationEmail,
+  buildPasswordResetEmail,
+  buildNewSignupEmail,
+  buildDailyPulseEmail,
+  buildWelcomeEmail,
+  buildD2NoMachineEmail,
+  buildD7NoSmsEmail,
+  buildD30RecapEmail,
+} from '../templates';
 
 const sampleData = {
   laundromatName: 'Sparkle Clean Laundry',
@@ -279,5 +288,116 @@ describe('buildDailyPulseEmail', () => {
     expect(result.html).toContain('&lt;script&gt;');
     expect(result.html).not.toContain('<img src=x');
     expect(result.html).toContain('&lt;img');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Lifecycle emails (D0 welcome / D2 no-machine / D7 no-SMS / D30 recap)
+// ---------------------------------------------------------------------------
+
+describe('buildWelcomeEmail', () => {
+  const sample = { shopName: 'Sparkle Clean', onboardingUrl: 'https://laundryping.com/onboarding' };
+
+  it('returns subject and html', () => {
+    const result = buildWelcomeEmail(sample);
+    expect(result.subject).toBe('Welcome to LaundryPing — send your first SMS today');
+    expect(result.html).toContain('Sparkle Clean');
+    expect(result.html).toContain('https://laundryping.com/onboarding');
+  });
+
+  it('escapes HTML in shop name', () => {
+    const result = buildWelcomeEmail({ ...sample, shopName: '<script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in onboardingUrl (CTA href injection)', () => {
+    const result = buildWelcomeEmail({
+      ...sample,
+      onboardingUrl: '"><script>alert(1)</script>',
+    });
+    expect(result.html).not.toContain('<script>alert(1)</script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+});
+
+describe('buildD2NoMachineEmail', () => {
+  const sample = { shopName: 'Sparkle Clean', onboardingUrl: 'https://laundryping.com/onboarding' };
+
+  it('returns subject and html', () => {
+    const result = buildD2NoMachineEmail(sample);
+    expect(result.subject).toBe('Add your first machine in under a minute');
+    expect(result.html).toContain('Sparkle Clean');
+  });
+
+  it('escapes HTML in shop name', () => {
+    const result = buildD2NoMachineEmail({ ...sample, shopName: '<script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in onboardingUrl (CTA href injection)', () => {
+    const result = buildD2NoMachineEmail({
+      ...sample,
+      onboardingUrl: '"><script>alert(1)</script>',
+    });
+    expect(result.html).not.toContain('<script>alert(1)</script>');
+  });
+});
+
+describe('buildD7NoSmsEmail', () => {
+  const sample = { shopName: 'Sparkle Clean', appUrl: 'https://laundryping.com/dashboard' };
+
+  it('returns subject and html', () => {
+    const result = buildD7NoSmsEmail(sample);
+    expect(result.subject).toBe('Send your first "laundry done" SMS today');
+    expect(result.html).toContain('Sparkle Clean');
+  });
+
+  it('escapes HTML in shop name', () => {
+    const result = buildD7NoSmsEmail({ ...sample, shopName: '<script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in appUrl (CTA href injection)', () => {
+    const result = buildD7NoSmsEmail({ ...sample, appUrl: '"><script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>alert(1)</script>');
+  });
+});
+
+describe('buildD30RecapEmail', () => {
+  const sample = {
+    shopName: 'Sparkle Clean',
+    appUrl: 'https://laundryping.com/dashboard',
+    jobsCount: 12,
+    smsSent: 9,
+    freeCreditsRemaining: 41,
+  };
+
+  it('returns subject and html with stats', () => {
+    const result = buildD30RecapEmail(sample);
+    expect(result.subject).toBe('Your first 30 days on LaundryPing');
+    expect(result.html).toContain('Sparkle Clean');
+    expect(result.html).toContain('>12<'); // jobsCount cell
+    expect(result.html).toContain('>9<'); // smsSent cell
+    expect(result.html).toContain('>41<'); // freeCreditsRemaining cell
+  });
+
+  it('shows the "blocked feedback" copy when no SMS sent', () => {
+    const result = buildD30RecapEmail({ ...sample, smsSent: 0 });
+    // Apostrophe is HTML-escaped (&#39;) in the rendered template.
+    expect(result.html).toContain('what&#39;s blocking');
+  });
+
+  it('escapes HTML in shop name', () => {
+    const result = buildD30RecapEmail({ ...sample, shopName: '<script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>');
+    expect(result.html).toContain('&lt;script&gt;');
+  });
+
+  it('escapes HTML in appUrl (CTA href injection)', () => {
+    const result = buildD30RecapEmail({ ...sample, appUrl: '"><script>alert(1)</script>' });
+    expect(result.html).not.toContain('<script>alert(1)</script>');
   });
 });
