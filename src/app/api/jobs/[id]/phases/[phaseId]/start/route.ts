@@ -1,7 +1,12 @@
 import { NextResponse } from 'next/server';
 import { z } from 'zod';
 import { getAuthenticatedUser } from '@/lib/supabase/auth-helpers';
-import { machineTypeMatches } from '@/lib/jobs/phases';
+import {
+  canStartPhase,
+  isKnownPhaseType,
+  resolvePhaseRequirement,
+  validateMachineForPhase,
+} from '@/lib/jobs/phases';
 import type { MachineType, ServicePhaseConfigEntry } from '@/types/database';
 
 // machine_id is optional. If omitted, the route falls back to the phase's
@@ -36,29 +41,46 @@ export async function POST(
       );
     }
 
-    // Fetch the phase + verify ownership via job. Read machine_id so we can
-    // fall back to a pre-assigned machine when the body omits one (1-tap start).
-    const { data: phase, error: phaseError } = await supabase
+    // Fetch all phases for the job (verifies tenancy via laundromat_id and
+    // gives us the sibling phases we need for the sequence-order guard).
+    const { data: phases, error: phasesError } = await supabase
       .from('job_phases')
       .select('id, job_id, phase_type, status, sequence, laundromat_id, machine_id')
-      .eq('id', phaseId)
       .eq('job_id', jobId)
       .eq('laundromat_id', laundromat.id)
-      .single();
+      .order('sequence', { ascending: true });
 
-    if (phaseError || !phase) {
+    if (phasesError || !phases || phases.length === 0) {
       return NextResponse.json({ error: 'Phase not found' }, { status: 404 });
     }
 
-    if (phase.status !== 'pending') {
-      return NextResponse.json(
-        { error: `Phase is ${phase.status}, can only start a pending phase` },
-        { status: 409 }
-      );
+    const phase = phases.find((p) => p.id === phaseId);
+    if (!phase) {
+      return NextResponse.json({ error: 'Phase not found' }, { status: 404 });
+    }
+
+    // Enforce phase sequence order: a later-sequence phase cannot start while
+    // an earlier-sequence phase is still pending (must be started or skipped).
+    const startable = canStartPhase(phase, phases);
+    if (!startable.ok) {
+      return NextResponse.json({ error: startable.reason }, { status: 409 });
     }
 
     const phaseConfig = (laundromat.service_phase_config ?? {}) as Record<string, ServicePhaseConfigEntry>;
-    const requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+
+    // If the phase_type has no current config entry (and isn't the 'legacy'
+    // backfill marker), refuse to start. Otherwise a service renamed/removed in
+    // settings would silently start as a machineless phase.
+    if (!isKnownPhaseType(phase.phase_type, phaseConfig)) {
+      return NextResponse.json(
+        {
+          error: `Phase type "${phase.phase_type}" is no longer configured. Update Settings → Services or skip this phase.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    const requiredType = resolvePhaseRequirement(phase.phase_type, phaseConfig).machine_type;
 
     // Resolve which machine to use: explicit body wins, then fall back to the
     // phase's pre-assigned machine. This is what makes 1-tap start possible:
@@ -82,11 +104,9 @@ export async function POST(
 
       machine = machineData;
 
-      if (!machineTypeMatches(machine.machine_type, requiredType)) {
-        return NextResponse.json(
-          { error: `This machine is a ${machine.machine_type} but the phase (${phase.phase_type}) requires a ${requiredType}.` },
-          { status: 400 }
-        );
+      const compatibility = validateMachineForPhase(machine, phase.phase_type, phaseConfig);
+      if (!compatibility.ok) {
+        return NextResponse.json({ error: compatibility.reason }, { status: 400 });
       }
     } else if (requiredType !== null) {
       return NextResponse.json(

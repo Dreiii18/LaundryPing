@@ -61,8 +61,18 @@ export function StartPhaseDialog({
               Loading machines...
             </div>
           ) : availableMachines.length === 0 ? (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-              No compatible machines available right now.
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                No compatible machines available right now.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="w-full min-h-11"
+              >
+                Close
+              </Button>
             </div>
           ) : (
             <>

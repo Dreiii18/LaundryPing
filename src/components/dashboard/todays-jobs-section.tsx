@@ -12,6 +12,7 @@ import { AssignMachineDialog } from '@/components/jobs-table/assign-machine-dial
 import { EmptyState } from '@/components/empty-state';
 import { TodaysJobsCard } from './todays-jobs-card';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 
 interface TodaysJobsSectionProps {
   jobs: Job[];
@@ -19,10 +20,12 @@ interface TodaysJobsSectionProps {
   allJobs?: Job[];
   shopInfo?: ShopInfo;
   mobileTabMode?: boolean;
+  /** Passed to useJobActions so dialog opens skip the /api/settings fetch. */
+  servicePhaseConfig?: Record<string, ServicePhaseConfigEntry> | null;
 }
 
-export function TodaysJobsSection({ jobs, allJobs, shopInfo, mobileTabMode }: TodaysJobsSectionProps) {
-  const actions = useJobActions(jobs);
+export function TodaysJobsSection({ jobs, allJobs, shopInfo, mobileTabMode, servicePhaseConfig }: TodaysJobsSectionProps) {
+  const actions = useJobActions(jobs, { servicePhaseConfig });
   const handlePrint = useHandlePrint(shopInfo);
   const [showCompleted, setShowCompleted] = useState(false);
   const [showCancelled, setShowCancelled] = useState(false);

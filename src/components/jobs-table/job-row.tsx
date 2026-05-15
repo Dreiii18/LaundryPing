@@ -5,7 +5,7 @@ import { TableCell, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, CheckCircle, Clock, CircleX, CircleAlert, Printer, Flame, Bell, Play, Check, SkipForward, Pencil } from 'lucide-react';
-import type { Job, JobPhase, ShopInfo } from './types';
+import { renderPhaseLabel, type Job, type JobPhase, type ShopInfo } from './types';
 
 interface JobRowProps {
   job: Job;
@@ -13,7 +13,8 @@ interface JobRowProps {
   shopInfo?: ShopInfo;
   completingId: string | null;
   cancellingId: string | null;
-  phaseInFlight: string | null;
+  /** Set of job_ids that currently have a phase action in flight. */
+  phaseInFlight: Set<string>;
   /** Is the pre-assigned machine on `phase` currently free? Used to show
    *  Ready vs Waiting on rows whose next pending phase has machine_id. */
   isMachineFree?: (machineId: string) => boolean;
@@ -51,33 +52,34 @@ const formatDate = (dateStr: string) => {
 
 function PhaseChip({ phase }: { phase: JobPhase }) {
   const base = 'inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border';
+  const label = renderPhaseLabel(phase.phase_type);
   if (phase.status === 'completed') {
     return (
-      <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`} title={`${phase.phase_type} done`}>
-        <Check className="size-3" /> {phase.phase_type}
+      <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`} title={`${label} done`}>
+        <Check className="size-3" /> {label}
       </span>
     );
   }
   if (phase.status === 'in_progress') {
     return (
-      <span className={`${base} bg-amber-50 text-amber-800 border-amber-300`} title={`${phase.phase_type} in progress`}>
+      <span className={`${base} bg-amber-50 text-amber-800 border-amber-300`} title={`${label} in progress`}>
         <span className="size-1.5 rounded-full bg-amber-500 animate-pulse" />
-        {phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}
+        {label}{phase.machine ? ` · ${phase.machine.label}` : ''}
       </span>
     );
   }
   if (phase.status === 'skipped') {
     return (
-      <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`} title={`${phase.phase_type} skipped`}>
-        {phase.phase_type}
+      <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`} title={`${label} skipped`}>
+        {label}
       </span>
     );
   }
   // pending — show pre-assigned machine label if the phase has been pre-assigned
   return (
-    <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`} title={`${phase.phase_type} pending`}>
+    <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`} title={`${label} pending`}>
       <span className="size-1.5 rounded-full bg-slate-300" />
-      {phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}
+      {label}{phase.machine ? ` · ${phase.machine.label}` : ''}
     </span>
   );
 }
@@ -99,7 +101,8 @@ export const JobRow = React.memo(function JobRow({
   onSkipPhase,
   onPrint,
 }: JobRowProps) {
-  const isActionDisabled = completingId !== null || cancellingId !== null || phaseInFlight !== null;
+  const jobInFlight = phaseInFlight.has(job.id);
+  const isActionDisabled = completingId === job.id || cancellingId === job.id || jobInFlight;
   const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
   const activePhase = phases.find((p) => p.status === 'in_progress') ?? null;
   const nextPendingPhase = phases.find((p) => p.status === 'pending') ?? null;
@@ -234,13 +237,13 @@ export const JobRow = React.memo(function JobRow({
                   size="sm"
                   onClick={() => onCompletePhase(job.id, activePhase)}
                   disabled={isActionDisabled}
-                  aria-label={`Complete ${activePhase.phase_type}`}
+                  aria-label={`Complete ${renderPhaseLabel(activePhase.phase_type)}`}
                   className="text-xs font-bold text-amber-700 border-amber-200 hover:bg-amber-50 min-h-11 min-w-11"
                 >
-                  {phaseInFlight === activePhase.id ? (
+                  {jobInFlight ? (
                     <><Loader2 className="size-3 animate-spin" /><span className="ml-1">…</span></>
                   ) : (
-                    <><Check className="size-3" /><span className="ml-1">Done {activePhase.phase_type}</span></>
+                    <><Check className="size-3" /><span className="ml-1">Done {renderPhaseLabel(activePhase.phase_type)}</span></>
                   )}
                 </Button>
                 <Button
@@ -248,7 +251,7 @@ export const JobRow = React.memo(function JobRow({
                   size="sm"
                   onClick={() => onSkipPhase(job.id, activePhase)}
                   disabled={isActionDisabled}
-                  aria-label={`Skip ${activePhase.phase_type}`}
+                  aria-label={`Skip ${renderPhaseLabel(activePhase.phase_type)}`}
                   className="text-xs text-slate-400 hover:text-slate-600 min-h-11 min-w-11"
                 >
                   <SkipForward className="size-3" />
@@ -280,13 +283,13 @@ export const JobRow = React.memo(function JobRow({
                       size="sm"
                       onClick={() => onStartPhaseDirect(job.id, nextPendingPhase)}
                       disabled={isActionDisabled || preassignedMachineFree === false}
-                      aria-label={`Start ${nextPendingPhase.phase_type} on ${preassignedMachineLabel}`}
+                      aria-label={`Start ${renderPhaseLabel(nextPendingPhase.phase_type)} on ${preassignedMachineLabel}`}
                       className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11 disabled:opacity-50"
                     >
-                      {phaseInFlight === nextPendingPhase.id ? (
+                      {jobInFlight ? (
                         <><Loader2 className="size-3 animate-spin" /><span className="ml-1">…</span></>
                       ) : (
-                        <><Play className="size-3" /><span className="ml-1">Start {nextPendingPhase.phase_type} · {preassignedMachineLabel}</span></>
+                        <><Play className="size-3" /><span className="ml-1">Start {renderPhaseLabel(nextPendingPhase.phase_type)} · {preassignedMachineLabel}</span></>
                       )}
                     </Button>
                     <Button
@@ -307,18 +310,18 @@ export const JobRow = React.memo(function JobRow({
                       size="sm"
                       onClick={() => onStartPhase(job.id, nextPendingPhase)}
                       disabled={isActionDisabled}
-                      aria-label={`Start ${nextPendingPhase.phase_type}`}
+                      aria-label={`Start ${renderPhaseLabel(nextPendingPhase.phase_type)}`}
                       className="text-xs font-bold text-blue-600 border-blue-200 hover:bg-blue-50 min-h-11 min-w-11"
                     >
                       <Play className="size-3" />
-                      <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
+                      <span className="ml-1">Start {renderPhaseLabel(nextPendingPhase.phase_type)}</span>
                     </Button>
                     <Button
                       variant="ghost"
                       size="sm"
                       onClick={() => onAssignMachine(job.id, nextPendingPhase)}
                       disabled={isActionDisabled}
-                      aria-label={`Pre-assign machine for ${nextPendingPhase.phase_type}`}
+                      aria-label={`Pre-assign machine for ${renderPhaseLabel(nextPendingPhase.phase_type)}`}
                       className="text-xs text-slate-400 hover:text-slate-600 min-h-11 min-w-11"
                       title="Pre-assign machine"
                     >
@@ -329,8 +332,10 @@ export const JobRow = React.memo(function JobRow({
               </>
             )}
 
-            {/* Ready for pickup or no phases left: notify customer + complete */}
-            {(job.status === 'ready_for_pickup' || (!activePhase && !nextPendingPhase)) && (
+            {/* Ready for pickup (or all phases settled): notify customer + complete.
+                Guard against rendering alongside an active-phase action — only
+                show this CTA when nothing is currently running for this job. */}
+            {!activePhase && (job.status === 'ready_for_pickup' || !nextPendingPhase) && (
               <Button
                 variant="outline"
                 size="sm"

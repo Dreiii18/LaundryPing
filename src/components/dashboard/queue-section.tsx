@@ -9,6 +9,7 @@ import { AssignMachineDialog } from '@/components/jobs-table/assign-machine-dial
 import { QueueCard } from './queue-card';
 import { ListTodo } from 'lucide-react';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 
 interface QueueSectionProps {
   /** Queued jobs (status='pending') — what the section actually renders. */
@@ -19,10 +20,12 @@ interface QueueSectionProps {
   allJobs?: Job[];
   shopInfo?: ShopInfo;
   mobileTabMode?: boolean;
+  /** Passed to useJobActions so dialog opens skip the /api/settings fetch. */
+  servicePhaseConfig?: Record<string, ServicePhaseConfigEntry> | null;
 }
 
-export function QueueSection({ jobs, allJobs, shopInfo, mobileTabMode }: QueueSectionProps) {
-  const actions = useJobActions(jobs);
+export function QueueSection({ jobs, allJobs, shopInfo, mobileTabMode, servicePhaseConfig }: QueueSectionProps) {
+  const actions = useJobActions(jobs, { servicePhaseConfig });
   const handlePrint = useHandlePrint(shopInfo);
 
   const busyMachineIds = useMemo(() => {

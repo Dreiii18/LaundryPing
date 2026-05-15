@@ -37,10 +37,12 @@ async function DashboardJobsTable({
   laundromatId,
   todayPH,
   shopInfo,
+  servicePhaseConfig,
 }: {
   laundromatId: string;
   todayPH: string;
   shopInfo: ShopInfo;
+  servicePhaseConfig: Record<string, import('@/types/database').ServicePhaseConfigEntry> | null;
 }) {
   const supabase = await createClient();
   // WARNING: this query must run after mark_overdue_jobs has committed — it needs to see
@@ -175,7 +177,12 @@ async function DashboardJobsTable({
     .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
 
   return (
-    <DashboardTabs todayJobs={todayJobs} queuedJobs={queuedJobs} shopInfo={shopInfo} />
+    <DashboardTabs
+      todayJobs={todayJobs}
+      queuedJobs={queuedJobs}
+      shopInfo={shopInfo}
+      servicePhaseConfig={servicePhaseConfig}
+    />
   );
 }
 
@@ -290,6 +297,7 @@ export default async function DashboardPage() {
         <DashboardJobsTable
           laundromatId={laundromat.id}
           todayPH={todayPH}
+          servicePhaseConfig={laundromat.service_phase_config ?? null}
           shopInfo={{
             name: laundromat.name,
             address: laundromat.address,

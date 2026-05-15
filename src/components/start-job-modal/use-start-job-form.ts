@@ -358,6 +358,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     if (selectedServices.length === 0) {
       return 'Please select at least one service';
     }
+    // Empty service_phase_config falls back to combo-everywhere defaults, which
+    // produces wrong-type phases for shops that have washer/dryer-only machines.
+    // Require operators to configure phases before creating jobs.
+    if (Object.keys(servicePhaseConfig).length === 0) {
+      return 'Phase configuration is missing — set this up in Settings → Services before creating jobs.';
+    }
     // Validate per_kg services have weight > 0
     for (const s of selectedServices) {
       if ((serviceTypes[s] ?? 'per_load') === 'per_kg' && !(serviceWeightsActual[s] > 0)) {
@@ -368,7 +374,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       return 'Please select a machine';
     }
     return null;
-  }, [selectedServices, serviceTypes, serviceWeightsActual, machineRequired, compatibleMachines, machineId]);
+  }, [selectedServices, servicePhaseConfig, serviceTypes, serviceWeightsActual, machineRequired, compatibleMachines, machineId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();

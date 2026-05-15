@@ -23,6 +23,7 @@ export interface JobsPageContentProps {
   pageSize: number;
   currentFilters: CurrentFilters;
   shopInfo?: ShopInfo;
+  servicePhaseConfig?: Record<string, import('@/types/database').ServicePhaseConfigEntry> | null;
 }
 
 export interface JobsFilterProps {

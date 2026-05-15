@@ -28,6 +28,23 @@ function stringRecordsEqual(a: Record<string, string>, b: Record<string, string>
   return keysA.every((k) => a[k] === b[k]);
 }
 
+function phaseConfigsEqual(
+  a: Record<string, ServicePhaseConfigEntry>,
+  b: Record<string, ServicePhaseConfigEntry>,
+): boolean {
+  const keysA = Object.keys(a);
+  const keysB = Object.keys(b);
+  if (keysA.length !== keysB.length) return false;
+  if (!keysA.every((k) => Object.prototype.hasOwnProperty.call(b, k))) return false;
+  return keysA.every(
+    (k) =>
+      a[k].is_phase === b[k].is_phase &&
+      a[k].machine_type === b[k].machine_type &&
+      a[k].default_minutes === b[k].default_minutes &&
+      a[k].sequence === b[k].sequence,
+  );
+}
+
 export function useSettingsForm({
   initialName,
   initialAddress,
@@ -67,7 +84,7 @@ export function useSettingsForm({
     !recordsEqual(servicePrices, initialServicePrices) ||
     !recordsEqual(serviceWeights, initialServiceWeights) ||
     !stringRecordsEqual(serviceTypes, initialServiceTypes) ||
-    JSON.stringify(servicePhaseConfig) !== JSON.stringify(initialServicePhaseConfig) ||
+    !phaseConfigsEqual(servicePhaseConfig, initialServicePhaseConfig) ||
     (parseFloat(rushFee) || 0) !== initialRushFee ||
     receiptPaperSize !== initialReceiptPaperSize;
 
@@ -202,7 +219,17 @@ export function useSettingsForm({
       const data = await res.json();
 
       if (!res.ok) {
-        toast.error(data.error || 'Failed to save settings');
+        // 409 with `conflicting: string[]` means in-flight phases reference
+        // a service the user is trying to remove. Surface the conflicting
+        // service names so the operator knows which jobs to clear first.
+        if (res.status === 409 && Array.isArray(data?.conflicting) && data.conflicting.length > 0) {
+          const list = data.conflicting.join(', ');
+          toast.error(`Cannot save: open jobs still use ${list}. Complete or skip them first.`, {
+            duration: 8000,
+          });
+        } else {
+          toast.error(data.error || 'Failed to save settings');
+        }
         setSaving(false);
         return;
       }

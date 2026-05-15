@@ -282,8 +282,18 @@ export async function POST(
         .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
       if (successUpdateError) {
-        // SMS was already sent -- log for ops but don't fail the response
+        // SMS was already sent but the final job-status UPDATE failed. Surface
+        // a 500 so the client retries; the next request hits the sms_logs
+        // idempotency check and completes the job without re-sending SMS.
         console.error('Job completion update failed (SMS-sent path):', successUpdateError);
+        return NextResponse.json(
+          {
+            error: 'SMS sent but completion failed — please retry.',
+            toastType: 'warning',
+            smsSent: true,
+          },
+          { status: 500 }
+        );
       }
 
       return NextResponse.json({

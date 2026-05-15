@@ -40,9 +40,11 @@ function MachineRowComponent({ machine, onEdit, onDelete }: MachineRowProps) {
             <span className="text-sm font-semibold text-slate-900">
               {machine.label}
             </span>
-            <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-slate-500 border-slate-200">
-              {machine.machine_type}
-            </Badge>
+            {machine.machine_type && (
+              <Badge variant="outline" className="text-[10px] uppercase tracking-wider text-slate-500 border-slate-200">
+                {machine.machine_type}
+              </Badge>
+            )}
           </div>
         </div>
       </TableCell>

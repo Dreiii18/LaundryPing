@@ -4,16 +4,21 @@ import { useState } from 'react';
 import { TodaysJobsSection } from './todays-jobs-section';
 import { QueueSection } from './queue-section';
 import type { Job, ShopInfo } from '@/components/jobs-table/types';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 
 interface DashboardTabsProps {
   todayJobs: Job[];
   queuedJobs: Job[];
   shopInfo?: ShopInfo;
+  servicePhaseConfig?: Record<string, ServicePhaseConfigEntry> | null;
 }
 
-export function DashboardTabs({ todayJobs, queuedJobs, shopInfo }: DashboardTabsProps) {
+export function DashboardTabs({ todayJobs, queuedJobs, shopInfo, servicePhaseConfig }: DashboardTabsProps) {
   const [activeTab, setActiveTab] = useState<'jobs' | 'queue'>('jobs');
-  const activeJobCount = todayJobs.filter((j) => j.status === 'in_progress').length;
+  // ready_for_pickup needs operator attention (notify + complete) — count both.
+  const activeJobCount = todayJobs.filter(
+    (j) => j.status === 'in_progress' || j.status === 'ready_for_pickup',
+  ).length;
   // Combined view so each section can compute "is machine free" across the
   // full dashboard data (queue cards need to see in_progress jobs from
   // Today's Jobs to render Ready/Waiting cues correctly).
@@ -66,16 +71,16 @@ export function DashboardTabs({ todayJobs, queuedJobs, shopInfo }: DashboardTabs
           </button>
         </div>
         {activeTab === 'jobs' ? (
-          <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} mobileTabMode />
+          <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} servicePhaseConfig={servicePhaseConfig} mobileTabMode />
         ) : (
-          <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} mobileTabMode />
+          <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} servicePhaseConfig={servicePhaseConfig} mobileTabMode />
         )}
       </div>
 
       {/* Desktop: Side-by-side grid */}
       <div className="hidden md:grid md:grid-cols-2 gap-6 md:flex-1 md:min-h-0">
-        <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} />
-        <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} />
+        <TodaysJobsSection jobs={todayJobs} allJobs={allJobs} shopInfo={shopInfo} servicePhaseConfig={servicePhaseConfig} />
+        <QueueSection jobs={queuedJobs} allJobs={allJobs} shopInfo={shopInfo} servicePhaseConfig={servicePhaseConfig} />
       </div>
     </>
   );

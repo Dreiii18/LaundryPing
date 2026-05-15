@@ -4,11 +4,20 @@ import { useState, useTransition, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 import type { Job, Machine } from './types';
 
-export function useJobActions(jobs: Job[]) {
+export interface UseJobActionsOptions {
+  /** Per-laundromat phase config (from server-rendered page data). When
+   *  provided, the hook uses it to derive required machine_type instead of
+   *  fetching /api/settings on every dialog open. */
+  servicePhaseConfig?: Record<string, ServicePhaseConfigEntry> | null;
+}
+
+export function useJobActions(jobs: Job[], options: UseJobActionsOptions = {}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const servicePhaseConfig = options.servicePhaseConfig ?? null;
 
   // Ref to avoid re-creating callbacks when jobs array reference changes
   const jobsRef = useRef(jobs);
@@ -32,7 +41,26 @@ export function useJobActions(jobs: Job[]) {
   const [startingPhase, setStartingPhase] = useState(false);
   const [availableMachines, setAvailableMachines] = useState<Machine[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(false);
-  const [phaseInFlight, setPhaseInFlight] = useState<string | null>(null);
+  // Keyed by job_id (not phase_id) so a phase action on Job A doesn't disable
+  // every other row's buttons. Use a Set for O(1) lookup per row.
+  const [phaseInFlight, setPhaseInFlight] = useState<Set<string>>(() => new Set());
+
+  const markPhaseInFlight = useCallback((jobId: string) => {
+    setPhaseInFlight((prev) => {
+      const next = new Set(prev);
+      next.add(jobId);
+      return next;
+    });
+  }, []);
+
+  const clearPhaseInFlight = useCallback((jobId: string) => {
+    setPhaseInFlight((prev) => {
+      if (!prev.has(jobId)) return prev;
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+  }, []);
 
   // Assign-machine dialog (pre-assignment for queued phases — separate from
   // the start-phase dialog).
@@ -155,7 +183,8 @@ export function useJobActions(jobs: Job[]) {
   }, [payLaterJobId, payLaterMethod, payLaterCashTendered, overdueReason, completeJob]);
 
   /** Open the "start phase" dialog. Looks up machines compatible with the
-   *  phase's required machine_type from settings.service_phase_config. */
+   *  phase's required machine_type from servicePhaseConfig (passed via props).
+   *  Falls back to a one-shot /api/settings fetch only when no config was supplied. */
   const openStartPhaseDialog = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
     setStartPhaseJobId(jobId);
     setStartPhaseId(phase.id);
@@ -164,11 +193,15 @@ export function useJobActions(jobs: Job[]) {
     setLoadingMachines(true);
 
     try {
-      // Fetch the phase config so we can filter machines by required type.
-      const settingsRes = await fetchWithAuth('/api/settings');
-      const settingsData = settingsRes.ok ? await settingsRes.json() : null;
-      const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
-      const requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      let requiredType: string | null;
+      if (servicePhaseConfig) {
+        requiredType = servicePhaseConfig[phase.phase_type]?.machine_type ?? null;
+      } else {
+        const settingsRes = await fetchWithAuth('/api/settings');
+        const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+        const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
+        requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      }
 
       const url = requiredType
         ? `/api/machines?available=true&machine_type=${requiredType}&exclude_job=${jobId}`
@@ -183,7 +216,7 @@ export function useJobActions(jobs: Job[]) {
     } finally {
       setLoadingMachines(false);
     }
-  }, []);
+  }, [servicePhaseConfig]);
 
   const handleStartPhase = useCallback(async () => {
     if (!startPhaseJobId || !startPhaseId || !startPhaseMachineId) return;
@@ -220,7 +253,7 @@ export function useJobActions(jobs: Job[]) {
    *  Sends an empty body — the server uses phase.machine_id (set previously
    *  via /assign-machine or POST /api/jobs phase_assignments). */
   const startPhaseDirect = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
-    setPhaseInFlight(phase.id);
+    markPhaseInFlight(jobId);
     try {
       const res = await fetchWithAuth(
         `/api/jobs/${jobId}/phases/${phase.id}/start`,
@@ -236,9 +269,9 @@ export function useJobActions(jobs: Job[]) {
     } catch {
       toast.error('An unexpected error occurred');
     } finally {
-      setPhaseInFlight(null);
+      clearPhaseInFlight(jobId);
     }
-  }, [router, startTransition]);
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
 
   /** Open the pre-assign dialog (variant of start-phase for queued phases). */
   const openAssignMachineDialog = useCallback(async (jobId: string, phase: { id: string; phase_type: string; machine_id?: string | null }) => {
@@ -250,10 +283,15 @@ export function useJobActions(jobs: Job[]) {
     setLoadingMachines(true);
 
     try {
-      const settingsRes = await fetchWithAuth('/api/settings');
-      const settingsData = settingsRes.ok ? await settingsRes.json() : null;
-      const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
-      const requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      let requiredType: string | null;
+      if (servicePhaseConfig) {
+        requiredType = servicePhaseConfig[phase.phase_type]?.machine_type ?? null;
+      } else {
+        const settingsRes = await fetchWithAuth('/api/settings');
+        const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+        const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
+        requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      }
 
       // For pre-assignment we want ALL active machines of the right type, not
       // only currently-free ones (operators want to plan ahead).
@@ -270,7 +308,7 @@ export function useJobActions(jobs: Job[]) {
     } finally {
       setLoadingMachines(false);
     }
-  }, []);
+  }, [servicePhaseConfig]);
 
   const handleAssignMachine = useCallback(async () => {
     if (!assignMachineJobId || !assignMachinePhaseId || !assignMachineSelectedId) return;
@@ -329,7 +367,7 @@ export function useJobActions(jobs: Job[]) {
   }, [assignMachineJobId, assignMachinePhaseId, assignMachinePhaseType, router, startTransition]);
 
   const handleCompletePhase = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
-    setPhaseInFlight(phase.id);
+    markPhaseInFlight(jobId);
     try {
       const res = await fetchWithAuth(
         `/api/jobs/${jobId}/phases/${phase.id}/complete`,
@@ -345,12 +383,12 @@ export function useJobActions(jobs: Job[]) {
     } catch {
       toast.error('An unexpected error occurred');
     } finally {
-      setPhaseInFlight(null);
+      clearPhaseInFlight(jobId);
     }
-  }, [router, startTransition]);
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
 
   const handleSkipPhase = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
-    setPhaseInFlight(phase.id);
+    markPhaseInFlight(jobId);
     try {
       const res = await fetchWithAuth(
         `/api/jobs/${jobId}/phases/${phase.id}/skip`,
@@ -366,9 +404,9 @@ export function useJobActions(jobs: Job[]) {
     } catch {
       toast.error('An unexpected error occurred');
     } finally {
-      setPhaseInFlight(null);
+      clearPhaseInFlight(jobId);
     }
-  }, [router, startTransition]);
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
 
   return {
     isPending,

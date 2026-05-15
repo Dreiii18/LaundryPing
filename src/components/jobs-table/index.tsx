@@ -22,8 +22,8 @@ import type { Job, JobsTableProps } from './types';
 export type { Job };
 export { type ShopInfo } from './types';
 
-export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }: JobsTableProps) {
-  const actions = useJobActions(initialJobs);
+export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo, servicePhaseConfig }: JobsTableProps) {
+  const actions = useJobActions(initialJobs, { servicePhaseConfig });
   const handlePrint = useHandlePrint(shopInfo);
 
   // Pre-compute the set of machine_ids that are currently in_progress across

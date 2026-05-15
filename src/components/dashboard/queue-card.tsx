@@ -3,14 +3,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Flame, Loader2, Printer, Pencil, Clock } from 'lucide-react';
-import type { Job, ShopInfo } from '@/components/jobs-table/types';
+import { renderPhaseLabel, type Job, type ShopInfo } from '@/components/jobs-table/types';
 
 interface QueueCardProps {
   job: Job;
   shopInfo?: ShopInfo;
   completingId: string | null;
   cancellingId: string | null;
-  phaseInFlight: string | null;
+  phaseInFlight: Set<string>;
   isMachineFree?: (machineId: string) => boolean;
   onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onStartPhaseDirect: (jobId: string, phase: { id: string; phase_type: string }) => void;
@@ -32,7 +32,8 @@ export function QueueCard({
   onCancel,
   onPrint,
 }: QueueCardProps) {
-  const isActionDisabled = completingId !== null || cancellingId !== null || phaseInFlight !== null;
+  const jobInFlight = phaseInFlight.has(job.id);
+  const isActionDisabled = completingId === job.id || cancellingId === job.id || jobInFlight;
   const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
   const nextPending = phases.find((p) => p.status === 'pending') ?? null;
 
@@ -88,22 +89,26 @@ export function QueueCard({
                 size="sm"
                 onClick={() => onStartPhaseDirect(job.id, nextPending)}
                 disabled={isActionDisabled || preassignedFree === false}
+                aria-label={`Start ${renderPhaseLabel(nextPending.phase_type)} on pre-assigned machine`}
                 className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-7 px-3 disabled:opacity-50"
               >
-                {phaseInFlight === nextPending.id ? (
+                {jobInFlight ? (
                   <Loader2 className="size-3 animate-spin" />
                 ) : (
-                  `Start ${nextPending.phase_type}`
+                  `Start ${renderPhaseLabel(nextPending.phase_type)}`
                 )}
               </Button>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => onAssignMachine(job.id, nextPending)}
                 disabled={isActionDisabled}
-                className="text-slate-400 hover:text-slate-600 disabled:opacity-50 p-1"
+                aria-label="Change pre-assigned machine"
                 title="Change pre-assigned machine"
+                className="text-slate-400 hover:text-slate-600 h-7 w-7 p-0 min-h-7"
               >
                 <Pencil className="size-3" />
-              </button>
+              </Button>
             </>
           ) : nextPending ? (
             <>
@@ -111,31 +116,38 @@ export function QueueCard({
                 size="sm"
                 onClick={() => onStartPhase(job.id, nextPending)}
                 disabled={isActionDisabled}
+                aria-label={`Start ${renderPhaseLabel(nextPending.phase_type)}`}
                 className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-7 px-3"
               >
-                Start {nextPending.phase_type}
+                Start {renderPhaseLabel(nextPending.phase_type)}
               </Button>
-              <button
+              <Button
+                variant="ghost"
+                size="sm"
                 onClick={() => onAssignMachine(job.id, nextPending)}
                 disabled={isActionDisabled}
-                className="text-slate-400 hover:text-slate-600 disabled:opacity-50 p-1"
+                aria-label="Pre-assign machine"
                 title="Pre-assign machine"
+                className="text-slate-400 hover:text-slate-600 h-7 w-7 p-0 min-h-7"
               >
                 <Pencil className="size-3" />
-              </button>
+              </Button>
             </>
           ) : null}
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => onCancel(job.id)}
             disabled={isActionDisabled}
-            className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 px-1"
+            aria-label="Cancel job"
+            className="text-xs text-red-500 hover:text-red-700 h-7 px-2 min-h-7"
           >
             {cancellingId === job.id ? (
               <Loader2 className="size-3 animate-spin" />
             ) : (
               'Cancel'
             )}
-          </button>
+          </Button>
           {shopInfo && (
             <Button
               variant="ghost"

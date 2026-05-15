@@ -20,6 +20,7 @@ export function JobsPageContent({
   pageSize,
   currentFilters,
   shopInfo,
+  servicePhaseConfig,
 }: JobsPageContentProps) {
   const {
     searchInput,
@@ -73,7 +74,7 @@ export function JobsPageContent({
         </p>
       )}
 
-      <JobsTable jobs={jobs} context="jobs-page" shopInfo={shopInfo} />
+      <JobsTable jobs={jobs} context="jobs-page" shopInfo={shopInfo} servicePhaseConfig={servicePhaseConfig} />
 
       {totalCount > pageSize && (
         <JobsPagination
