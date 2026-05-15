@@ -36,6 +36,7 @@ export default async function SettingsPage() {
             initialServicePrices={laundromat.service_prices || {}}
             initialServiceWeights={laundromat.service_weights || {}}
             initialServiceTypes={laundromat.service_types || {}}
+            initialServicePhaseConfig={laundromat.service_phase_config || {}}
             initialRushFee={laundromat.rush_fee ?? 0}
             initialContactNumber={laundromat.contact_number || ''}
             initialReceiptPaperSize={laundromat.receipt_paper_size ?? '58mm'}

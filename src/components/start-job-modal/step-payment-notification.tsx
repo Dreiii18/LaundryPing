@@ -2,7 +2,7 @@
 
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { AlertTriangle, XCircle } from 'lucide-react';
+import { AlertTriangle, Info, XCircle } from 'lucide-react';
 import { PhoneInput } from '@/components/phone-input';
 import { PaymentSection } from './payment-section';
 
@@ -105,6 +105,34 @@ export function StepPaymentNotification({
         onSetCashTendered={onSetCashTendered}
       />
 
+      {/* Phone — always visible; blank phone surfaces a yellow warning instead
+          of silently producing a no-SMS job. */}
+      <div className="flex flex-col gap-2">
+        <Label className="text-sm font-semibold text-[#111817]">
+          Customer phone number
+        </Label>
+        <PhoneInput
+          value={phone}
+          onChange={onPhoneChange}
+          disabled={loading}
+        />
+        {phone.trim() === '' && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-sm">
+            <AlertTriangle className="size-4 text-amber-600 shrink-0 mt-0.5" />
+            <span className="text-amber-800">
+              No phone number — the customer won&apos;t get an SMS when their load is ready.
+              Add a number to notify them.
+            </span>
+          </div>
+        )}
+        {phone.trim() !== '' && smsOption === 'none' && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-slate-50 border border-slate-200 text-sm">
+            <Info className="size-4 text-slate-500 shrink-0 mt-0.5" />
+            <span className="text-slate-700">SMS notifications are off for this job.</span>
+          </div>
+        )}
+      </div>
+
       {/* SMS Notification */}
       <div className="flex flex-col gap-2">
         <Label className="text-sm font-semibold text-[#111817]">SMS Notification</Label>
@@ -166,17 +194,6 @@ export function StepPaymentNotification({
           <p className="text-xs text-slate-400">Uses 1 SMS credit on completion.</p>
         )}
       </div>
-
-      {smsOption !== 'none' && (
-        <div className="flex flex-col gap-2">
-          <Label className="text-sm font-semibold text-[#111817]">Phone Number</Label>
-          <PhoneInput
-            value={phone}
-            onChange={onPhoneChange}
-            disabled={loading}
-          />
-        </div>
-      )}
 
       {/* Notes */}
       <div className="flex flex-col gap-2">

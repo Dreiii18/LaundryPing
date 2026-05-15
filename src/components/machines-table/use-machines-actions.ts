@@ -4,13 +4,14 @@ import { useState, useTransition, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
-import type { Machine } from './types';
+import type { Machine, MachineType } from './types';
 
 export interface MachinesActionsState {
   modalOpen: boolean;
   editingMachine: Machine | null;
   label: string;
   status: 'active' | 'maintenance';
+  machineType: MachineType;
   modalError: string;
   saving: boolean;
   deleteOpen: boolean;
@@ -25,6 +26,7 @@ export interface MachinesActionsHandlers {
   setDeleteOpen: (open: boolean) => void;
   setLabel: (label: string) => void;
   setStatus: (status: 'active' | 'maintenance') => void;
+  setMachineType: (machineType: MachineType) => void;
   openAddModal: () => void;
   openEditModal: (machine: Machine) => void;
   openDeleteDialog: (machine: Machine) => void;
@@ -40,6 +42,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
   const [editingMachine, setEditingMachine] = useState<Machine | null>(null);
   const [label, setLabel] = useState('');
   const [status, setStatus] = useState<'active' | 'maintenance'>('active');
+  const [machineType, setMachineType] = useState<MachineType>('washer');
   const [modalError, setModalError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -52,6 +55,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
     setEditingMachine(null);
     setLabel('');
     setStatus('active');
+    setMachineType('washer');
     setModalError('');
     setModalOpen(true);
   }, []);
@@ -60,6 +64,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
     setEditingMachine(machine);
     setLabel(machine.label);
     setStatus(machine.status === 'maintenance' ? 'maintenance' : 'active');
+    setMachineType(machine.machine_type);
     setModalError('');
     setModalOpen(true);
   }, []);
@@ -90,7 +95,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
         const res = await fetchWithAuth(`/api/machines/${editingMachine.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label.trim(), status }),
+          body: JSON.stringify({ label: label.trim(), status, machine_type: machineType }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -103,7 +108,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
         const res = await fetchWithAuth('/api/machines', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ label: label.trim() }),
+          body: JSON.stringify({ label: label.trim(), machine_type: machineType }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -121,7 +126,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
     } finally {
       setSaving(false);
     }
-  }, [editingMachine, label, status, router]);
+  }, [editingMachine, label, status, machineType, router]);
 
   const handleDelete = useCallback(async () => {
     if (!deletingMachine) return;
@@ -155,6 +160,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
     editingMachine,
     label,
     status,
+    machineType,
     modalError,
     saving,
     deleteOpen,
@@ -166,6 +172,7 @@ export function useMachinesActions(): MachinesActionsState & MachinesActionsHand
     setDeleteOpen,
     setLabel,
     setStatus,
+    setMachineType,
     openAddModal,
     openEditModal,
     openDeleteDialog,

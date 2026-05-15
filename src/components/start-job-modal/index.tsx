@@ -129,6 +129,9 @@ export function StartJobModal({ open, onOpenChange }: StartJobModalProps) {
                 machines={form.machines}
                 machineId={form.machineId}
                 onMachineChange={form.setMachineId}
+                phasesNeedingMachines={form.phasesNeedingMachines}
+                phaseAssignments={form.phaseAssignments}
+                onPhaseAssignmentChange={form.setPhaseAssignment}
                 priority={form.priority}
                 onPriorityChange={form.setPriority}
                 rushFeeAmount={form.rushFeeAmount}

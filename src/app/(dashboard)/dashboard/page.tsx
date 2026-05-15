@@ -5,9 +5,9 @@ import { SmsUsageCard } from '@/components/sms-usage-card';
 import { SmsQuotaWarning } from '@/components/sms-quota-warning';
 import { StatCardWithTrend } from '@/components/dashboard/stat-card-with-trend';
 import { DashboardTabs } from '@/components/dashboard/dashboard-tabs';
-import { OnboardingBanner } from '@/components/onboarding-banner';
 import { createClient } from '@/lib/supabase/server';
 import type { ShopInfo } from '@/types/shop';
+import type { MachineType } from '@/components/jobs-table/types';
 
 function DashboardSkeleton() {
   return (
@@ -36,10 +36,12 @@ async function DashboardJobsTable({
   laundromatId,
   todayPH,
   shopInfo,
+  servicePhaseConfig,
 }: {
   laundromatId: string;
   todayPH: string;
   shopInfo: ShopInfo;
+  servicePhaseConfig: Record<string, import('@/types/database').ServicePhaseConfigEntry> | null;
 }) {
   const supabase = await createClient();
   // WARNING: this query must run after mark_overdue_jobs has committed — it needs to see
@@ -75,40 +77,89 @@ async function DashboardJobsTable({
       priority,
       machines (
         id,
-        label
+        label,
+        machine_type
+      ),
+      job_phases (
+        id,
+        phase_type,
+        machine_id,
+        sequence,
+        status,
+        started_at,
+        completed_at,
+        estimated_minutes,
+        machines (
+          id,
+          label,
+          machine_type
+        )
       )
     `)
     .eq('laundromat_id', laundromatId)
-    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
+    .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending,status.eq.ready_for_pickup`)
     .order('started_at', { ascending: false });
 
-  const safeJobs = (jobs || []).map((job) => ({
-    id: job.id,
-    machine_id: job.machine_id as string | null,
-    customer_phone_masked: job.customer_phone_masked as string | null,
-    status: job.status as 'pending' | 'in_progress' | 'completed' | 'cancelled',
-    started_at: job.started_at,
-    completed_at: job.completed_at,
-    sms_sent: job.sms_sent,
-    notify_sms: job.notify_sms as boolean,
-    notify_queue_sms: job.notify_queue_sms as boolean,
-    notes: job.notes,
-    payment_method: job.payment_method as string | null,
-    pay_amount: job.pay_amount as number | null,
-    cash_tendered: job.cash_tendered as number | null,
-    is_paid: job.is_paid as boolean,
-    is_overdue: job.is_overdue as boolean,
-    overdue_reason: job.overdue_reason as string | null,
-    services: (job.services || []) as string[],
-    service_quantities: (job.service_quantities as Record<string, number> | null) ?? null,
-    service_weights_actual: (job.service_weights_actual as Record<string, number> | null) ?? null,
-    total_weight: job.total_weight as number | null,
-    claim_number: job.claim_number as number | null,
-    customer_name: job.customer_name as string | null,
-    priority: (job.priority as 'normal' | 'rush') ?? 'normal',
-    created_at: job.created_at as string,
-    machine: Array.isArray(job.machines) ? job.machines[0] as { id: string; label: string } ?? null : job.machines as { id: string; label: string } | null,
-  }));
+  type JoinedMachine = { id: string; label: string; machine_type?: MachineType };
+  type JoinedPhase = {
+    id: string;
+    phase_type: string;
+    machine_id: string | null;
+    sequence: number;
+    status: string;
+    started_at: string | null;
+    completed_at: string | null;
+    estimated_minutes: number | null;
+    machines: JoinedMachine | JoinedMachine[] | null;
+  };
+  const pickOne = <T,>(v: T | T[] | null): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : v;
+
+  const safeJobs = (jobs || []).map((job) => {
+    const phases = ((job.job_phases ?? []) as unknown as JoinedPhase[])
+      .slice()
+      .sort((a, b) => a.sequence - b.sequence)
+      .map((p) => ({
+        id: p.id,
+        phase_type: p.phase_type,
+        machine_id: p.machine_id,
+        sequence: p.sequence,
+        status: p.status as 'pending' | 'in_progress' | 'completed' | 'skipped',
+        started_at: p.started_at,
+        completed_at: p.completed_at,
+        estimated_minutes: p.estimated_minutes,
+        machine: pickOne(p.machines),
+      }));
+
+    return {
+      id: job.id,
+      machine_id: job.machine_id as string | null,
+      customer_phone_masked: job.customer_phone_masked as string | null,
+      status: job.status as 'pending' | 'in_progress' | 'ready_for_pickup' | 'completed' | 'cancelled',
+      started_at: job.started_at,
+      completed_at: job.completed_at,
+      sms_sent: job.sms_sent,
+      notify_sms: job.notify_sms as boolean,
+      notify_queue_sms: job.notify_queue_sms as boolean,
+      notes: job.notes,
+      payment_method: job.payment_method as string | null,
+      pay_amount: job.pay_amount as number | null,
+      cash_tendered: job.cash_tendered as number | null,
+      is_paid: job.is_paid as boolean,
+      is_overdue: job.is_overdue as boolean,
+      overdue_reason: job.overdue_reason as string | null,
+      services: (job.services || []) as string[],
+      service_quantities: (job.service_quantities as Record<string, number> | null) ?? null,
+      service_weights_actual: (job.service_weights_actual as Record<string, number> | null) ?? null,
+      total_weight: job.total_weight as number | null,
+      claim_number: job.claim_number as number | null,
+      customer_name: job.customer_name as string | null,
+      priority: (job.priority as 'normal' | 'rush') ?? 'normal',
+      created_at: job.created_at as string,
+      machine: pickOne(job.machines as JoinedMachine | JoinedMachine[] | null),
+      phases,
+    };
+  });
 
   // Queue: pending jobs — rush first, then oldest first (FIFO)
   const queuedJobs = safeJobs
@@ -125,7 +176,12 @@ async function DashboardJobsTable({
     .sort((a, b) => new Date(b.started_at).getTime() - new Date(a.started_at).getTime());
 
   return (
-    <DashboardTabs todayJobs={todayJobs} queuedJobs={queuedJobs} shopInfo={shopInfo} />
+    <DashboardTabs
+      todayJobs={todayJobs}
+      queuedJobs={queuedJobs}
+      shopInfo={shopInfo}
+      servicePhaseConfig={servicePhaseConfig}
+    />
   );
 }
 
@@ -161,13 +217,8 @@ export default async function DashboardPage() {
   // Run all independent queries in parallel.
   // mark_overdue_jobs only modifies in_progress rows, so the todayCompleted/yesterdayCompleted
   // queries (filtered to status=completed) are unaffected by execution order.
-  const [{ count: machineCount }, { error: overdueError }, { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
+  const [{ error: overdueError }, { data: todayCompletedJobs }, { data: yesterdayCompletedJobs }] =
     await Promise.all([
-      supabase
-        .from('machines')
-        .select('id', { count: 'exact', head: true })
-        .eq('laundromat_id', laundromat.id)
-        .in('status', ['active', 'maintenance']),
       supabase.rpc('mark_overdue_jobs', { p_laundromat_id: laundromat.id }),
       supabase
         .from('jobs')
@@ -186,8 +237,6 @@ export default async function DashboardPage() {
 
   if (overdueError) console.error('mark_overdue_jobs failed:', overdueError.message);
 
-  const hasNoMachines = (machineCount ?? 0) === 0;
-
   const completedToday = todayCompletedJobs?.length ?? 0;
   const todayRevenue = (todayCompletedJobs || [])
     .filter((j) => j.pay_amount != null)
@@ -200,9 +249,6 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-6 md:h-full">
-      {/* Onboarding Banner - only when no machines */}
-      {hasNoMachines && <OnboardingBanner />}
-
       {/* SMS Credit Warning */}
       <SmsQuotaWarning totalCredits={totalCredits} />
 
@@ -240,6 +286,7 @@ export default async function DashboardPage() {
         <DashboardJobsTable
           laundromatId={laundromat.id}
           todayPH={todayPH}
+          servicePhaseConfig={laundromat.service_phase_config ?? null}
           shopInfo={{
             name: laundromat.name,
             address: laundromat.address,

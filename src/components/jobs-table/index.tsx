@@ -14,15 +14,31 @@ import { JobRow } from './job-row';
 import { OverdueDialog } from './overdue-dialog';
 import { CancelDialog } from './cancel-dialog';
 import { PaymentDialog } from './payment-dialog';
-import { AssignDialog } from './assign-dialog';
+import { StartPhaseDialog } from './start-phase-dialog';
+import { AssignMachineDialog } from './assign-machine-dialog';
+import { useMemo } from 'react';
 import type { Job, JobsTableProps } from './types';
 
 export type { Job };
 export { type ShopInfo } from './types';
 
-export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }: JobsTableProps) {
-  const actions = useJobActions(initialJobs);
+export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo, servicePhaseConfig }: JobsTableProps) {
+  const actions = useJobActions(initialJobs, { servicePhaseConfig });
   const handlePrint = useHandlePrint(shopInfo);
+
+  // Pre-compute the set of machine_ids that are currently in_progress across
+  // all visible jobs. Drives the Ready/Waiting badge on rows whose next
+  // pending phase has a pre-assigned machine.
+  const busyMachineIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const j of initialJobs) {
+      for (const p of j.phases ?? []) {
+        if (p.status === 'in_progress' && p.machine_id) set.add(p.machine_id);
+      }
+    }
+    return set;
+  }, [initialJobs]);
+  const isMachineFree = (machineId: string) => !busyMachineIds.has(machineId);
 
   if (initialJobs.length === 0) {
     return (
@@ -100,9 +116,15 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
               shopInfo={shopInfo}
               completingId={actions.completingId}
               cancellingId={actions.cancellingId}
+              phaseInFlight={actions.phaseInFlight}
+              isMachineFree={isMachineFree}
               onMarkDone={actions.handleMarkDone}
               onCancelConfirm={actions.setCancelConfirmJobId}
-              onAssign={actions.openAssignDialog}
+              onStartPhase={actions.openStartPhaseDialog}
+              onStartPhaseDirect={actions.startPhaseDirect}
+              onAssignMachine={actions.openAssignMachineDialog}
+              onCompletePhase={actions.handleCompletePhase}
+              onSkipPhase={actions.handleSkipPhase}
               onPrint={handlePrint}
             />
           ))}
@@ -136,15 +158,30 @@ export function JobsTable({ jobs: initialJobs, context = 'dashboard', shopInfo }
         onClose={() => { actions.setPayLaterJobId(null); actions.setOverdueReason(''); }}
       />
 
-      <AssignDialog
-        assignJobId={actions.assignJobId}
-        assignMachineId={actions.assignMachineId}
-        assigningMachine={actions.assigningMachine}
+      <StartPhaseDialog
+        open={actions.startPhaseJobId !== null}
+        phaseType={actions.startPhaseType}
+        machineId={actions.startPhaseMachineId}
+        starting={actions.startingPhase}
         availableMachines={actions.availableMachines}
         loadingMachines={actions.loadingMachines}
-        onMachineChange={actions.setAssignMachineId}
+        onMachineChange={actions.setStartPhaseMachineId}
+        onConfirm={actions.handleStartPhase}
+        onClose={() => { actions.setStartPhaseJobId(null); actions.setStartPhaseId(null); }}
+      />
+
+      <AssignMachineDialog
+        open={actions.assignMachineJobId !== null}
+        phaseType={actions.assignMachinePhaseType}
+        machineId={actions.assignMachineSelectedId}
+        saving={actions.assigningMachine}
+        availableMachines={actions.availableMachines}
+        loadingMachines={actions.loadingMachines}
+        hasExistingAssignment={!!actions.assignMachineCurrentId}
+        onMachineChange={actions.setAssignMachineSelectedId}
         onConfirm={actions.handleAssignMachine}
-        onClose={() => actions.setAssignJobId(null)}
+        onUnassign={actions.handleUnassignMachine}
+        onClose={() => { actions.setAssignMachineJobId(null); actions.setAssignMachinePhaseId(null); }}
       />
     </div>
   );

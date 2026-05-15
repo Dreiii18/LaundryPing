@@ -20,10 +20,11 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import type { Machine } from './types';
 
-interface AssignDialogProps {
-  assignJobId: string | null;
-  assignMachineId: string;
-  assigningMachine: boolean;
+interface StartPhaseDialogProps {
+  open: boolean;
+  phaseType: string;
+  machineId: string;
+  starting: boolean;
   availableMachines: Machine[];
   loadingMachines: boolean;
   onMachineChange: (machineId: string) => void;
@@ -31,25 +32,26 @@ interface AssignDialogProps {
   onClose: () => void;
 }
 
-export function AssignDialog({
-  assignJobId,
-  assignMachineId,
-  assigningMachine,
+export function StartPhaseDialog({
+  open,
+  phaseType,
+  machineId,
+  starting,
   availableMachines,
   loadingMachines,
   onMachineChange,
   onConfirm,
   onClose,
-}: AssignDialogProps) {
+}: StartPhaseDialogProps) {
   return (
-    <Dialog open={assignJobId !== null} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-100">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-[#111817]">
-            Assign Machine
+            Start {phaseType}
           </DialogTitle>
           <DialogDescription className="text-[#618986]">
-            Select a machine to assign to this job.
+            Select a machine for this phase. Only compatible machines are listed.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -59,20 +61,30 @@ export function AssignDialog({
               Loading machines...
             </div>
           ) : availableMachines.length === 0 ? (
-            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-              No available machines right now.
+            <div className="space-y-3">
+              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+                No compatible machines available right now.
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onClose}
+                className="w-full min-h-11"
+              >
+                Close
+              </Button>
             </div>
           ) : (
             <>
-              <Label htmlFor="assign-machine" className="text-sm font-semibold text-[#111817]">Machine</Label>
-              <Select value={assignMachineId} onValueChange={onMachineChange}>
-                <SelectTrigger id="assign-machine" className="w-full h-12 mt-2">
+              <Label htmlFor="start-phase-machine" className="text-sm font-semibold text-[#111817]">Machine</Label>
+              <Select value={machineId} onValueChange={onMachineChange}>
+                <SelectTrigger id="start-phase-machine" className="w-full h-12 mt-2">
                   <SelectValue placeholder="Select a machine" />
                 </SelectTrigger>
                 <SelectContent>
                   {availableMachines.map((m) => (
                     <SelectItem key={m.id} value={m.id}>
-                      {m.label}
+                      {m.label}{m.machine_type ? ` (${m.machine_type})` : ''}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -91,17 +103,17 @@ export function AssignDialog({
           </Button>
           <Button
             type="button"
-            disabled={!assignMachineId || assigningMachine}
+            disabled={!machineId || starting}
             onClick={onConfirm}
             className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
           >
-            {assigningMachine ? (
+            {starting ? (
               <>
                 <Loader2 className="size-4 animate-spin" />
-                Assigning...
+                Starting...
               </>
             ) : (
-              'Assign Machine'
+              `Start ${phaseType}`
             )}
           </Button>
         </DialogFooter>

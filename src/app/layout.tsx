@@ -13,11 +13,11 @@ const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || "https://laundryping.com";
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
   title: {
-    default: "LaundryPing - SMS Notifications for Philippine Laundromats",
+    default: "LaundryPing — Faster pickups for Philippine laundromats",
     template: "%s | LaundryPing",
   },
   description:
-    "Automatically send SMS notifications to your laundromat customers when their laundry is done. Simple, fast, and built for Philippine laundromats.",
+    "Auto-text customers when their laundry is done. Pickups happen sooner, machines free up faster, and you take more loads — no app, no chasing.",
   keywords: [
     "laundry SMS Philippines",
     "laundromat notification system",
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
         url: "/laundryping-logo.png",
         width: 1536,
         height: 1024,
-        alt: "LaundryPing - SMS Notifications for Philippine Laundromats",
+        alt: "LaundryPing — Faster pickups for Philippine laundromats",
       },
     ],
   },

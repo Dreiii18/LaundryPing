@@ -4,11 +4,20 @@ import { useState, useTransition, useCallback, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
+import type { ServicePhaseConfigEntry } from '@/types/database';
 import type { Job, Machine } from './types';
 
-export function useJobActions(jobs: Job[]) {
+export interface UseJobActionsOptions {
+  /** Per-laundromat phase config (from server-rendered page data). When
+   *  provided, the hook uses it to derive required machine_type instead of
+   *  fetching /api/settings on every dialog open. */
+  servicePhaseConfig?: Record<string, ServicePhaseConfigEntry> | null;
+}
+
+export function useJobActions(jobs: Job[], options: UseJobActionsOptions = {}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const servicePhaseConfig = options.servicePhaseConfig ?? null;
 
   // Ref to avoid re-creating callbacks when jobs array reference changes
   const jobsRef = useRef(jobs);
@@ -22,11 +31,45 @@ export function useJobActions(jobs: Job[]) {
   const [payLaterCashTendered, setPayLaterCashTendered] = useState('');
   const [overdueJobId, setOverdueJobId] = useState<string | null>(null);
   const [overdueReason, setOverdueReason] = useState('');
-  const [assignJobId, setAssignJobId] = useState<string | null>(null);
-  const [assignMachineId, setAssignMachineId] = useState('');
-  const [assigningMachine, setAssigningMachine] = useState(false);
+  // Phase action state — replaces the old job-level "assign machine" dialog.
+  // We track the JOB and the PHASE the user wants to start so the dialog can
+  // filter the machine list by the phase's required machine_type.
+  const [startPhaseJobId, setStartPhaseJobId] = useState<string | null>(null);
+  const [startPhaseId, setStartPhaseId] = useState<string | null>(null);
+  const [startPhaseType, setStartPhaseType] = useState<string>('');
+  const [startPhaseMachineId, setStartPhaseMachineId] = useState('');
+  const [startingPhase, setStartingPhase] = useState(false);
   const [availableMachines, setAvailableMachines] = useState<Machine[]>([]);
   const [loadingMachines, setLoadingMachines] = useState(false);
+  // Keyed by job_id (not phase_id) so a phase action on Job A doesn't disable
+  // every other row's buttons. Use a Set for O(1) lookup per row.
+  const [phaseInFlight, setPhaseInFlight] = useState<Set<string>>(() => new Set());
+
+  const markPhaseInFlight = useCallback((jobId: string) => {
+    setPhaseInFlight((prev) => {
+      const next = new Set(prev);
+      next.add(jobId);
+      return next;
+    });
+  }, []);
+
+  const clearPhaseInFlight = useCallback((jobId: string) => {
+    setPhaseInFlight((prev) => {
+      if (!prev.has(jobId)) return prev;
+      const next = new Set(prev);
+      next.delete(jobId);
+      return next;
+    });
+  }, []);
+
+  // Assign-machine dialog (pre-assignment for queued phases — separate from
+  // the start-phase dialog).
+  const [assignMachineJobId, setAssignMachineJobId] = useState<string | null>(null);
+  const [assignMachinePhaseId, setAssignMachinePhaseId] = useState<string | null>(null);
+  const [assignMachinePhaseType, setAssignMachinePhaseType] = useState<string>('');
+  const [assignMachineCurrentId, setAssignMachineCurrentId] = useState<string>('');
+  const [assignMachineSelectedId, setAssignMachineSelectedId] = useState<string>('');
+  const [assigningMachine, setAssigningMachine] = useState(false);
 
   const completeJob = useCallback(async (jobId: string, options?: { payment_method?: string; cash_tendered?: number; overdue_reason?: string }) => {
     setCompletingId(jobId);
@@ -139,54 +182,261 @@ export function useJobActions(jobs: Job[]) {
     setPayLaterCashTendered('');
   }, [payLaterJobId, payLaterMethod, payLaterCashTendered, overdueReason, completeJob]);
 
-  const openAssignDialog = useCallback(async (jobId: string) => {
-    setAssignJobId(jobId);
-    setAssignMachineId('');
+  /** Open the "start phase" dialog. Looks up machines compatible with the
+   *  phase's required machine_type from servicePhaseConfig (passed via props).
+   *  Falls back to a one-shot /api/settings fetch only when no config was supplied.
+   *  If the phase needs no machine (e.g. Fold), starts it immediately without
+   *  opening the dialog. */
+  const openStartPhaseDialog = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
+    // First: resolve required machine type so we know whether a dialog is needed.
+    let requiredType: string | null = null;
+    if (servicePhaseConfig) {
+      requiredType = servicePhaseConfig[phase.phase_type]?.machine_type ?? null;
+    } else {
+      try {
+        const settingsRes = await fetchWithAuth('/api/settings');
+        const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+        const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
+        requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      } catch {
+        toast.error('Failed to load settings');
+        return;
+      }
+    }
+
+    // Phase needs no machine — start it immediately.
+    if (requiredType === null) {
+      markPhaseInFlight(jobId);
+      try {
+        const res = await fetchWithAuth(
+          `/api/jobs/${jobId}/phases/${phase.id}/start`,
+          { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+        );
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Failed to start phase');
+          return;
+        }
+        toast.success(`${phase.phase_type} started.`);
+        startTransition(() => router.refresh());
+      } catch {
+        toast.error('An unexpected error occurred');
+      } finally {
+        clearPhaseInFlight(jobId);
+      }
+      return;
+    }
+
+    // Phase needs a machine — open the picker dialog.
+    setStartPhaseJobId(jobId);
+    setStartPhaseId(phase.id);
+    setStartPhaseType(phase.phase_type);
+    setStartPhaseMachineId('');
     setLoadingMachines(true);
 
     try {
-      const machinesRes = await fetchWithAuth(
-        `/api/machines?available=true&exclude_job=${jobId}`
-      );
+      const url = `/api/machines?available=true&machine_type=${requiredType}&exclude_job=${jobId}`;
+      const machinesRes = await fetchWithAuth(url);
       const machinesData = await machinesRes.json();
       setAvailableMachines(machinesData.machines || []);
     } catch {
       toast.error('Failed to load machines');
-      setAssignJobId(null);
+      setStartPhaseJobId(null);
+      setStartPhaseId(null);
     } finally {
       setLoadingMachines(false);
     }
-  }, []);
+  }, [servicePhaseConfig, router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
 
-  const handleAssignMachine = useCallback(async () => {
-    if (!assignJobId || !assignMachineId) return;
-    setAssigningMachine(true);
+  const handleStartPhase = useCallback(async () => {
+    if (!startPhaseJobId || !startPhaseId || !startPhaseMachineId) return;
+    setStartingPhase(true);
 
     try {
-      const res = await fetchWithAuth(`/api/jobs/${assignJobId}/assign-machine`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ machine_id: assignMachineId }),
-      });
-
+      const res = await fetchWithAuth(
+        `/api/jobs/${startPhaseJobId}/phases/${startPhaseId}/start`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ machine_id: startPhaseMachineId }),
+        }
+      );
       const data = await res.json();
 
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to start phase');
+        return;
+      }
+
+      toast.success(`${startPhaseType} started.`);
+      setStartPhaseJobId(null);
+      setStartPhaseId(null);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setStartingPhase(false);
+    }
+  }, [startPhaseJobId, startPhaseId, startPhaseMachineId, startPhaseType, router, startTransition]);
+
+  /** 1-tap variant: start a phase that already has a pre-assigned machine.
+   *  Sends an empty body — the server uses phase.machine_id (set previously
+   *  via /assign-machine or POST /api/jobs phase_assignments). */
+  const startPhaseDirect = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
+    markPhaseInFlight(jobId);
+    try {
+      const res = await fetchWithAuth(
+        `/api/jobs/${jobId}/phases/${phase.id}/start`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to start phase');
+        return;
+      }
+      toast.success(`${phase.phase_type} started.`);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      clearPhaseInFlight(jobId);
+    }
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
+
+  /** Open the pre-assign dialog (variant of start-phase for queued phases). */
+  const openAssignMachineDialog = useCallback(async (jobId: string, phase: { id: string; phase_type: string; machine_id?: string | null }) => {
+    setAssignMachineJobId(jobId);
+    setAssignMachinePhaseId(phase.id);
+    setAssignMachinePhaseType(phase.phase_type);
+    setAssignMachineCurrentId(phase.machine_id ?? '');
+    setAssignMachineSelectedId(phase.machine_id ?? '');
+    setLoadingMachines(true);
+
+    try {
+      let requiredType: string | null;
+      if (servicePhaseConfig) {
+        requiredType = servicePhaseConfig[phase.phase_type]?.machine_type ?? null;
+      } else {
+        const settingsRes = await fetchWithAuth('/api/settings');
+        const settingsData = settingsRes.ok ? await settingsRes.json() : null;
+        const phaseConfig = settingsData?.settings?.service_phase_config ?? {};
+        requiredType = phaseConfig[phase.phase_type]?.machine_type ?? null;
+      }
+
+      // For pre-assignment we want ALL active machines of the right type, not
+      // only currently-free ones (operators want to plan ahead).
+      const url = requiredType
+        ? `/api/machines?machine_type=${requiredType}`
+        : `/api/machines`;
+      const machinesRes = await fetchWithAuth(url);
+      const machinesData = await machinesRes.json();
+      setAvailableMachines(machinesData.machines || []);
+    } catch {
+      toast.error('Failed to load machines');
+      setAssignMachineJobId(null);
+      setAssignMachinePhaseId(null);
+    } finally {
+      setLoadingMachines(false);
+    }
+  }, [servicePhaseConfig]);
+
+  const handleAssignMachine = useCallback(async () => {
+    if (!assignMachineJobId || !assignMachinePhaseId || !assignMachineSelectedId) return;
+    setAssigningMachine(true);
+    try {
+      const res = await fetchWithAuth(
+        `/api/jobs/${assignMachineJobId}/phases/${assignMachinePhaseId}/assign-machine`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ machine_id: assignMachineSelectedId }),
+        }
+      );
+      const data = await res.json();
       if (!res.ok) {
         toast.error(data.error || 'Failed to assign machine');
         return;
       }
-
-      toast.success('Machine assigned.');
-      setAssignJobId(null);
-      startTransition(() => {
-        router.refresh();
-      });
+      toast.success(`${assignMachinePhaseType} pre-assigned.`);
+      setAssignMachineJobId(null);
+      setAssignMachinePhaseId(null);
+      startTransition(() => router.refresh());
     } catch {
       toast.error('An unexpected error occurred');
     } finally {
       setAssigningMachine(false);
     }
-  }, [assignJobId, assignMachineId, router, startTransition]);
+  }, [assignMachineJobId, assignMachinePhaseId, assignMachineSelectedId, assignMachinePhaseType, router, startTransition]);
+
+  const handleUnassignMachine = useCallback(async () => {
+    if (!assignMachineJobId || !assignMachinePhaseId) return;
+    setAssigningMachine(true);
+    try {
+      const res = await fetchWithAuth(
+        `/api/jobs/${assignMachineJobId}/phases/${assignMachinePhaseId}/assign-machine`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ machine_id: null }),
+        }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to unassign machine');
+        return;
+      }
+      toast.success(`${assignMachinePhaseType} unassigned.`);
+      setAssignMachineJobId(null);
+      setAssignMachinePhaseId(null);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      setAssigningMachine(false);
+    }
+  }, [assignMachineJobId, assignMachinePhaseId, assignMachinePhaseType, router, startTransition]);
+
+  const handleCompletePhase = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
+    markPhaseInFlight(jobId);
+    try {
+      const res = await fetchWithAuth(
+        `/api/jobs/${jobId}/phases/${phase.id}/complete`,
+        { method: 'POST' }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to complete phase');
+        return;
+      }
+      toast.success(`${phase.phase_type} done.`);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      clearPhaseInFlight(jobId);
+    }
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
+
+  const handleSkipPhase = useCallback(async (jobId: string, phase: { id: string; phase_type: string }) => {
+    markPhaseInFlight(jobId);
+    try {
+      const res = await fetchWithAuth(
+        `/api/jobs/${jobId}/phases/${phase.id}/skip`,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }
+      );
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Failed to skip phase');
+        return;
+      }
+      toast.success(`${phase.phase_type} skipped.`);
+      startTransition(() => router.refresh());
+    } catch {
+      toast.error('An unexpected error occurred');
+    } finally {
+      clearPhaseInFlight(jobId);
+    }
+  }, [router, startTransition, markPhaseInFlight, clearPhaseInFlight]);
 
   return {
     isPending,
@@ -204,18 +454,40 @@ export function useJobActions(jobs: Job[]) {
     setOverdueJobId,
     overdueReason,
     setOverdueReason,
-    assignJobId,
-    setAssignJobId,
-    assignMachineId,
-    setAssignMachineId,
-    assigningMachine,
+    // Phase actions (replaces job-level assign-machine)
+    startPhaseJobId,
+    setStartPhaseJobId,
+    startPhaseId,
+    setStartPhaseId,
+    startPhaseType,
+    startPhaseMachineId,
+    setStartPhaseMachineId,
+    startingPhase,
     availableMachines,
     loadingMachines,
+    phaseInFlight,
     handleMarkDone,
     handleCancelJob,
     handleOverdueConfirm,
     handlePayLaterConfirm,
-    openAssignDialog,
+    openStartPhaseDialog,
+    handleStartPhase,
+    handleCompletePhase,
+    handleSkipPhase,
+    // 1-tap start (for phases with pre-assigned machines)
+    startPhaseDirect,
+    // Pre-assign / unassign machine on a queued phase
+    assignMachineJobId,
+    setAssignMachineJobId,
+    assignMachinePhaseId,
+    setAssignMachinePhaseId,
+    assignMachinePhaseType,
+    assignMachineCurrentId,
+    assignMachineSelectedId,
+    setAssignMachineSelectedId,
+    assigningMachine,
+    openAssignMachineDialog,
     handleAssignMachine,
+    handleUnassignMachine,
   };
 }

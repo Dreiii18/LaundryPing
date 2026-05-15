@@ -6,6 +6,19 @@ export type Json =
   | { [key: string]: Json | undefined }
   | Json[];
 
+export type MachineType = 'washer' | 'dryer' | 'combo' | 'other';
+
+export type JobStatus = 'pending' | 'in_progress' | 'ready_for_pickup' | 'completed' | 'cancelled';
+
+export type PhaseStatus = 'pending' | 'in_progress' | 'completed' | 'skipped';
+
+export interface ServicePhaseConfigEntry {
+  is_phase: boolean;
+  machine_type: MachineType | null;
+  default_minutes: number;
+  sequence: number;
+}
+
 export interface Database {
   public: {
     Tables: {
@@ -22,12 +35,18 @@ export interface Database {
           service_prices: Record<string, number>;
           service_weights: Record<string, number>;
           service_types: Record<string, string>;
+          service_phase_config: Record<string, ServicePhaseConfigEntry>;
           rush_fee: number;
           contact_number: string | null;
           receipt_paper_size: '58mm' | '80mm';
           sms_queue_template: string | null;
           sms_completion_template: string | null;
           sender_name: string | null;
+          onboarding_completed_at: string | null;
+          welcome_email_sent_at: string | null;
+          d2_email_sent_at: string | null;
+          d7_email_sent_at: string | null;
+          d30_email_sent_at: string | null;
           created_at: string;
           updated_at: string;
         };
@@ -43,12 +62,18 @@ export interface Database {
           service_prices?: Record<string, number>;
           service_weights?: Record<string, number>;
           service_types?: Record<string, string>;
+          service_phase_config?: Record<string, ServicePhaseConfigEntry>;
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
           sms_queue_template?: string | null;
           sms_completion_template?: string | null;
           sender_name?: string | null;
+          onboarding_completed_at?: string | null;
+          welcome_email_sent_at?: string | null;
+          d2_email_sent_at?: string | null;
+          d7_email_sent_at?: string | null;
+          d30_email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -64,12 +89,18 @@ export interface Database {
           service_prices?: Record<string, number>;
           service_weights?: Record<string, number>;
           service_types?: Record<string, string>;
+          service_phase_config?: Record<string, ServicePhaseConfigEntry>;
           rush_fee?: number;
           contact_number?: string | null;
           receipt_paper_size?: '58mm' | '80mm';
           sms_queue_template?: string | null;
           sms_completion_template?: string | null;
           sender_name?: string | null;
+          onboarding_completed_at?: string | null;
+          welcome_email_sent_at?: string | null;
+          d2_email_sent_at?: string | null;
+          d7_email_sent_at?: string | null;
+          d30_email_sent_at?: string | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -80,6 +111,7 @@ export interface Database {
           laundromat_id: string;
           label: string;
           status: 'active' | 'inactive' | 'maintenance';
+          machine_type: MachineType;
           created_at: string;
           updated_at: string;
         };
@@ -88,6 +120,7 @@ export interface Database {
           laundromat_id: string;
           label: string;
           status?: 'active' | 'inactive' | 'maintenance';
+          machine_type?: MachineType;
           created_at?: string;
           updated_at?: string;
         };
@@ -96,6 +129,7 @@ export interface Database {
           laundromat_id?: string;
           label?: string;
           status?: 'active' | 'inactive' | 'maintenance';
+          machine_type?: MachineType;
           created_at?: string;
           updated_at?: string;
         };
@@ -108,7 +142,7 @@ export interface Database {
           customer_phone_encrypted: string | null;
           customer_phone_masked: string | null;
           notes: string | null;
-          status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+          status: JobStatus;
           started_at: string;
           completed_at: string | null;
           sms_sent: boolean;
@@ -138,7 +172,7 @@ export interface Database {
           customer_phone_encrypted?: string | null;
           customer_phone_masked?: string | null;
           notes?: string | null;
-          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+          status?: JobStatus;
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
@@ -167,7 +201,7 @@ export interface Database {
           customer_phone_encrypted?: string | null;
           customer_phone_masked?: string | null;
           notes?: string | null;
-          status?: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+          status?: JobStatus;
           started_at?: string;
           completed_at?: string | null;
           sms_sent?: boolean;
@@ -187,6 +221,50 @@ export interface Database {
           notify_queue_sms?: boolean;
           priority?: 'normal' | 'rush';
 
+          created_at?: string;
+        };
+      };
+      job_phases: {
+        Row: {
+          id: string;
+          job_id: string;
+          laundromat_id: string;
+          phase_type: string;
+          machine_id: string | null;
+          sequence: number;
+          status: PhaseStatus;
+          started_at: string | null;
+          completed_at: string | null;
+          estimated_minutes: number | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          job_id: string;
+          laundromat_id: string;
+          phase_type: string;
+          machine_id?: string | null;
+          sequence: number;
+          status?: PhaseStatus;
+          started_at?: string | null;
+          completed_at?: string | null;
+          estimated_minutes?: number | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          job_id?: string;
+          laundromat_id?: string;
+          phase_type?: string;
+          machine_id?: string | null;
+          sequence?: number;
+          status?: PhaseStatus;
+          started_at?: string | null;
+          completed_at?: string | null;
+          estimated_minutes?: number | null;
+          notes?: string | null;
           created_at?: string;
         };
       };

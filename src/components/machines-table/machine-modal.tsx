@@ -20,7 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Loader2, Wrench } from 'lucide-react';
-import type { Machine } from './types';
+import type { Machine, MachineType } from './types';
 
 interface MachineModalProps {
   open: boolean;
@@ -30,6 +30,8 @@ interface MachineModalProps {
   onLabelChange: (label: string) => void;
   status: 'active' | 'maintenance';
   onStatusChange: (status: 'active' | 'maintenance') => void;
+  machineType: MachineType;
+  onMachineTypeChange: (machineType: MachineType) => void;
   onSave: (e: React.FormEvent) => Promise<void>;
   saving: boolean;
   error: string;
@@ -43,6 +45,8 @@ export function MachineModal({
   onLabelChange,
   status,
   onStatusChange,
+  machineType,
+  onMachineTypeChange,
   onSave,
   saving,
   error,
@@ -100,6 +104,27 @@ export function MachineModal({
                 maxLength={20}
                 className="h-10"
               />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Label className="text-sm font-medium">Machine type</Label>
+              <Select
+                value={machineType}
+                onValueChange={(v) => onMachineTypeChange(v as MachineType)}
+              >
+                <SelectTrigger className="w-full h-10">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="washer">Washer</SelectItem>
+                  <SelectItem value="dryer">Dryer</SelectItem>
+                  <SelectItem value="combo">Combo (washer + dryer)</SelectItem>
+                  <SelectItem value="other">Other</SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-slate-400">
+                Combo machines can serve any phase. Washers / dryers can only serve their matching phase.
+              </p>
             </div>
 
             {editingMachine && (

@@ -7,6 +7,8 @@ import { sanitizeNotes, sanitizeCustomerName } from '@/lib/utils/sanitize';
 import { sendSms } from '@/lib/sms/provider';
 import { renderSmsTemplate, DEFAULT_QUEUE_TEMPLATE } from '@/lib/sms/templates';
 import { checkAndConsumeCredit, refundCredit } from '@/lib/sms/quota';
+import { buildPhaseRecords, validateMachineForPhase } from '@/lib/jobs/phases';
+import type { MachineType, ServicePhaseConfigEntry } from '@/types/database';
 
 const PAYMENT_METHODS = ['cash', 'ewallet', 'card', 'bank_transfer'] as const;
 
@@ -29,6 +31,17 @@ const createJobSchema = z.object({
   total_weight: z.number().min(0).max(99999).optional(),
   notify_queue_sms: z.boolean().optional(),
   priority: z.enum(['normal', 'rush']).optional(),
+  // Optional pre-assignments for phases beyond the first. Map of phase_type
+  // (matches a service in `services`) → machine_id (uuid). The machines are
+  // validated up-front (ownership, active, type-compatible) and set on the
+  // corresponding phase rows after they're inserted, while status='pending'.
+  // The legacy `machine_id` parameter still wins for the FIRST phase (it
+  // starts that phase immediately) — phase_assignments only pre-assigns,
+  // never starts.
+  phase_assignments: z
+    .record(z.string().min(1).max(50), z.string().uuid('Invalid machine ID'))
+    .refine((obj) => Object.keys(obj).length <= 20, 'Maximum 20 phase assignments')
+    .optional(),
 }).refine(
   (data) => !data.is_paid || data.payment_method !== undefined,
   { message: 'Payment method is required when paid', path: ['payment_method'] }
@@ -61,7 +74,7 @@ export async function GET() {
     });
     const todayPH = phFormatter.format(now); // YYYY-MM-DD format
 
-    // Get jobs started today (PH timezone) OR still in_progress (overdue)
+    // Get jobs started today (PH timezone) OR still pending/in_progress/ready_for_pickup
     const { data: jobs, error: queryError } = await supabase
       .from('jobs')
       .select(`
@@ -90,44 +103,95 @@ export async function GET() {
         priority,
         machines (
           id,
-          label
+          label,
+          machine_type
+        ),
+        job_phases (
+          id,
+          phase_type,
+          machine_id,
+          sequence,
+          status,
+          started_at,
+          completed_at,
+          estimated_minutes,
+          machines (
+            id,
+            label,
+            machine_type
+          )
         )
       `)
       .eq('laundromat_id', laundromat.id)
-      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending`)
+      .or(`started_at.gte.${todayPH}T00:00:00+08:00,status.eq.in_progress,status.eq.pending,status.eq.ready_for_pickup`)
       .order('started_at', { ascending: false });
 
     if (queryError) {
       return NextResponse.json({ error: 'Failed to fetch jobs' }, { status: 500 });
     }
 
-    // Never send encrypted phone to client -- only masked
-    const safeJobs = (jobs || []).map((job) => ({
-      id: job.id,
-      laundromat_id: job.laundromat_id,
-      machine_id: job.machine_id,
-      customer_phone_masked: job.customer_phone_masked,
-      notes: job.notes,
-      status: job.status,
-      started_at: job.started_at,
-      completed_at: job.completed_at,
-      sms_sent: job.sms_sent,
-      notify_sms: job.notify_sms,
-      notify_queue_sms: job.notify_queue_sms,
-      payment_method: job.payment_method,
-      pay_amount: job.pay_amount,
-      cash_tendered: job.cash_tendered,
-      is_paid: job.is_paid,
-      services: job.services,
-      service_quantities: job.service_quantities as Record<string, number> | null,
-      service_weights_actual: job.service_weights_actual as Record<string, number> | null,
-      total_weight: job.total_weight as number | null,
-      claim_number: job.claim_number,
-      customer_name: job.customer_name,
-      created_at: job.created_at,
-      priority: job.priority,
-      machine: job.machines,
-    }));
+    // Never send encrypted phone to client -- only masked.
+    // Supabase types nested relations as arrays even for many-to-one joins;
+    // we tolerate both shapes.
+    type JoinedMachine = { id: string; label: string; machine_type: string };
+    type JoinedPhase = {
+      id: string;
+      phase_type: string;
+      machine_id: string | null;
+      sequence: number;
+      status: string;
+      started_at: string | null;
+      completed_at: string | null;
+      estimated_minutes: number | null;
+      machines: JoinedMachine | JoinedMachine[] | null;
+    };
+    const pickOne = <T,>(v: T | T[] | null): T | null =>
+      Array.isArray(v) ? (v[0] ?? null) : v;
+
+    const safeJobs = (jobs || []).map((job) => {
+      const phases = ((job.job_phases ?? []) as unknown as JoinedPhase[])
+        .slice()
+        .sort((a, b) => a.sequence - b.sequence)
+        .map((p) => ({
+          id: p.id,
+          phase_type: p.phase_type,
+          machine_id: p.machine_id,
+          sequence: p.sequence,
+          status: p.status,
+          started_at: p.started_at,
+          completed_at: p.completed_at,
+          estimated_minutes: p.estimated_minutes,
+          machine: pickOne(p.machines),
+        }));
+
+      return {
+        id: job.id,
+        laundromat_id: job.laundromat_id,
+        machine_id: job.machine_id,
+        customer_phone_masked: job.customer_phone_masked,
+        notes: job.notes,
+        status: job.status,
+        started_at: job.started_at,
+        completed_at: job.completed_at,
+        sms_sent: job.sms_sent,
+        notify_sms: job.notify_sms,
+        notify_queue_sms: job.notify_queue_sms,
+        payment_method: job.payment_method,
+        pay_amount: job.pay_amount,
+        cash_tendered: job.cash_tendered,
+        is_paid: job.is_paid,
+        services: job.services,
+        service_quantities: job.service_quantities as Record<string, number> | null,
+        service_weights_actual: job.service_weights_actual as Record<string, number> | null,
+        total_weight: job.total_weight as number | null,
+        claim_number: job.claim_number,
+        customer_name: job.customer_name,
+        created_at: job.created_at,
+        priority: job.priority,
+        machine: job.machines,
+        phases,
+      };
+    });
 
     return NextResponse.json({ jobs: safeJobs });
   } catch {
@@ -170,13 +234,29 @@ export async function POST(request: Request) {
       );
     }
 
+    const phaseConfig = (laundromat.service_phase_config ?? {}) as Record<string, ServicePhaseConfigEntry>;
+    const availableServices = laundromat.available_services ?? [];
+
+    // Reject services that aren't in this laundromat's available_services list.
+    // service_phase_config is allowed to omit a service (falls back to default)
+    // but every job-creation service must be an explicitly offered service.
+    const unknownService = parsed.data.services.find(
+      (s) => !availableServices.includes(s),
+    );
+    if (unknownService) {
+      return NextResponse.json(
+        { error: `Service "${unknownService}" is not in your available services. Update Settings → Services.` },
+        { status: 400 }
+      );
+    }
+
     // Validate machine if provided
-    let machine: { id: string; label: string } | null = null;
+    let machine: { id: string; label: string; machine_type: MachineType } | null = null;
 
     if (machine_id) {
       const { data: machineData, error: machineError } = await supabase
         .from('machines')
-        .select('*')
+        .select('id, label, machine_type')
         .eq('id', machine_id)
         .eq('laundromat_id', laundromat.id)
         .eq('status', 'active')
@@ -191,28 +271,29 @@ export async function POST(request: Request) {
 
       machine = machineData;
 
-      // Check if machine already has an active job
-      const { data: activeJobs } = await supabase
-        .from('jobs')
+      // Check if machine is currently in an in_progress phase
+      const { data: activePhases } = await supabase
+        .from('job_phases')
         .select('id')
         .eq('machine_id', machine_id)
-        .in('status', ['pending', 'in_progress'])
+        .eq('status', 'in_progress')
         .limit(1);
 
-      if (activeJobs && activeJobs.length > 0) {
+      if (activePhases && activePhases.length > 0) {
         return NextResponse.json(
-          { error: 'This machine already has an active job' },
+          { error: 'This machine is currently in use' },
           { status: 409 }
         );
       }
     }
 
-    // Check laundromat-wide active job cap
+    // Check laundromat-wide active job cap. Include ready_for_pickup so busy
+    // shops awaiting customer pickups are counted toward operational capacity.
     const { count: activeJobCount } = await supabase
       .from('jobs')
       .select('id', { count: 'exact', head: true })
       .eq('laundromat_id', laundromat.id)
-      .in('status', ['pending', 'in_progress']);
+      .in('status', ['pending', 'in_progress', 'ready_for_pickup']);
 
     const { count: machineCount } = await supabase
       .from('machines')
@@ -302,6 +383,122 @@ export async function POST(request: Request) {
 
     if (insertError || !job) {
       return NextResponse.json({ error: 'Failed to create job' }, { status: 500 });
+    }
+
+    // Expand services into phase rows. The trg_sync_job_from_phases trigger
+    // will keep jobs.status / jobs.machine_id in sync as phases activate/complete.
+    const phaseRecords = buildPhaseRecords({
+      jobId: job.id,
+      laundromatId: laundromat.id,
+      services: parsed.data.services,
+      phaseConfig,
+    });
+
+    // Rollback helper — logs any delete failure so orphaned jobs are visible in logs.
+    const rollbackJob = async (reason: string) => {
+      const { error: deleteError } = await supabase.from('jobs').delete().eq('id', job.id);
+      if (deleteError) {
+        console.error(`[Job rollback] Failed to delete job ${job.id} after ${reason}:`, deleteError);
+      }
+    };
+
+    // If a machine was supplied, validate type compatibility with the first phase
+    // and start that phase immediately.
+    if (machine && phaseRecords.length > 0) {
+      const firstPhase = phaseRecords[0];
+      const compatibility = validateMachineForPhase(machine, firstPhase.phase_type, phaseConfig);
+      if (!compatibility.ok) {
+        await rollbackJob('first-phase machine type mismatch');
+        return NextResponse.json({ error: compatibility.reason }, { status: 400 });
+      }
+      firstPhase.machine_id = machine.id;
+      firstPhase.status = 'in_progress';
+      firstPhase.started_at = new Date().toISOString();
+    }
+
+    // Apply phase_assignments (pre-assignments for phases that won't start
+    // immediately). Skips any phase already in_progress (legacy machine_id wins).
+    // Validates ownership/active/type-compat in a single batched fetch.
+    const phaseAssignments = parsed.data.phase_assignments ?? {};
+    if (Object.keys(phaseAssignments).length > 0) {
+      const machineIds = Array.from(new Set(Object.values(phaseAssignments)));
+      const { data: assignedMachines, error: assignedMachinesErr } = await supabase
+        .from('machines')
+        .select('id, label, machine_type, status')
+        .eq('laundromat_id', laundromat.id)
+        .in('id', machineIds);
+
+      if (assignedMachinesErr) {
+        await rollbackJob('phase_assignments machine fetch');
+        console.error('phase_assignments machine fetch failed:', assignedMachinesErr);
+        return NextResponse.json({ error: 'Failed to validate phase assignments' }, { status: 500 });
+      }
+
+      const machineMap = new Map((assignedMachines ?? []).map((m) => [m.id, m]));
+
+      for (const [phaseType, machineId] of Object.entries(phaseAssignments)) {
+        const m = machineMap.get(machineId);
+        if (!m) {
+          await rollbackJob(`pre-assigned machine for "${phaseType}" not found`);
+          return NextResponse.json(
+            { error: `Pre-assigned machine for "${phaseType}" not found` },
+            { status: 404 }
+          );
+        }
+        if (m.status !== 'active') {
+          await rollbackJob(`machine "${m.label}" not active`);
+          return NextResponse.json(
+            { error: `Machine "${m.label}" is not active` },
+            { status: 400 }
+          );
+        }
+        const compatibility = validateMachineForPhase(
+          { machine_type: m.machine_type as MachineType },
+          phaseType,
+          phaseConfig,
+        );
+        if (!compatibility.ok) {
+          await rollbackJob(`phase_assignment machine type mismatch (${phaseType})`);
+          return NextResponse.json({ error: compatibility.reason }, { status: 400 });
+        }
+
+        const phaseRow = phaseRecords.find((p) => p.phase_type === phaseType);
+        if (!phaseRow) {
+          await rollbackJob(`phase_assignments references unknown phase "${phaseType}"`);
+          return NextResponse.json(
+            { error: `phase_assignments references "${phaseType}" but it is not a phase of this job.` },
+            { status: 400 }
+          );
+        }
+
+        // Skip any phase already in_progress (legacy machine_id won that slot).
+        if (phaseRow.status === 'pending') {
+          phaseRow.machine_id = machineId;
+        }
+      }
+    }
+
+    if (phaseRecords.length > 0) {
+      const { error: phasesError } = await supabase.from('job_phases').insert(phaseRecords);
+      if (phasesError) {
+        console.error('Phase insert failed:', phasesError);
+        await rollbackJob('phase insert');
+        return NextResponse.json({ error: 'Failed to create job phases' }, { status: 500 });
+      }
+    } else {
+      // All services are administrative (is_phase=false) — no operational work needed.
+      // Skip straight to ready_for_pickup, and clear the inherited machine_id so
+      // jobs.machine_id never points at a machine that has no associated phase row.
+      const { error: readyError } = await supabase
+        .from('jobs')
+        .update({ status: 'ready_for_pickup', machine_id: null })
+        .eq('id', job.id);
+      if (readyError) {
+        console.error('[Create Job] Ready-for-pickup fallback update failed:', readyError);
+        return NextResponse.json({ error: 'Failed to finalize job' }, { status: 500 });
+      }
+      job.status = 'ready_for_pickup';
+      job.machine_id = null;
     }
 
     // Queue SMS: send notification if job is queued, queue SMS enabled, and phone exists
