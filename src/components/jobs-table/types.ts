@@ -73,4 +73,23 @@ export interface JobsTableProps {
   jobs: Job[];
   context?: 'dashboard' | 'jobs-page';
   shopInfo?: ShopInfo;
+  /** Per-laundromat phase config (passed from server-rendered pages so the
+   *  client doesn't have to re-fetch /api/settings on every dialog open). */
+  servicePhaseConfig?: Record<string, {
+    is_phase: boolean;
+    machine_type: MachineType | null;
+    default_minutes: number;
+    sequence: number;
+  }> | null;
+}
+
+/**
+ * Display label for a phase chip / button. Legacy backfilled jobs (created
+ * before the phase migration) have phase_type='legacy', which would render
+ * unhelpfully as "Skip legacy" / "Done legacy" in the UI. Map it to "Job"
+ * so the buttons read naturally for those legacy rows.
+ */
+export function renderPhaseLabel(phaseType: string): string {
+  if (phaseType === 'legacy') return 'job';
+  return phaseType;
 }

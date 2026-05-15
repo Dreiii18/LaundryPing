@@ -49,6 +49,7 @@ npx vitest run src/lib/utils/__tests__/phone.test.ts
 - `provider.ts` -- Factory pattern with `SmsProvider` interface. `SMS_PROVIDER=mock` (default) logs to console; `SMS_PROVIDER=semaphore` calls the real API with 5s AbortController timeout.
 - `quota.ts` -- SMS credit management via Postgres stored procedures: `ensure_billing_cycle` (lazy monthly reset of free credits), `check_and_consume_sms_credit` (atomic consume with `SELECT ... FOR UPDATE` row locking, free credits first then paid), and `refund_sms_credit` (refund on failure). All users get 50 free SMS/month + optional purchased credits.
 - `templates.ts` -- Bilingual Tagalog/English SMS message builder.
+- Customer-supplied free-text fields (names, notes, addresses) flow through `lib/utils/sanitize.ts` which strips HTML tags, C0/C1 control chars (incl. CRLF/NUL), and bidi-override codepoints before storage — so a malicious customer_name can't forge a second SMS line or flip text direction.
 - Triple-layer duplicate SMS prevention: UI button disable + `sms_logs` check + UNIQUE constraint on `sms_logs.job_id`.
 
 ### Phone Number Handling

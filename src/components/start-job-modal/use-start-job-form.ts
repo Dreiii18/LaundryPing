@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { fetchWithAuth } from '@/lib/utils/fetch';
 import { isValidPhNumber } from '@/lib/utils/phone';
 import type { Machine } from './types';
-import type { ServicePhaseConfigEntry } from '@/types/database';
+import type { MachineType, ServicePhaseConfigEntry } from '@/types/database';
 
 export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => void) {
   const router = useRouter();
@@ -117,6 +117,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       setServiceWeights({});
       setServiceTypes({});
       setServicePhaseConfig({});
+      setPhaseAssignments({});
       setPriceManuallyChanged(false);
       setCashTendered('');
       setPriority('normal');
@@ -134,16 +135,43 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     return serviceTypes[service] ?? 'per_load';
   }, [serviceTypes]);
 
+  /** Pre-assignments for phases beyond the first. Map of phase_type → machine_id.
+   *  The first phase's machine still uses `machineId` (legacy: start-now). */
+  const [phaseAssignments, setPhaseAssignments] = useState<Record<string, string>>({});
+
+  /** Phases (in sequence order) that require a machine, with their compatible
+   *  machine candidates. Drives both the per-phase picker UI and validation. */
+  const phasesNeedingMachines = useMemo(() => {
+    const filterByType = (requiredType: MachineType | null) =>
+      machines.filter((m) => {
+        if (!m.machine_type) return true; // legacy machines without type metadata
+        if (m.machine_type === 'combo') return true;
+        return requiredType === null ? false : m.machine_type === requiredType;
+      });
+
+    return selectedServices
+      .map((service) => {
+        const cfg = servicePhaseConfig[service];
+        if (cfg && cfg.is_phase === false) return null;
+        const requiredType: MachineType | null = cfg?.machine_type ?? null;
+        if (requiredType === null) return null; // phase doesn't need a machine
+        return {
+          phase_type: service,
+          requiredType,
+          candidates: filterByType(requiredType),
+        };
+      })
+      .filter((p): p is { phase_type: string; requiredType: MachineType; candidates: Machine[] } => p !== null);
+  }, [selectedServices, servicePhaseConfig, machines]);
+
   /** First selected service that's an operational phase, in user-selection order. */
   const firstPhaseRequiredType = useMemo(() => {
     for (const s of selectedServices) {
       const cfg = servicePhaseConfig[s];
-      // If config says is_phase=false, skip this service. Unknown services
-      // default to is_phase=true so they participate.
       if (cfg && cfg.is_phase === false) continue;
-      return cfg?.machine_type ?? null; // null = no machine required
+      return cfg?.machine_type ?? null;
     }
-    return undefined; // no selected phase requires a machine
+    return undefined;
   }, [selectedServices, servicePhaseConfig]);
 
   /** Machines compatible with the first phase. 'combo' fits any required type. */
@@ -151,11 +179,46 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     if (firstPhaseRequiredType === undefined) return machines;
     if (firstPhaseRequiredType === null) return [];
     return machines.filter((m) => {
-      if (!m.machine_type) return true; // legacy machines without type metadata
+      if (!m.machine_type) return true;
       if (m.machine_type === 'combo') return true;
       return m.machine_type === firstPhaseRequiredType;
     });
   }, [machines, firstPhaseRequiredType]);
+
+  /** Drop stale phase_assignments entries when the user changes services or
+   *  the picked machine is no longer compatible. */
+  useEffect(() => {
+    setPhaseAssignments((prev) => {
+      const validPhases = new Set(phasesNeedingMachines.slice(1).map((p) => p.phase_type));
+      const next: Record<string, string> = {};
+      for (const phase of phasesNeedingMachines.slice(1)) {
+        const stored = prev[phase.phase_type];
+        if (stored && phase.candidates.find((m) => m.id === stored)) {
+          next[phase.phase_type] = stored;
+        }
+      }
+      // Drop any phase_type that's no longer in the list
+      for (const k of Object.keys(prev)) {
+        if (!validPhases.has(k)) continue;
+        if (next[k] === undefined && prev[k]) {
+          // Was set but the candidate disappeared — leave it dropped (next has no entry)
+        }
+      }
+      return next;
+    });
+  }, [phasesNeedingMachines]);
+
+  const setPhaseAssignment = useCallback((phaseType: string, machineId: string) => {
+    setPhaseAssignments((prev) => {
+      const next = { ...prev };
+      if (machineId) {
+        next[phaseType] = machineId;
+      } else {
+        delete next[phaseType];
+      }
+      return next;
+    });
+  }, []);
 
   /** Should the modal show a machine picker at all?
    *  - undefined: no service selected yet, or all selected services are admin
@@ -307,6 +370,12 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     if (selectedServices.length === 0) {
       return 'Please select at least one service';
     }
+    // Empty service_phase_config falls back to combo-everywhere defaults, which
+    // produces wrong-type phases for shops that have washer/dryer-only machines.
+    // Require operators to configure phases before creating jobs.
+    if (Object.keys(servicePhaseConfig).length === 0) {
+      return 'Phase configuration is missing — set this up in Settings → Services before creating jobs.';
+    }
     // Validate per_kg services have weight > 0
     for (const s of selectedServices) {
       if ((serviceTypes[s] ?? 'per_load') === 'per_kg' && !(serviceWeightsActual[s] > 0)) {
@@ -317,7 +386,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
       return 'Please select a machine';
     }
     return null;
-  }, [selectedServices, serviceTypes, serviceWeightsActual, machineRequired, compatibleMachines, machineId]);
+  }, [selectedServices, servicePhaseConfig, serviceTypes, serviceWeightsActual, machineRequired, compatibleMachines, machineId]);
 
   const handleSubmit = useCallback(async (e: React.FormEvent) => {
     e.preventDefault();
@@ -398,6 +467,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
             return tw > 0 ? Math.round(tw * 100) / 100 : undefined;
           })(),
           ...(!machineId ? { priority } : {}),
+          ...(Object.keys(phaseAssignments).length > 0 ? { phase_assignments: phaseAssignments } : {}),
         }),
       });
 
@@ -435,6 +505,7 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     compatibleMachines,
     machineRequired,
     machineId,
+    phaseAssignments,
     smsOption,
     phone,
     payAmount,
@@ -457,6 +528,9 @@ export function useStartJobForm(open: boolean, onOpenChange: (open: boolean) => 
     machineRequired,
     machineId,
     setMachineId: handleMachineChange,
+    phasesNeedingMachines,
+    phaseAssignments,
+    setPhaseAssignment,
     phone,
     setPhone,
     notes,

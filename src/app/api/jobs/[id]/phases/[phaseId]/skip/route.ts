@@ -35,7 +35,7 @@ export async function POST(
 
     const { data: phase, error: phaseError } = await supabase
       .from('job_phases')
-      .select('id, status, notes')
+      .select('id, status, notes, completed_at')
       .eq('id', phaseId)
       .eq('job_id', jobId)
       .eq('laundromat_id', laundromat.id)
@@ -43,6 +43,13 @@ export async function POST(
 
     if (phaseError || !phase) {
       return NextResponse.json({ error: 'Phase not found' }, { status: 404 });
+    }
+
+    // Idempotent: a retry on an already-skipped phase is a no-op.
+    if (phase.status === 'skipped') {
+      return NextResponse.json({
+        phase: { id: phase.id, status: phase.status, completed_at: phase.completed_at },
+      });
     }
 
     if (!['pending', 'in_progress'].includes(phase.status)) {

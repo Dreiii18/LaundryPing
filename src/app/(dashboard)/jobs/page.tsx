@@ -212,6 +212,7 @@ export default async function JobsPage({
       currentPage={page}
       pageSize={PAGE_SIZE}
       currentFilters={{ status, machineId, dateFrom, dateTo, search }}
+      servicePhaseConfig={laundromat.service_phase_config ?? null}
       shopInfo={{
         name: laundromat.name,
         address: laundromat.address,

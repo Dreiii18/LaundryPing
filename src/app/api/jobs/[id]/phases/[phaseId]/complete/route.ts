@@ -18,7 +18,7 @@ export async function POST(
 
     const { data: phase, error: phaseError } = await supabase
       .from('job_phases')
-      .select('id, status')
+      .select('id, status, completed_at, machine_id')
       .eq('id', phaseId)
       .eq('job_id', jobId)
       .eq('laundromat_id', laundromat.id)
@@ -26,6 +26,12 @@ export async function POST(
 
     if (phaseError || !phase) {
       return NextResponse.json({ error: 'Phase not found' }, { status: 404 });
+    }
+
+    // Idempotent: a retry or double-tap on an already-completed phase is a no-op,
+    // not a 409. (A second concurrent request that lost the race lands here.)
+    if (phase.status === 'completed') {
+      return NextResponse.json({ phase });
     }
 
     if (phase.status !== 'in_progress') {
@@ -49,16 +55,20 @@ export async function POST(
       .single();
 
     if (updateError || !updated) {
+      // PGRST116 (no rows) means a concurrent caller won the race and the phase
+      // is already completed — surface that idempotently.
+      if (updateError && (updateError.code === 'PGRST116' || updateError.details?.includes('0 rows'))) {
+        const { data: latest } = await supabase
+          .from('job_phases')
+          .select('id, status, completed_at, machine_id')
+          .eq('id', phaseId)
+          .single();
+        if (latest && latest.status === 'completed') {
+          return NextResponse.json({ phase: latest });
+        }
+      }
       console.error('[Complete Phase] Update failed:', updateError);
-      return NextResponse.json(
-        {
-          error: updateError?.message || 'Failed to complete phase',
-          code: updateError?.code,
-          details: updateError?.details,
-          hint: updateError?.hint,
-        },
-        { status: 500 }
-      );
+      return NextResponse.json({ error: 'Failed to complete phase' }, { status: 500 });
     }
 
     return NextResponse.json({ phase: updated });

@@ -125,22 +125,44 @@ export async function DELETE(
       return NextResponse.json({ error: 'Machine not found' }, { status: 404 });
     }
 
-    // Check for active phases on this machine
-    const { data: activePhases, error: phasesError } = await supabase
+    // Block delete if any phase is currently running on this machine.
+    // Pending phases (machine pre-assigned but not yet started) are allowed —
+    // we'll clear their machine_id before soft-deleting so they don't dangle.
+    const { data: inProgressPhases, error: phasesError } = await supabase
       .from('job_phases')
       .select('id')
       .eq('machine_id', id)
-      .in('status', ['pending', 'in_progress'])
+      .eq('status', 'in_progress')
       .limit(1);
 
     if (phasesError) {
       return NextResponse.json({ error: 'Failed to check active phases' }, { status: 500 });
     }
 
-    if (activePhases && activePhases.length > 0) {
+    if (inProgressPhases && inProgressPhases.length > 0) {
       return NextResponse.json(
         { error: 'Cannot delete -- this machine has active jobs.' },
         { status: 409 }
+      );
+    }
+
+    // Clear machine_id on any pending phases that were pre-assigned to this
+    // machine. Operator will need to re-assign before starting those phases.
+    const { data: clearedPhases, error: clearError } = await supabase
+      .from('job_phases')
+      .update({ machine_id: null })
+      .eq('machine_id', id)
+      .eq('status', 'pending')
+      .select('id');
+
+    if (clearError) {
+      console.error('[Soft-delete machine] Failed to clear pending phases:', clearError);
+      return NextResponse.json({ error: 'Failed to delete machine' }, { status: 500 });
+    }
+
+    if (clearedPhases && clearedPhases.length > 0) {
+      console.info(
+        `[Soft-delete machine] Cleared ${clearedPhases.length} pending phase(s) for machine ${id}`,
       );
     }
 

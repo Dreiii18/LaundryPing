@@ -26,6 +26,17 @@ const updateSettingsSchema = z.object({
     })
   )
     .refine(obj => Object.keys(obj).length <= 20, 'Maximum 20 service phase configs')
+    .refine(
+      (obj) => {
+        // Sequence values must be unique among phase services (is_phase=true).
+        // Duplicate sequence makes findNextPendingPhase ordering nondeterministic.
+        const sequences = Object.values(obj)
+          .filter((v) => v.is_phase)
+          .map((v) => v.sequence);
+        return new Set(sequences).size === sequences.length;
+      },
+      'Phase sequence values must be unique',
+    )
     .optional(),
   contact_number: z.string().max(20, 'Contact number must be 20 characters or less').optional().nullable(),
   rush_fee: z.number().min(0, 'Rush fee must be 0 or more').max(99999).optional(),
@@ -96,6 +107,51 @@ export async function PUT(request: Request) {
         { error: parsed.error.issues[0]?.message || 'Invalid input' },
         { status: 400 }
       );
+    }
+
+    // Guard: if available_services is being changed, refuse to drop any service
+    // that has open phases referencing it. Otherwise a rename/remove would
+    // silently strand in-flight phases (start route would refuse them later,
+    // but the operator wouldn't know until they tried to start the phase).
+    const willChangeServices =
+      parsed.data.available_services !== undefined ||
+      parsed.data.service_phase_config !== undefined;
+
+    if (willChangeServices) {
+      const nextAvailable = new Set(
+        parsed.data.available_services ?? laundromat.available_services ?? [],
+      );
+      const oldServices = laundromat.available_services ?? [];
+      const removedServices = oldServices.filter((s: string) => !nextAvailable.has(s));
+
+      if (removedServices.length > 0) {
+        const { data: blockingPhases, error: blockingError } = await supabase
+          .from('job_phases')
+          .select('phase_type')
+          .eq('laundromat_id', laundromat.id)
+          .in('phase_type', removedServices)
+          .in('status', ['pending', 'in_progress']);
+
+        if (blockingError) {
+          console.error('[Settings] Failed to check open phases:', blockingError);
+          return NextResponse.json(
+            { error: 'Could not verify open phases. Please retry.' },
+            { status: 500 }
+          );
+        }
+
+        if (blockingPhases && blockingPhases.length > 0) {
+          const conflicting = Array.from(new Set(blockingPhases.map((p) => p.phase_type)));
+          return NextResponse.json(
+            {
+              error: 'Cannot remove services with open phases',
+              conflicting,
+              hint: 'Complete or skip the in-flight phases first.',
+            },
+            { status: 409 }
+          );
+        }
+      }
     }
 
     const updateData: Record<string, unknown> = {};

@@ -2,19 +2,22 @@
 
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Loader2, Printer, MessageSquare, Bell, Check, Play, SkipForward } from 'lucide-react';
-import type { Job, JobPhase, ShopInfo } from '@/components/jobs-table/types';
+import { Loader2, Printer, MessageSquare, Bell, Check, Play, SkipForward, Pencil, Clock } from 'lucide-react';
+import { renderPhaseLabel, type Job, type JobPhase, type ShopInfo } from '@/components/jobs-table/types';
 
 interface TodaysJobsCardProps {
   job: Job;
   shopInfo?: ShopInfo;
   completingId: string | null;
   cancellingId: string | null;
-  phaseInFlight: string | null;
+  phaseInFlight: Set<string>;
+  isMachineFree?: (machineId: string) => boolean;
   onMarkDone: (job: Job) => void;
   onCancel: (jobId: string) => void;
   onPrint: (job: Job) => void;
   onStartPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onStartPhaseDirect: (jobId: string, phase: { id: string; phase_type: string }) => void;
+  onAssignMachine: (jobId: string, phase: { id: string; phase_type: string; machine_id?: string | null }) => void;
   onCompletePhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
   onSkipPhase: (jobId: string, phase: { id: string; phase_type: string }) => void;
 }
@@ -44,16 +47,18 @@ const getBorderColor = (job: Job) => {
 
 function PhaseChip({ phase }: { phase: JobPhase }) {
   const base = 'inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[10px] font-semibold border';
+  const label = renderPhaseLabel(phase.phase_type);
   if (phase.status === 'completed') {
-    return <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`}><Check className="size-2.5" />{phase.phase_type}</span>;
+    return <span className={`${base} bg-emerald-50 text-emerald-700 border-emerald-200`}><Check className="size-2.5" />{label}</span>;
   }
   if (phase.status === 'in_progress') {
-    return <span className={`${base} bg-amber-50 text-amber-800 border-amber-300`}><span className="size-1 rounded-full bg-amber-500 animate-pulse" />{phase.phase_type}{phase.machine ? ` · ${phase.machine.label}` : ''}</span>;
+    return <span className={`${base} bg-amber-50 text-amber-800 border-amber-300`}><span className="size-1 rounded-full bg-amber-500 animate-pulse" />{label}{phase.machine ? ` · ${phase.machine.label}` : ''}</span>;
   }
   if (phase.status === 'skipped') {
-    return <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`}>{phase.phase_type}</span>;
+    return <span className={`${base} bg-slate-50 text-slate-400 border-slate-200 line-through`}>{label}</span>;
   }
-  return <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`}><span className="size-1 rounded-full bg-slate-300" />{phase.phase_type}</span>;
+  // pending — show pre-assigned machine label if any
+  return <span className={`${base} bg-slate-50 text-slate-500 border-slate-200`}><span className="size-1 rounded-full bg-slate-300" />{label}{phase.machine ? ` · ${phase.machine.label}` : ''}</span>;
 }
 
 export function TodaysJobsCard({
@@ -62,14 +67,18 @@ export function TodaysJobsCard({
   completingId,
   cancellingId,
   phaseInFlight,
+  isMachineFree,
   onMarkDone,
   onCancel,
   onPrint,
   onStartPhase,
+  onStartPhaseDirect,
+  onAssignMachine,
   onCompletePhase,
   onSkipPhase,
 }: TodaysJobsCardProps) {
-  const isActionDisabled = completingId !== null || cancellingId !== null || phaseInFlight !== null;
+  const jobInFlight = phaseInFlight.has(job.id);
+  const isActionDisabled = completingId === job.id || cancellingId === job.id || jobInFlight;
   const isOpen = job.status === 'in_progress' || job.status === 'ready_for_pickup';
   const borderColor = getBorderColor(job);
   const amount = formatAmount(job.pay_amount);
@@ -77,6 +86,10 @@ export function TodaysJobsCard({
   const phases = (job.phases ?? []).slice().sort((a, b) => a.sequence - b.sequence);
   const activePhase = phases.find((p) => p.status === 'in_progress') ?? null;
   const nextPendingPhase = phases.find((p) => p.status === 'pending') ?? null;
+  const preassignedMachineId = nextPendingPhase?.machine_id ?? null;
+  const preassignedMachineLabel = nextPendingPhase?.machine?.label ?? null;
+  const preassignedFree =
+    preassignedMachineId && isMachineFree ? isMachineFree(preassignedMachineId) : null;
 
   // Secondary info: claim# + customer name (machine label is now inside the phase strip)
   const secondaryParts: string[] = [];
@@ -136,44 +149,105 @@ export function TodaysJobsCard({
               size="sm"
               onClick={() => onCompletePhase(job.id, activePhase)}
               disabled={isActionDisabled}
+              aria-label={`Complete ${renderPhaseLabel(activePhase.phase_type)}`}
               className="text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white h-8 px-3"
             >
-              {phaseInFlight === activePhase.id ? (
+              {jobInFlight ? (
                 <Loader2 className="size-3 animate-spin" />
               ) : (
-                <><Check className="size-3" /><span className="ml-1">Done {activePhase.phase_type}</span></>
+                <><Check className="size-3" /><span className="ml-1">Done {renderPhaseLabel(activePhase.phase_type)}</span></>
               )}
             </Button>
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => onSkipPhase(job.id, activePhase)}
               disabled={isActionDisabled}
-              className="text-xs text-slate-400 hover:text-slate-600 disabled:opacity-50 px-1"
-              aria-label={`Skip ${activePhase.phase_type}`}
+              aria-label={`Skip ${renderPhaseLabel(activePhase.phase_type)}`}
+              className="text-xs text-slate-400 hover:text-slate-600 h-8 w-8 p-0 min-h-8"
             >
               <SkipForward className="size-3.5" />
-            </button>
+            </Button>
           </>
         )}
 
-        {/* Next pending phase: start it */}
+        {/* Next pending phase: start it. Pre-assigned → 1-tap (machine in label).
+            Pre-assigned + busy → Waiting cue + disabled button.
+            Unassigned → opens picker. */}
         {!activePhase && nextPendingPhase && (
-          <Button
-            size="sm"
-            onClick={() => onStartPhase(job.id, nextPendingPhase)}
-            disabled={isActionDisabled}
-            className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
-          >
-            <Play className="size-3" />
-            <span className="ml-1">Start {nextPendingPhase.phase_type}</span>
-          </Button>
+          preassignedMachineId ? (
+            <>
+              {preassignedFree === false && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-700">
+                  <Clock className="size-3" />
+                  Waiting on {preassignedMachineLabel}
+                </span>
+              )}
+              {preassignedFree !== false && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-teal-700">
+                  Ready
+                </span>
+              )}
+              <Button
+                size="sm"
+                onClick={() => onStartPhaseDirect(job.id, nextPendingPhase)}
+                disabled={isActionDisabled || preassignedFree === false}
+                aria-label={`Start ${renderPhaseLabel(nextPendingPhase.phase_type)} on ${preassignedMachineLabel ?? 'machine'}`}
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3 disabled:opacity-50"
+              >
+                {jobInFlight ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <><Play className="size-3" /><span className="ml-1">Start {renderPhaseLabel(nextPendingPhase.phase_type)} · {preassignedMachineLabel}</span></>
+                )}
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                aria-label="Change pre-assigned machine"
+                title="Change pre-assigned machine"
+                className="text-slate-400 hover:text-slate-600 h-8 w-8 p-0 min-h-8"
+              >
+                <Pencil className="size-3" />
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button
+                size="sm"
+                onClick={() => onStartPhase(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                aria-label={`Start ${renderPhaseLabel(nextPendingPhase.phase_type)}`}
+                className="text-xs font-bold bg-blue-600 hover:bg-blue-700 text-white h-8 px-3"
+              >
+                <Play className="size-3" />
+                <span className="ml-1">Start {renderPhaseLabel(nextPendingPhase.phase_type)}</span>
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onAssignMachine(job.id, nextPendingPhase)}
+                disabled={isActionDisabled}
+                aria-label="Pre-assign machine"
+                title="Pre-assign machine"
+                className="text-slate-400 hover:text-slate-600 h-8 w-8 p-0 min-h-8"
+              >
+                <Pencil className="size-3" />
+              </Button>
+            </>
+          )
         )}
 
-        {/* Ready for pickup OR no phases at all: notify customer */}
-        {(job.status === 'ready_for_pickup' || (!activePhase && !nextPendingPhase)) && (
+        {/* Ready for pickup (with no in-flight active phase): notify + complete.
+            Guard against the active-phase action competing with this CTA. */}
+        {!activePhase && (job.status === 'ready_for_pickup' || !nextPendingPhase) && (
           <Button
             size="sm"
             onClick={() => onMarkDone(job)}
             disabled={isActionDisabled}
+            aria-label="Notify customer and complete job"
             className="text-xs font-bold bg-[#0d968b] hover:bg-[#0b7f75] text-white h-8 px-3"
           >
             {completingId === job.id ? (
@@ -184,17 +258,20 @@ export function TodaysJobsCard({
           </Button>
         )}
 
-        <button
+        <Button
+          variant="ghost"
+          size="sm"
           onClick={() => onCancel(job.id)}
           disabled={isActionDisabled}
-          className="text-xs text-red-500 hover:text-red-700 disabled:opacity-50 px-1"
+          aria-label="Cancel job"
+          className="text-xs text-red-500 hover:text-red-700 h-8 px-2 min-h-8"
         >
           {cancellingId === job.id ? (
             <Loader2 className="size-3 animate-spin" />
           ) : (
             'Cancel'
           )}
-        </button>
+        </Button>
         {shopInfo && (
           <Button
             variant="ghost"

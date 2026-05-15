@@ -17,41 +17,45 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, X } from 'lucide-react';
 import type { Machine } from './types';
 
-interface StartPhaseDialogProps {
+interface AssignMachineDialogProps {
   open: boolean;
   phaseType: string;
   machineId: string;
-  starting: boolean;
+  saving: boolean;
   availableMachines: Machine[];
   loadingMachines: boolean;
+  hasExistingAssignment: boolean;
   onMachineChange: (machineId: string) => void;
   onConfirm: () => void;
+  onUnassign: () => void;
   onClose: () => void;
 }
 
-export function StartPhaseDialog({
+export function AssignMachineDialog({
   open,
   phaseType,
   machineId,
-  starting,
+  saving,
   availableMachines,
   loadingMachines,
+  hasExistingAssignment,
   onMachineChange,
   onConfirm,
+  onUnassign,
   onClose,
-}: StartPhaseDialogProps) {
+}: AssignMachineDialogProps) {
   return (
     <Dialog open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <DialogContent className="sm:max-w-100">
         <DialogHeader>
           <DialogTitle className="text-lg font-bold text-[#111817]">
-            Start {phaseType}
+            Pre-assign machine for {phaseType}
           </DialogTitle>
           <DialogDescription className="text-[#618986]">
-            Select a machine for this phase. Only compatible machines are listed.
+            The phase stays queued. When you click Start, the assigned machine is used directly — no extra dialog.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4">
@@ -61,24 +65,14 @@ export function StartPhaseDialog({
               Loading machines...
             </div>
           ) : availableMachines.length === 0 ? (
-            <div className="space-y-3">
-              <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
-                No compatible machines available right now.
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={onClose}
-                className="w-full min-h-11"
-              >
-                Close
-              </Button>
+            <div className="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-700 text-sm">
+              No compatible machines right now.
             </div>
           ) : (
             <>
-              <Label htmlFor="start-phase-machine" className="text-sm font-semibold text-[#111817]">Machine</Label>
+              <Label htmlFor="assign-machine-select" className="text-sm font-semibold text-[#111817]">Machine</Label>
               <Select value={machineId} onValueChange={onMachineChange}>
-                <SelectTrigger id="start-phase-machine" className="w-full h-12 mt-2">
+                <SelectTrigger id="assign-machine-select" className="w-full h-12 mt-2">
                   <SelectValue placeholder="Select a machine" />
                 </SelectTrigger>
                 <SelectContent>
@@ -92,30 +86,46 @@ export function StartPhaseDialog({
             </>
           )}
         </div>
-        <DialogFooter>
-          <Button
-            type="button"
-            variant="ghost"
-            onClick={onClose}
-            className="min-h-11"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="button"
-            disabled={!machineId || starting}
-            onClick={onConfirm}
-            className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
-          >
-            {starting ? (
-              <>
-                <Loader2 className="size-4 animate-spin" />
-                Starting...
-              </>
-            ) : (
-              `Start ${phaseType}`
+        <DialogFooter className="flex-row sm:justify-between">
+          <div>
+            {hasExistingAssignment && (
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={onUnassign}
+                disabled={saving}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 min-h-11"
+              >
+                <X className="size-4" />
+                Unassign
+              </Button>
             )}
-          </Button>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
+              className="min-h-11"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              disabled={!machineId || saving}
+              onClick={onConfirm}
+              className="bg-[#0d968b] hover:bg-[#0d968b]/90 text-white font-bold min-h-11"
+            >
+              {saving ? (
+                <>
+                  <Loader2 className="size-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                'Pre-assign'
+              )}
+            </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
